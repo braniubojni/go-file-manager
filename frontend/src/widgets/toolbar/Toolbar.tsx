@@ -5,7 +5,7 @@ import { NameDialog } from './components/NameDialog'
 import { ToolbarBar } from './components/ToolbarBar'
 import { useToolbarActions } from './hooks/useToolbarActions'
 
-export function Toolbar() {
+export const Toolbar = () => {
   const a = useToolbarActions()
 
   return (
