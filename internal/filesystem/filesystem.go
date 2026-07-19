@@ -1,0 +1,373 @@
+package filesystem
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/erikharutyunyan/go-file-manager/internal/domain"
+)
+
+var (
+	ErrInvalidPath = errors.New("invalid path")
+	ErrInvalidName = errors.New("invalid name")
+	ErrNotFound    = errors.New("path not found")
+	ErrExists      = errors.New("destination already exists")
+	ErrSamePath    = errors.New("source and destination are the same")
+)
+
+// Resolve returns a cleaned absolute path.
+func Resolve(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", ErrInvalidPath
+	}
+	abs, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrInvalidPath, err)
+	}
+	return abs, nil
+}
+
+// HomeDir returns the current user's home directory.
+func HomeDir() (string, error) {
+	return os.UserHomeDir()
+}
+
+// Exists reports whether path exists.
+func Exists(path string) (bool, error) {
+	abs, err := Resolve(path)
+	if err != nil {
+		return false, err
+	}
+	_, err = os.Lstat(abs)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+// ListDir lists directory entries. Directories first, then files, name-sorted.
+// When not at filesystem root, a synthetic ".." entry is prepended.
+func ListDir(path string) ([]domain.FileEntry, error) {
+	abs, err := Resolve(path)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("%w: %s", ErrNotFound, abs)
+		}
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("not a directory: %s", abs)
+	}
+
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]domain.FileEntry, 0, len(entries)+1)
+	if parent := filepath.Dir(abs); parent != abs {
+		result = append(result, domain.FileEntry{
+			Name:  "..",
+			Path:  parent,
+			IsDir: true,
+		})
+	}
+
+	for _, e := range entries {
+		full := filepath.Join(abs, e.Name())
+		entry, err := entryFromDirEntry(full, e)
+		if err != nil {
+			// Skip unreadable entries rather than failing the whole list.
+			continue
+		}
+		result = append(result, entry)
+	}
+
+	// Sort: keep ".." first, then dirs, then files, by name (case-insensitive).
+	sort.SliceStable(result, func(i, j int) bool {
+		a, b := result[i], result[j]
+		if a.Name == ".." {
+			return true
+		}
+		if b.Name == ".." {
+			return false
+		}
+		if a.IsDir != b.IsDir {
+			return a.IsDir
+		}
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
+	})
+
+	return result, nil
+}
+
+func entryFromDirEntry(full string, e os.DirEntry) (domain.FileEntry, error) {
+	info, err := e.Info()
+	if err != nil {
+		return domain.FileEntry{}, err
+	}
+	isSymlink := info.Mode()&os.ModeSymlink != 0
+	isDir := e.IsDir()
+	if isSymlink {
+		if target, err := os.Stat(full); err == nil {
+			isDir = target.IsDir()
+		}
+	}
+	size := int64(0)
+	if !isDir {
+		size = info.Size()
+	}
+	ext := ""
+	if !isDir {
+		ext = strings.TrimPrefix(filepath.Ext(e.Name()), ".")
+	}
+	return domain.FileEntry{
+		Name:      e.Name(),
+		Path:      full,
+		IsDir:     isDir,
+		Size:      size,
+		ModTime:   info.ModTime().UnixMilli(),
+		Ext:       ext,
+		IsSymlink: isSymlink,
+	}, nil
+}
+
+// validateName rejects empty, dotted-path, and separator-containing names.
+func validateName(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "." || name == ".." {
+		return ErrInvalidName
+	}
+	if strings.ContainsAny(name, `/\`) {
+		return ErrInvalidName
+	}
+	if filepath.Base(name) != name {
+		return ErrInvalidName
+	}
+	return nil
+}
+
+// Mkdir creates a directory under parent.
+func Mkdir(parent, name string) (string, error) {
+	if err := validateName(name); err != nil {
+		return "", err
+	}
+	abs, err := Resolve(parent)
+	if err != nil {
+		return "", err
+	}
+	dest := filepath.Join(abs, name)
+	if err := os.Mkdir(dest, 0o755); err != nil {
+		if os.IsExist(err) {
+			return "", fmt.Errorf("%w: %s", ErrExists, dest)
+		}
+		return "", err
+	}
+	return dest, nil
+}
+
+// Rename renames a path in place (newName is basename only).
+func Rename(oldPath, newName string) (string, error) {
+	if err := validateName(newName); err != nil {
+		return "", err
+	}
+	abs, err := Resolve(oldPath)
+	if err != nil {
+		return "", err
+	}
+	dest := filepath.Join(filepath.Dir(abs), newName)
+	if abs == dest {
+		return abs, nil
+	}
+	if _, err := os.Lstat(dest); err == nil {
+		return "", fmt.Errorf("%w: %s", ErrExists, dest)
+	}
+	if err := os.Rename(abs, dest); err != nil {
+		return "", err
+	}
+	return dest, nil
+}
+
+// Delete removes files or directories (recursive for dirs). Does not follow symlinks for removal of the link itself.
+func Delete(paths []string) error {
+	for _, p := range paths {
+		abs, err := Resolve(p)
+		if err != nil {
+			return err
+		}
+		info, err := os.Lstat(abs)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return fmt.Errorf("%w: %s", ErrNotFound, abs)
+			}
+			return err
+		}
+		if info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+			if err := os.RemoveAll(abs); err != nil {
+				return err
+			}
+		} else {
+			if err := os.Remove(abs); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Copy copies sources into destDir (files and directories).
+func Copy(sources []string, destDir string) error {
+	destAbs, err := Resolve(destDir)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(destAbs)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("destination is not a directory: %s", destAbs)
+	}
+
+	for _, src := range sources {
+		srcAbs, err := Resolve(src)
+		if err != nil {
+			return err
+		}
+		if srcAbs == destAbs || strings.HasPrefix(destAbs+string(os.PathSeparator), srcAbs+string(os.PathSeparator)) {
+			// Prevent copying a directory into itself.
+			if isDir(srcAbs) {
+				return fmt.Errorf("cannot copy directory into itself: %s", srcAbs)
+			}
+		}
+		base := filepath.Base(srcAbs)
+		target := uniquePath(filepath.Join(destAbs, base))
+		if err := copyPath(srcAbs, target); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Move moves sources into destDir.
+func Move(sources []string, destDir string) error {
+	destAbs, err := Resolve(destDir)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(destAbs)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("destination is not a directory: %s", destAbs)
+	}
+
+	for _, src := range sources {
+		srcAbs, err := Resolve(src)
+		if err != nil {
+			return err
+		}
+		if filepath.Dir(srcAbs) == destAbs {
+			return ErrSamePath
+		}
+		base := filepath.Base(srcAbs)
+		target := uniquePath(filepath.Join(destAbs, base))
+		if err := os.Rename(srcAbs, target); err != nil {
+			// Cross-device: fall back to copy + delete.
+			if err := copyPath(srcAbs, target); err != nil {
+				return err
+			}
+			if err := Delete([]string{srcAbs}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+func uniquePath(path string) string {
+	if _, err := os.Lstat(path); os.IsNotExist(err) {
+		return path
+	}
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+	for i := 1; ; i++ {
+		candidate := filepath.Join(dir, fmt.Sprintf("%s (%d)%s", name, i, ext))
+		if _, err := os.Lstat(candidate); os.IsNotExist(err) {
+			return candidate
+		}
+	}
+}
+
+func copyPath(src, dst string) error {
+	info, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(src)
+		if err != nil {
+			return err
+		}
+		return os.Symlink(target, dst)
+	}
+	if info.IsDir() {
+		return copyDir(src, dst, info.Mode())
+	}
+	return copyFile(src, dst, info.Mode())
+}
+
+func copyDir(src, dst string, mode os.FileMode) error {
+	if err := os.MkdirAll(dst, mode.Perm()); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if err := copyPath(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func copyFile(src, dst string, mode os.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode.Perm())
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Close()
+}
