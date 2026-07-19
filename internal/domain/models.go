@@ -26,9 +26,29 @@ type PanePaths struct {
 	Right string `json:"right"`
 }
 
-// Setting keys persisted in SQLite.
+// ThemeMode values for Settings.Theme.
 const (
-	SettingLeftPath  = "left_path"
-	SettingRightPath = "right_path"
-	SettingTheme     = "theme"
+	ThemeSystem = "system"
+	ThemeDark   = "dark"
+	ThemeLight  = "light"
 )
+
+// Settings is the contents of settings.json.
+type Settings struct {
+	Theme          string `json:"theme"`
+	ShowHidden     bool   `json:"showHidden"`
+	ShowExtensions bool   `json:"showExtensions"`
+	LeftPath       string `json:"leftPath"`
+	RightPath      string `json:"rightPath"`
+}
+
+// ShortcutDef describes one bindable action (for UI + docs).
+type ShortcutDef struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	Binding     string `json:"binding"`
+}
+
+// AppName is used for config/data directories.
+const AppName = "go-file-manager"

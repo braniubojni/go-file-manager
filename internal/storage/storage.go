@@ -11,7 +11,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// DB wraps the application SQLite database.
+// DB wraps the application SQLite database (bookmarks only).
 type DB struct {
 	sql *sql.DB
 }
@@ -55,11 +55,6 @@ func (db *DB) Close() error {
 
 func (db *DB) migrate() error {
 	_, err := db.sql.Exec(`
-CREATE TABLE IF NOT EXISTS settings (
-  key   TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS bookmarks (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   name       TEXT NOT NULL,
@@ -69,65 +64,6 @@ CREATE TABLE IF NOT EXISTS bookmarks (
 );
 `)
 	return err
-}
-
-// GetSetting returns a setting value (empty string if missing).
-func (db *DB) GetSetting(key string) (string, error) {
-	var value string
-	err := db.sql.QueryRow(`SELECT value FROM settings WHERE key = ?`, key).Scan(&value)
-	if err == sql.ErrNoRows {
-		return "", nil
-	}
-	return value, err
-}
-
-// SetSetting upserts a setting.
-func (db *DB) SetSetting(key, value string) error {
-	_, err := db.sql.Exec(`
-INSERT INTO settings(key, value) VALUES(?, ?)
-ON CONFLICT(key) DO UPDATE SET value = excluded.value
-`, key, value)
-	return err
-}
-
-// GetAllSettings returns all settings as a map.
-func (db *DB) GetAllSettings() (map[string]string, error) {
-	rows, err := db.sql.Query(`SELECT key, value FROM settings`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := make(map[string]string)
-	for rows.Next() {
-		var k, v string
-		if err := rows.Scan(&k, &v); err != nil {
-			return nil, err
-		}
-		out[k] = v
-	}
-	return out, rows.Err()
-}
-
-// GetPanePaths returns saved left/right paths.
-func (db *DB) GetPanePaths() (domain.PanePaths, error) {
-	left, err := db.GetSetting(domain.SettingLeftPath)
-	if err != nil {
-		return domain.PanePaths{}, err
-	}
-	right, err := db.GetSetting(domain.SettingRightPath)
-	if err != nil {
-		return domain.PanePaths{}, err
-	}
-	return domain.PanePaths{Left: left, Right: right}, nil
-}
-
-// SavePanePaths persists left/right paths.
-func (db *DB) SavePanePaths(left, right string) error {
-	if err := db.SetSetting(domain.SettingLeftPath, left); err != nil {
-		return err
-	}
-	return db.SetSetting(domain.SettingRightPath, right)
 }
 
 // ListBookmarks returns bookmarks ordered by sort_order then id.

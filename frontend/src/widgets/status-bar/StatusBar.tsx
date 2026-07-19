@@ -1,5 +1,5 @@
 import { Box, Typography } from '@mui/material'
-import { useDirListing } from '../../entities/file/queries'
+import { useDirListing, useSettings } from '../../entities/file/queries'
 import { usePaneStore } from '../../features/pane/paneStore'
 
 export function StatusBar() {
@@ -8,7 +8,8 @@ export function StatusBar() {
   const selection = usePaneStore((s) =>
     s.activePane === 'left' ? s.leftSelection : s.rightSelection,
   )
-  const listing = useDirListing(path || undefined)
+  const { data: settings } = useSettings()
+  const listing = useDirListing(path || undefined, settings?.showHidden ?? false)
   const count = listing.data?.filter((e) => e.name !== '..').length ?? 0
 
   return (

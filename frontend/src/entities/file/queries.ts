@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookmarkService, FileService, SettingsService } from '../../shared/api/bindings'
-import type { Bookmark, FileEntry, PanePaths } from './types'
+import type { AppSettings, Bookmark, FileEntry, PanePaths, ShortcutDef, ThemePreference } from './types'
+import { defaultSettings } from './types'
 
 export const queryKeys = {
-  dir: (path: string) => ['dir', path] as const,
+  dir: (path: string, showHidden: boolean) => ['dir', path, showHidden] as const,
   home: ['home'] as const,
-  panePaths: ['panePaths'] as const,
-  theme: ['theme'] as const,
+  settings: ['settings'] as const,
+  shortcuts: ['shortcuts'] as const,
+  shortcutDefs: ['shortcutDefs'] as const,
   bookmarks: ['bookmarks'] as const,
+  pathCompletions: (partial: string) => ['pathCompletions', partial] as const,
 }
 
 export function useHomeDir() {
@@ -18,34 +21,68 @@ export function useHomeDir() {
   })
 }
 
-export function useDirListing(path: string | undefined) {
+export function useSettings() {
   return useQuery({
-    queryKey: queryKeys.dir(path ?? ''),
+    queryKey: queryKeys.settings,
     queryFn: async () => {
-      const rows = await FileService.ListDir(path!)
-      return rows as FileEntry[]
+      const s = await SettingsService.GetSettings()
+      return normalizeSettings(s as Partial<AppSettings>)
+    },
+  })
+}
+
+function normalizeSettings(s: Partial<AppSettings> | null | undefined): AppSettings {
+  const theme = s?.theme
+  return {
+    theme: theme === 'dark' || theme === 'light' || theme === 'system' ? theme : defaultSettings.theme,
+    showHidden: Boolean(s?.showHidden),
+    showExtensions: s?.showExtensions !== false,
+    leftPath: s?.leftPath ?? '',
+    rightPath: s?.rightPath ?? '',
+  }
+}
+
+export function useSaveSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (settings: AppSettings) => SettingsService.SaveSettings(settings),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.settings }),
+  })
+}
+
+export function usePatchSettings() {
+  const qc = useQueryClient()
+  const save = useSaveSettings()
+  return async (patch: Partial<AppSettings>) => {
+    const current =
+      (qc.getQueryData<AppSettings>(queryKeys.settings) as AppSettings | undefined) ??
+      normalizeSettings(await SettingsService.GetSettings())
+    const next = { ...current, ...patch }
+    await save.mutateAsync(next)
+    return next
+  }
+}
+
+export function useDirListing(path: string | undefined, showHidden: boolean) {
+  return useQuery({
+    queryKey: queryKeys.dir(path ?? '', showHidden),
+    queryFn: async () => {
+      const rows = await FileService.ListDir(path!, showHidden)
+      return (rows ?? []) as FileEntry[]
     },
     enabled: Boolean(path),
   })
 }
 
-export function usePanePaths() {
+export function usePathCompletions(partial: string, enabled: boolean) {
   return useQuery({
-    queryKey: queryKeys.panePaths,
+    queryKey: queryKeys.pathCompletions(partial),
     queryFn: async () => {
-      const paths = await SettingsService.GetPanePaths()
-      return paths as PanePaths
+      const rows = await FileService.ListPathCompletions(partial)
+      return (rows ?? []) as string[]
     },
-  })
-}
-
-export function useThemeSetting() {
-  return useQuery({
-    queryKey: queryKeys.theme,
-    queryFn: async () => {
-      const theme = await SettingsService.GetTheme()
-      return (theme === 'light' ? 'light' : 'dark') as 'light' | 'dark'
-    },
+    enabled: enabled && partial.length > 0,
+    staleTime: 5_000,
   })
 }
 
@@ -54,7 +91,28 @@ export function useBookmarks() {
     queryKey: queryKeys.bookmarks,
     queryFn: async () => {
       const list = await BookmarkService.List()
-      return list as Bookmark[]
+      return (list ?? []) as Bookmark[]
+    },
+  })
+}
+
+export function useShortcutDefs() {
+  return useQuery({
+    queryKey: queryKeys.shortcutDefs,
+    queryFn: async () => {
+      const list = await SettingsService.ListShortcutDefs()
+      return (list ?? []) as ShortcutDef[]
+    },
+  })
+}
+
+export function useSaveShortcuts() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (map: Record<string, string>) => SettingsService.SaveShortcuts(map),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.shortcutDefs })
+      void qc.invalidateQueries({ queryKey: queryKeys.shortcuts })
     },
   })
 }
@@ -62,24 +120,25 @@ export function useBookmarks() {
 export function useSavePanePaths() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ left, right }: PanePaths) => SettingsService.SavePanePaths(left, right),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.panePaths }),
+    mutationFn: async ({ left, right }: PanePaths) => {
+      await SettingsService.SavePanePaths(left, right)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.settings }),
   })
 }
 
 export function useSetTheme() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (theme: 'light' | 'dark') => SettingsService.SetTheme(theme),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.theme }),
-  })
+  const patch = usePatchSettings()
+  return {
+    mutateAsync: (theme: ThemePreference) => patch({ theme }),
+  }
 }
 
 export function useInvalidateDirs() {
   const qc = useQueryClient()
   return (...paths: string[]) => {
     for (const p of paths) {
-      if (p) void qc.invalidateQueries({ queryKey: queryKeys.dir(p) })
+      if (p) void qc.invalidateQueries({ queryKey: ['dir', p] })
     }
   }
 }

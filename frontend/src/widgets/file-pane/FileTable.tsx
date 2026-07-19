@@ -1,26 +1,14 @@
 import FolderIcon from '@mui/icons-material/Folder'
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
 import LinkIcon from '@mui/icons-material/Link'
+import { Box, CircularProgress, Typography } from '@mui/material'
 import {
-  Box,
-  CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-} from '@mui/material'
-import {
-  flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type ColumnDef,
-  type SortingState,
-} from '@tanstack/react-table'
-import { useMemo, useState } from 'react'
+  DataGrid,
+  type GridColDef,
+  type GridRowParams,
+  type GridRowSelectionModel,
+} from '@mui/x-data-grid'
+import { useMemo } from 'react'
 import type { FileEntry } from '../../entities/file/types'
 import { formatModTime, formatSize } from '../../shared/lib/format'
 
@@ -31,9 +19,17 @@ interface Props {
   errorMessage?: string
   selected: string[]
   active: boolean
-  onSelect: (path: string, multi: boolean) => void
+  showExtensions: boolean
+  onSelect: (paths: string[]) => void
   onActivate: () => void
   onOpen: (entry: FileEntry) => void
+}
+
+function displayName(e: FileEntry, showExtensions: boolean): string {
+  if (e.isDir || showExtensions || e.name === '..') return e.name
+  const i = e.name.lastIndexOf('.')
+  if (i <= 0) return e.name
+  return e.name.slice(0, i)
 }
 
 export function FileTable({
@@ -43,73 +39,84 @@ export function FileTable({
   errorMessage,
   selected,
   active,
+  showExtensions,
   onSelect,
   onActivate,
   onOpen,
 }: Props) {
-  const [sorting, setSorting] = useState<SortingState>([])
+  const rows = useMemo(
+    () =>
+      (entries ?? []).map((e) => ({
+        ...e,
+        id: e.path,
+        displayName: displayName(e, showExtensions),
+      })),
+    [entries, showExtensions],
+  )
 
-  const columns = useMemo<ColumnDef<FileEntry>[]>(
+  const columns = useMemo<GridColDef[]>(
     () => [
       {
-        id: 'icon',
-        header: '',
-        size: 36,
-        cell: ({ row }) => {
-          const e = row.original
+        field: 'icon',
+        headerName: '',
+        width: 44,
+        sortable: false,
+        resizable: false,
+        disableColumnMenu: true,
+        renderCell: (params) => {
+          const e = params.row as FileEntry
           if (e.isDir) return <FolderIcon fontSize="small" color="warning" />
           if (e.isSymlink) return <LinkIcon fontSize="small" color="info" />
           return <InsertDriveFileIcon fontSize="small" color="action" />
         },
       },
       {
-        accessorKey: 'name',
-        header: 'Name',
-        cell: ({ row }) => (
-          <Typography
-            variant="body2"
-            noWrap
-            sx={{ fontWeight: row.original.isDir ? 600 : 400, maxWidth: 320 }}
-          >
-            {row.original.name}
-            {row.original.isSymlink ? ' ↗' : ''}
-          </Typography>
-        ),
+        field: 'displayName',
+        headerName: 'Name',
+        flex: 1,
+        minWidth: 140,
+        renderCell: (params) => {
+          const e = params.row as FileEntry & { displayName: string }
+          return (
+            <Typography
+              variant="body2"
+              noWrap
+              sx={{ fontWeight: e.isDir ? 600 : 400 }}
+            >
+              {e.displayName}
+              {e.isSymlink ? ' ↗' : ''}
+            </Typography>
+          )
+        },
       },
       {
-        accessorKey: 'size',
-        header: 'Size',
-        size: 100,
-        cell: ({ row }) => formatSize(row.original.size, row.original.isDir),
+        field: 'size',
+        headerName: 'Size',
+        width: 100,
+        valueGetter: (_v, row) => (row as FileEntry).size,
+        valueFormatter: (value, row) =>
+          formatSize(Number(value) || 0, (row as FileEntry).isDir),
       },
       {
-        accessorKey: 'modTime',
-        header: 'Modified',
-        size: 160,
-        cell: ({ row }) => formatModTime(row.original.modTime),
+        field: 'modTime',
+        headerName: 'Modified',
+        width: 160,
+        valueFormatter: (value) => formatModTime(Number(value) || 0),
       },
       {
-        accessorKey: 'ext',
-        header: 'Type',
-        size: 70,
-        cell: ({ row }) => (row.original.isDir ? 'dir' : row.original.ext || 'file'),
+        field: 'ext',
+        headerName: 'Type',
+        width: 80,
+        valueGetter: (_v, row) => {
+          const e = row as FileEntry
+          return e.isDir ? 'dir' : e.ext || 'file'
+        },
       },
     ],
     [],
   )
 
-  const data = entries ?? []
-
-  const table = useReactTable({
-    data,
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  })
-
-  if (isLoading) {
+  if (isLoading && !entries) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress size={28} />
@@ -127,76 +134,56 @@ export function FileTable({
     )
   }
 
+  const selectionModel: GridRowSelectionModel = {
+    type: 'include',
+    ids: new Set(selected),
+  }
+
   return (
-    <TableContainer
+    <Box
       onClick={onActivate}
       sx={{
         flex: 1,
-        overflow: 'auto',
+        minHeight: 0,
         outline: active ? '2px solid' : '1px solid',
         outlineColor: active ? 'primary.main' : 'divider',
         borderRadius: 1,
         bgcolor: 'background.paper',
+        '& .MuiDataGrid-root': { border: 'none' },
       }}
     >
-      <Table size="small" stickyHeader sx={{ tableLayout: 'fixed' }}>
-        <TableHead>
-          {table.getHeaderGroups().map((hg) => (
-            <TableRow key={hg.id}>
-              {hg.headers.map((h) => (
-                <TableCell
-                  key={h.id}
-                  onClick={h.column.getToggleSortingHandler()}
-                  sx={{
-                    cursor: h.column.getCanSort() ? 'pointer' : 'default',
-                    width: h.getSize(),
-                    py: 0.75,
-                    fontWeight: 700,
-                    bgcolor: 'background.paper',
-                  }}
-                >
-                  {flexRender(h.column.columnDef.header, h.getContext())}
-                  {{ asc: ' ↑', desc: ' ↓' }[h.column.getIsSorted() as string] ?? null}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableHead>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => {
-            const e = row.original
-            const isSelected = selected.includes(e.path)
-            return (
-              <TableRow
-                key={e.path}
-                hover
-                selected={isSelected}
-                onClick={(ev) => {
-                  onActivate()
-                  onSelect(e.path, ev.metaKey || ev.ctrlKey)
-                }}
-                onDoubleClick={() => onOpen(e)}
-                sx={{ cursor: 'default', userSelect: 'none' }}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} sx={{ py: 0.35, overflow: 'hidden' }}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            )
-          })}
-          {data.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={columns.length}>
-                <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                  Empty folder
-                </Typography>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        density="compact"
+        disableColumnMenu
+        hideFooter
+        checkboxSelection={false}
+        disableRowSelectionOnClick
+        rowSelectionModel={selectionModel}
+        onRowClick={(params, event) => {
+          onActivate()
+          const path = String(params.id)
+          if (event.metaKey || event.ctrlKey) {
+            if (selected.includes(path)) {
+              onSelect(selected.filter((p) => p !== path))
+            } else {
+              onSelect([...selected, path])
+            }
+          } else {
+            onSelect([path])
+          }
+        }}
+        onRowDoubleClick={(params: GridRowParams) => {
+          onOpen(params.row as FileEntry)
+        }}
+        getRowId={(row) => row.path}
+        sx={{
+          height: '100%',
+          '& .MuiDataGrid-cell': { py: 0 },
+          '& .MuiDataGrid-columnHeader': { fontWeight: 700 },
+        }}
+      />
+    </Box>
   )
 }

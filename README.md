@@ -7,14 +7,17 @@ Dual-pane desktop file manager (Double Commander style) built with **Wails v3**,
 ## Features (MVP)
 
 - Independent left / right panes
+- Resizable columns (MUI X DataGrid)
 - Directory listing (name, size, modified, type)
-- Navigate: enter folder, parent, path bar, home
+- Navigate: enter folder, parent, Autocomplete path bar, home
 - Multi-select (Ctrl/Cmd+click)
 - Copy / Move to opposite pane
 - Delete, rename, create folder
-- Bookmarks
-- Dark / light theme
-- Last pane paths persisted in **SQLite**
+- Bookmarks (SQLite)
+- Theme: **system / dark / light** (default system)
+- View menu: show hidden files, show extensions
+- Settings + keyboard shortcuts dialogs (lazy), backed by JSON files
+- Last pane paths in **settings.json**
 
 ## Stack
 
@@ -22,9 +25,10 @@ Dual-pane desktop file manager (Double Commander style) built with **Wails v3**,
 |-------|--------|
 | Shell | Wails v3 |
 | Backend | Go (`internal/` standard layout) |
-| DB | SQLite via `modernc.org/sqlite` (pure Go, no CGO) |
-| UI | React TS, MUI, Feature-Sliced Design (lite) |
-| Data | TanStack Query + TanStack Table |
+| Prefs | `settings.json` + `shortcuts.json` |
+| DB | SQLite bookmarks only (`modernc.org/sqlite`) |
+| UI | React TS, MUI, MUI X DataGrid, FSD-lite |
+| Data | TanStack Query |
 | UI state | Zustand |
 
 ## Prerequisites
@@ -78,11 +82,15 @@ frontend/
 
 ## Backend services
 
-- `FileService` — list, copy, move, delete, rename, mkdir
-- `SettingsService` — pane paths, theme
-- `BookmarkService` — add / list / remove
+- `FileService` — list (with hidden flag), path completions, copy/move/delete/rename/mkdir
+- `SettingsService` — settings.json / shortcuts.json + reveal/open
+- `BookmarkService` — add / list / remove (SQLite)
 
-SQLite DB path: `~/Library/Application Support/go-file-manager/app.db` (macOS).
+Config dir (macOS): `~/Library/Application Support/go-file-manager/`
+
+- `settings.json` — theme, showHidden, showExtensions, leftPath, rightPath  
+- `shortcuts.json` — action → binding (`Mod` = Cmd/Ctrl)  
+- `app.db` — bookmarks only  
 
 ## Tests
 
@@ -90,13 +98,21 @@ SQLite DB path: `~/Library/Application Support/go-file-manager/app.db` (macOS).
 go test ./internal/...
 ```
 
-## Keyboard
+## Keyboard (defaults; editable in UI / shortcuts.json)
 
-| Key | Action |
-|-----|--------|
+| Binding | Action |
+|---------|--------|
 | Tab | Switch active pane |
+| F5 | Refresh |
+| F2 | Rename |
+| Delete | Delete |
+| Mod+Shift+C / X | Copy / Move |
+| Alt+ArrowUp | Parent folder |
+| Mod+, / Mod+/ | Settings / Shortcuts |
 | Double-click | Enter directory |
 | Ctrl/Cmd+click | Multi-select |
+
+When adding a **new setting**, specify: key, type, default, allowed values, UI control, tooltip text, and where it is used.
 
 ## Later ideas
 

@@ -4,6 +4,8 @@ import (
 	"embed"
 	"log"
 
+	"github.com/erikharutyunyan/go-file-manager/internal/config"
+	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 	"github.com/erikharutyunyan/go-file-manager/internal/service"
 	"github.com/erikharutyunyan/go-file-manager/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -13,13 +15,18 @@ import (
 var assets embed.FS
 
 func main() {
-	db, err := storage.Open("go-file-manager")
+	cfgStore, err := config.Open(domain.AppName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	db, err := storage.Open(domain.AppName)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	fileSvc := service.NewFileService()
-	settingsSvc := service.NewSettingsService(db)
+	settingsSvc := service.NewSettingsService(cfgStore)
 	bookmarkSvc := service.NewBookmarkService(db)
 
 	app := application.New(application.Options{
@@ -43,9 +50,9 @@ func main() {
 	})
 
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "Go File Manager",
-		Width:  1280,
-		Height: 800,
+		Title:     "Go File Manager",
+		Width:     1280,
+		Height:    800,
 		MinWidth:  900,
 		MinHeight: 500,
 		Mac: application.MacWindow{

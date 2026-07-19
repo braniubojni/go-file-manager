@@ -3,35 +3,14 @@ package storage
 import (
 	"path/filepath"
 	"testing"
-
-	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 )
 
-func TestSettingsAndBookmarks(t *testing.T) {
+func TestBookmarks(t *testing.T) {
 	db, err := OpenPath(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-
-	if err := db.SavePanePaths("/tmp/a", "/tmp/b"); err != nil {
-		t.Fatal(err)
-	}
-	paths, err := db.GetPanePaths()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if paths.Left != "/tmp/a" || paths.Right != "/tmp/b" {
-		t.Fatalf("unexpected paths: %+v", paths)
-	}
-
-	if err := db.SetSetting(domain.SettingTheme, "light"); err != nil {
-		t.Fatal(err)
-	}
-	theme, err := db.GetSetting(domain.SettingTheme)
-	if err != nil || theme != "light" {
-		t.Fatalf("theme=%q err=%v", theme, err)
-	}
 
 	bm, err := db.AddBookmark("Tmp", "/tmp")
 	if err != nil {

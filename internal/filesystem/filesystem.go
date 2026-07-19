@@ -55,7 +55,8 @@ func Exists(path string) (bool, error) {
 
 // ListDir lists directory entries. Directories first, then files, name-sorted.
 // When not at filesystem root, a synthetic ".." entry is prepended.
-func ListDir(path string) ([]domain.FileEntry, error) {
+// If showHidden is false, names starting with '.' are skipped (except "..").
+func ListDir(path string, showHidden bool) ([]domain.FileEntry, error) {
 	abs, err := Resolve(path)
 	if err != nil {
 		return nil, err
@@ -86,7 +87,11 @@ func ListDir(path string) ([]domain.FileEntry, error) {
 	}
 
 	for _, e := range entries {
-		full := filepath.Join(abs, e.Name())
+		name := e.Name()
+		if !showHidden && strings.HasPrefix(name, ".") {
+			continue
+		}
+		full := filepath.Join(abs, name)
 		entry, err := entryFromDirEntry(full, e)
 		if err != nil {
 			// Skip unreadable entries rather than failing the whole list.
@@ -111,6 +116,73 @@ func ListDir(path string) ([]domain.FileEntry, error) {
 	})
 
 	return result, nil
+}
+
+// ListPathCompletions returns absolute path suggestions for partial input (max 50).
+func ListPathCompletions(partial string) ([]string, error) {
+	partial = strings.TrimSpace(partial)
+	if partial == "" {
+		home, err := HomeDir()
+		if err != nil {
+			return nil, err
+		}
+		partial = home + string(os.PathSeparator)
+	}
+
+	// Expand ~ to home
+	if partial == "~" || strings.HasPrefix(partial, "~/") {
+		home, err := HomeDir()
+		if err != nil {
+			return nil, err
+		}
+		if partial == "~" {
+			partial = home + string(os.PathSeparator)
+		} else {
+			partial = filepath.Join(home, partial[2:])
+		}
+	}
+
+	var dir, prefix string
+	if strings.HasSuffix(partial, "/") || strings.HasSuffix(partial, string(os.PathSeparator)) {
+		dir = partial
+		prefix = ""
+	} else {
+		dir = filepath.Dir(partial)
+		prefix = filepath.Base(partial)
+	}
+
+	absDir, err := Resolve(dir)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Stat(absDir)
+	if err != nil || !info.IsDir() {
+		return []string{}, nil
+	}
+
+	entries, err := os.ReadDir(absDir)
+	if err != nil {
+		return nil, err
+	}
+
+	prefixLower := strings.ToLower(prefix)
+	out := make([]string, 0, 16)
+	for _, e := range entries {
+		name := e.Name()
+		if prefix != "" && !strings.HasPrefix(strings.ToLower(name), prefixLower) {
+			continue
+		}
+		full := filepath.Join(absDir, name)
+		if e.IsDir() {
+			full = full + string(os.PathSeparator)
+		}
+		out = append(out, full)
+		if len(out) >= 50 {
+			break
+		}
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 func entryFromDirEntry(full string, e os.DirEntry) (domain.FileEntry, error) {

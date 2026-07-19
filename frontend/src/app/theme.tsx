@@ -1,9 +1,36 @@
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material'
-import { useMemo, type ReactNode } from 'react'
-import { useThemeSetting } from '../entities/file/queries'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useSettings } from '../entities/file/queries'
+import type { ThemePreference } from '../entities/file/types'
+
+function useSystemDark(): boolean {
+  const [dark, setDark] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : true,
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => setDark(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  return dark
+}
+
+function resolveMode(pref: ThemePreference, systemDark: boolean): 'light' | 'dark' {
+  if (pref === 'light') return 'light'
+  if (pref === 'dark') return 'dark'
+  return systemDark ? 'dark' : 'light'
+}
 
 export function AppThemeProvider({ children }: { children: ReactNode }) {
-  const { data: mode = 'dark' } = useThemeSetting()
+  const { data: settings } = useSettings()
+  const pref: ThemePreference = settings?.theme ?? 'system'
+  const systemDark = useSystemDark()
+  const mode = resolveMode(pref, systemDark)
 
   const theme = useMemo(
     () =>

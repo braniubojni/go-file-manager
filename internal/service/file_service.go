@@ -12,8 +12,12 @@ func NewFileService() *FileService {
 	return &FileService{}
 }
 
-func (s *FileService) ListDir(path string) ([]domain.FileEntry, error) {
-	return filesystem.ListDir(path)
+func (s *FileService) ListDir(path string, showHidden bool) ([]domain.FileEntry, error) {
+	return filesystem.ListDir(path, showHidden)
+}
+
+func (s *FileService) ListPathCompletions(partial string) ([]string, error) {
+	return filesystem.ListPathCompletions(partial)
 }
 
 func (s *FileService) GetHomeDir() (string, error) {

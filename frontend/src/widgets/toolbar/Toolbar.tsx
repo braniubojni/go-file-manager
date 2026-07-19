@@ -7,6 +7,8 @@ import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove'
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness'
+import SettingsIcon from '@mui/icons-material/Settings'
 import {
   AppBar,
   Box,
@@ -25,15 +27,13 @@ import {
   Typography,
 } from '@mui/material'
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import {
-  queryKeys,
-  useBookmarks,
-  useFileOps,
-  useSetTheme,
-  useThemeSetting,
-} from '../../entities/file/queries'
+import { useEffect, useState } from 'react'
+import { useBookmarks, useFileOps, useSetTheme, useSettings } from '../../entities/file/queries'
+import type { ThemePreference } from '../../entities/file/types'
+import { useFileOpsStore } from '../../features/file-ops/fileOpsStore'
 import { usePaneStore } from '../../features/pane/paneStore'
+import { useDialogStore } from '../../features/ui/dialogStore'
+import { FileService } from '../../shared/api/bindings'
 import { errMessage } from '../../shared/lib/format'
 import { useSnack } from '../../shared/ui/SnackbarHost'
 
@@ -46,13 +46,18 @@ export function Toolbar() {
   const setPath = usePaneStore((s) => s.setPath)
   const clearSelection = usePaneStore((s) => s.clearSelection)
   const otherPane = usePaneStore((s) => s.otherPane)
+  const openSettings = useDialogStore((s) => s.openSettings)
 
   const ops = useFileOps()
-  const { data: theme = 'dark' } = useThemeSetting()
+  const { data: settings } = useSettings()
   const setTheme = useSetTheme()
   const { data: bookmarks = [] } = useBookmarks()
   const show = useSnack((s) => s.show)
   const qc = useQueryClient()
+
+  const request = useFileOpsStore((s) => s.request)
+  const nonce = useFileOpsStore((s) => s.nonce)
+  const consume = useFileOpsStore((s) => s.consume)
 
   const [mkdirOpen, setMkdirOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
@@ -67,6 +72,24 @@ export function Toolbar() {
     const name = p.split(/[/\\]/).pop()
     return name !== '..'
   })
+
+  const theme = settings?.theme ?? 'system'
+
+  const cycleTheme = () => {
+    const order: ThemePreference[] = ['system', 'dark', 'light']
+    const i = order.indexOf(theme)
+    const next = order[(i + 1) % order.length]
+    void setTheme.mutateAsync(next)
+  }
+
+  const themeIcon =
+    theme === 'system' ? (
+      <SettingsBrightnessIcon />
+    ) : theme === 'dark' ? (
+      <DarkModeIcon />
+    ) : (
+      <LightModeIcon />
+    )
 
   const refreshAll = () => {
     void qc.invalidateQueries({ queryKey: ['dir'] })
@@ -129,6 +152,62 @@ export function Toolbar() {
   const onBookmark = () => {
     void run('Bookmark', () => ops.addBookmark.mutateAsync({ name: '', path: activePath }))
   }
+
+  const goParent = async () => {
+    if (!activePath) return
+    const parent = activePath.replace(/\/+$/, '').split(/[/\\]/).slice(0, -1).join('/') || '/'
+    const fixed =
+      activePath.startsWith('/') && !parent.startsWith('/')
+        ? `/${parent}`.replace(/\/+/g, '/')
+        : parent
+    const next = fixed || '/'
+    try {
+      if (await FileService.Exists(next)) setPath(activePane, next)
+    } catch (e) {
+      show(errMessage(e), 'error')
+    }
+  }
+
+  const goHome = async () => {
+    try {
+      const home = await FileService.GetHomeDir()
+      setPath(activePane, home)
+    } catch (e) {
+      show(errMessage(e), 'error')
+    }
+  }
+
+  useEffect(() => {
+    if (!request) return
+    switch (request) {
+      case 'copy':
+        onCopy()
+        break
+      case 'move':
+        onMove()
+        break
+      case 'delete':
+        onDelete()
+        break
+      case 'rename':
+        onRename()
+        break
+      case 'mkdir':
+        onMkdir()
+        break
+      case 'refresh':
+        refreshAll()
+        break
+      case 'goParent':
+        void goParent()
+        break
+      case 'goHome':
+        void goHome()
+        break
+    }
+    consume()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nonce])
 
   return (
     <>
@@ -205,20 +284,17 @@ export function Toolbar() {
 
           <Box sx={{ flex: 1 }} />
 
-          <Tooltip title="Refresh both panes">
+          <Tooltip title="Refresh both panes (F5)">
             <IconButton onClick={refreshAll}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Toggle theme">
-            <IconButton
-              onClick={() => {
-                const next = theme === 'dark' ? 'light' : 'dark'
-                void setTheme.mutateAsync(next)
-                void qc.invalidateQueries({ queryKey: queryKeys.theme })
-              }}
-            >
-              {theme === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+          <Tooltip title={`Theme: ${theme} (click to cycle)`}>
+            <IconButton onClick={cycleTheme}>{themeIcon}</IconButton>
+          </Tooltip>
+          <Tooltip title="Settings">
+            <IconButton onClick={openSettings}>
+              <SettingsIcon />
             </IconButton>
           </Tooltip>
         </MuiToolbar>

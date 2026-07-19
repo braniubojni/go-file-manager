@@ -16,9 +16,30 @@ func TestListDirAndMkdir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries, err := ListDir(root)
+	if _, err := os.Create(filepath.Join(root, ".hidden")); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := ListDir(root, false)
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name == ".hidden" {
+			t.Fatal("hidden file should be filtered")
+		}
+	}
+	entries, err = ListDir(root, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundHidden := false
+	for _, e := range entries {
+		if e.Name == ".hidden" {
+			foundHidden = true
+		}
+	}
+	if !foundHidden {
+		t.Fatal("expected hidden file when showHidden=true")
 	}
 	found := false
 	for _, e := range entries {

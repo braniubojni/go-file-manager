@@ -1,6 +1,5 @@
 import { Box, Typography } from '@mui/material'
-import { useQueryClient } from '@tanstack/react-query'
-import { useDirListing, queryKeys, useHomeDir } from '../../entities/file/queries'
+import { useDirListing, useHomeDir, useSettings } from '../../entities/file/queries'
 import type { FileEntry, PaneId } from '../../entities/file/types'
 import { usePaneStore } from '../../features/pane/paneStore'
 import { FileService } from '../../shared/api/bindings'
@@ -19,14 +18,17 @@ export function FilePane({ id }: Props) {
   const active = usePaneStore((s) => s.activePane === id)
   const setPath = usePaneStore((s) => s.setPath)
   const setActivePane = usePaneStore((s) => s.setActivePane)
-  const toggleSelect = usePaneStore((s) => s.toggleSelect)
+  const setSelection = usePaneStore((s) => s.setSelection)
   const { data: home } = useHomeDir()
-  const listing = useDirListing(path || undefined)
-  const qc = useQueryClient()
+  const { data: settings } = useSettings()
+  const showHidden = settings?.showHidden ?? false
+  const showExtensions = settings?.showExtensions ?? true
+  const listing = useDirListing(path || undefined, showHidden)
   const show = useSnack((s) => s.show)
 
   const navigate = async (next: string) => {
     try {
+      // If user picked a file path, open parent if not a dir — Exists ok; ListDir fails for files
       const ok = await FileService.Exists(next)
       if (!ok) {
         show(`Path not found: ${next}`, 'error')
@@ -41,7 +43,6 @@ export function FilePane({ id }: Props) {
   const goUp = () => {
     if (!path) return
     const parent = path.replace(/\/+$/, '').split(/[/\\]/).slice(0, -1).join('/') || '/'
-    // On mac/linux keep leading /
     const fixed =
       path.startsWith('/') && !parent.startsWith('/') ? `/${parent}`.replace(/\/+/g, '/') : parent
     void navigate(fixed || '/')
@@ -49,10 +50,6 @@ export function FilePane({ id }: Props) {
 
   const goHome = () => {
     if (home) void navigate(home)
-  }
-
-  const refresh = () => {
-    if (path) void qc.invalidateQueries({ queryKey: queryKeys.dir(path) })
   }
 
   const openEntry = (entry: FileEntry) => {
@@ -94,7 +91,6 @@ export function FilePane({ id }: Props) {
         onNavigate={(p) => void navigate(p)}
         onUp={goUp}
         onHome={goHome}
-        onRefresh={refresh}
         onFocusPane={() => setActivePane(id)}
       />
       <FileTable
@@ -104,7 +100,8 @@ export function FilePane({ id }: Props) {
         errorMessage={listing.error ? errMessage(listing.error) : undefined}
         selected={selection}
         active={active}
-        onSelect={(p, multi) => toggleSelect(id, p, multi)}
+        showExtensions={showExtensions}
+        onSelect={(paths) => setSelection(id, paths)}
         onActivate={() => setActivePane(id)}
         onOpen={openEntry}
       />
