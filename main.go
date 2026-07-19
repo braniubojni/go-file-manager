@@ -25,9 +25,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fileSvc := service.NewFileService()
-	settingsSvc := service.NewSettingsService(cfgStore)
+	remoteMgr := service.NewRemoteManager(db)
+	fileSvc := service.NewFileService(remoteMgr)
+	settingsSvc := service.NewSettingsService(db, cfgStore)
 	bookmarkSvc := service.NewBookmarkService(db)
+	termSvc := service.NewTerminalService()
+	connSvc := service.NewConnectionService(db, remoteMgr)
 
 	app := application.New(application.Options{
 		Name:        "go-file-manager",
@@ -36,16 +39,28 @@ func main() {
 			application.NewService(fileSvc),
 			application.NewService(settingsSvc),
 			application.NewService(bookmarkSvc),
+			application.NewService(termSvc),
+			application.NewService(connSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
+		},
+		// Used when built with -tags server (e2e / headless).
+		Server: application.ServerOptions{
+			Host: "127.0.0.1",
+			Port: 8080,
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
 	})
 
+	termSvc.SetApp(app)
+
 	app.OnShutdown(func() {
+		_ = termSvc.Stop("left")
+		_ = termSvc.Stop("right")
+		remoteMgr.CloseAll()
 		_ = db.Close()
 	})
 

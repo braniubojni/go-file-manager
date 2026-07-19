@@ -50,5 +50,32 @@ type ShortcutDef struct {
 	Binding     string `json:"binding"`
 }
 
+// ConnectionProfile is a saved remote connection (SSH now; FTP/SFTP later).
+type ConnectionProfile struct {
+	ID       string `json:"id"`
+	Protocol string `json:"protocol"` // "ssh", future: "ftp", "sftp"
+	User     string `json:"user"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Label    string `json:"label"` // display name; default user@host
+}
+
+// ActiveSession is a live remote connection for UI.
+type ActiveSession struct {
+	Key      string `json:"key"`      // user@host:port
+	Protocol string `json:"protocol"`
+	User     string `json:"user"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	RootPath string `json:"rootPath"` // ssh://user@host:port/
+}
+
+// ConnectResult is returned after a successful SSH dial.
+type ConnectResult struct {
+	RootPath string `json:"rootPath"`
+	HomePath string `json:"homePath"` // preferred start path (remote home or root)
+	Key      string `json:"key"`
+}
+
 // AppName is used for config/data directories.
 const AppName = "go-file-manager"

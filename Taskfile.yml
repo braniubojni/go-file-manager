@@ -39,6 +39,24 @@ tasks:
     cmds:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
 
+  test:
+    summary: Unit tests (Go)
+    cmds:
+      - go test ./internal/...
+
+  test:e2e:
+    summary: Playwright e2e against Wails server mode
+    dir: e2e
+    cmds:
+      - npm test
+
+  test:all:
+    summary: Full gate — unit + e2e + production build (run after big changes)
+    cmds:
+      - task: test
+      - task: test:e2e
+      - wails3 build
+
   setup:docker:
     summary: Builds Docker image for cross-compilation (~800MB download)
     cmds:

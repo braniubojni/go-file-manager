@@ -118,7 +118,17 @@ func ListDir(path string, showHidden bool) ([]domain.FileEntry, error) {
 	return result, nil
 }
 
+type completionItem struct {
+	full      string
+	name      string
+	isDir     bool
+	startsWith bool
+	isDot     bool
+}
+
 // ListPathCompletions returns absolute path suggestions for partial input (max 50).
+// Filter: case-insensitive contains. Order: non-dot first, startsWith before contains-only,
+// directories before files, then case-insensitive name.
 func ListPathCompletions(partial string) ([]string, error) {
 	partial = strings.TrimSpace(partial)
 	if partial == "" {
@@ -142,13 +152,13 @@ func ListPathCompletions(partial string) ([]string, error) {
 		}
 	}
 
-	var dir, prefix string
+	var dir, query string
 	if strings.HasSuffix(partial, "/") || strings.HasSuffix(partial, string(os.PathSeparator)) {
 		dir = partial
-		prefix = ""
+		query = ""
 	} else {
 		dir = filepath.Dir(partial)
-		prefix = filepath.Base(partial)
+		query = filepath.Base(partial)
 	}
 
 	absDir, err := Resolve(dir)
@@ -165,23 +175,50 @@ func ListPathCompletions(partial string) ([]string, error) {
 		return nil, err
 	}
 
-	prefixLower := strings.ToLower(prefix)
-	out := make([]string, 0, 16)
+	queryLower := strings.ToLower(query)
+	items := make([]completionItem, 0, len(entries))
 	for _, e := range entries {
 		name := e.Name()
-		if prefix != "" && !strings.HasPrefix(strings.ToLower(name), prefixLower) {
+		nameLower := strings.ToLower(name)
+		if query != "" && !strings.Contains(nameLower, queryLower) {
 			continue
 		}
 		full := filepath.Join(absDir, name)
-		if e.IsDir() {
+		isDir := e.IsDir()
+		if isDir {
 			full = full + string(os.PathSeparator)
 		}
-		out = append(out, full)
-		if len(out) >= 50 {
-			break
-		}
+		items = append(items, completionItem{
+			full:       full,
+			name:       name,
+			isDir:      isDir,
+			startsWith: query == "" || strings.HasPrefix(nameLower, queryLower),
+			isDot:      strings.HasPrefix(name, "."),
+		})
 	}
-	sort.Strings(out)
+
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := items[i], items[j]
+		if a.isDot != b.isDot {
+			return !a.isDot // non-dot first
+		}
+		if a.startsWith != b.startsWith {
+			return a.startsWith
+		}
+		if a.isDir != b.isDir {
+			return a.isDir
+		}
+		return strings.ToLower(a.name) < strings.ToLower(b.name)
+	})
+
+	limit := 50
+	if len(items) < limit {
+		limit = len(items)
+	}
+	out := make([]string, limit)
+	for i := 0; i < limit; i++ {
+		out[i] = items[i].full
+	}
 	return out, nil
 }
 
@@ -272,6 +309,9 @@ func Rename(oldPath, newName string) (string, error) {
 	return dest, nil
 }
 
+// ErrPermission is returned when the OS denies delete/write access.
+var ErrPermission = errors.New("permission denied")
+
 // Delete removes files or directories (recursive for dirs). Does not follow symlinks for removal of the link itself.
 func Delete(paths []string) error {
 	for _, p := range paths {
@@ -284,16 +324,27 @@ func Delete(paths []string) error {
 			if os.IsNotExist(err) {
 				return fmt.Errorf("%w: %s", ErrNotFound, abs)
 			}
+			if os.IsPermission(err) {
+				return fmt.Errorf("%w: cannot access %s", ErrPermission, abs)
+			}
 			return err
 		}
+		var delErr error
 		if info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
-			if err := os.RemoveAll(abs); err != nil {
-				return err
-			}
+			delErr = os.RemoveAll(abs)
 		} else {
-			if err := os.Remove(abs); err != nil {
-				return err
+			delErr = os.Remove(abs)
+		}
+		if delErr != nil {
+			if os.IsPermission(delErr) {
+				return fmt.Errorf("%w: cannot delete %s", ErrPermission, abs)
 			}
+			// Normalize common OS messages (e.g. unlinkat …: permission denied)
+			msg := delErr.Error()
+			if strings.Contains(strings.ToLower(msg), "permission denied") {
+				return fmt.Errorf("%w: cannot delete %s", ErrPermission, abs)
+			}
+			return fmt.Errorf("cannot delete %s: %w", abs, delErr)
 		}
 	}
 	return nil

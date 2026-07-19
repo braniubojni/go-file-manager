@@ -69,7 +69,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog data-testid="dialog-settings" open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Settings</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -77,6 +77,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
             <FormControl fullWidth size="small">
               <InputLabel id="theme-label">Theme</InputLabel>
               <Select
+                data-testid="settings-theme"
                 labelId="theme-label"
                 label="Theme"
                 value={draft.theme}
@@ -95,6 +96,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
             <FormControlLabel
               control={
                 <Switch
+                  data-testid="settings-show-hidden"
                   checked={draft.showHidden}
                   onChange={(_, v) => setDraft({ ...draft, showHidden: v })}
                 />
@@ -107,6 +109,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
             <FormControlLabel
               control={
                 <Switch
+                  data-testid="settings-show-extensions"
                   checked={draft.showExtensions}
                   onChange={(_, v) => setDraft({ ...draft, showExtensions: v })}
                 />
@@ -129,7 +132,12 @@ export default function SettingsDialog({ open, onClose }: Props) {
         </Button>
         <span style={{ flex: 1 }} />
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={() => void onSave()} disabled={save.isPending}>
+        <Button
+          data-testid="settings-save"
+          variant="contained"
+          onClick={() => void onSave()}
+          disabled={save.isPending}
+        >
           Save
         </Button>
       </DialogActions>

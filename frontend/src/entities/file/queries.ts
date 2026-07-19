@@ -25,13 +25,21 @@ export function useSettings() {
   return useQuery({
     queryKey: queryKeys.settings,
     queryFn: async () => {
+      // Bindings type theme as string; normalize to our ThemePreference union.
       const s = await SettingsService.GetSettings()
-      return normalizeSettings(s as Partial<AppSettings>)
+      return normalizeSettings(s)
     },
   })
 }
 
-function normalizeSettings(s: Partial<AppSettings> | null | undefined): AppSettings {
+/** Accept loose binding payloads (generated types use string theme, etc.). */
+function normalizeSettings(s: {
+  theme?: string
+  showHidden?: boolean
+  showExtensions?: boolean
+  leftPath?: string
+  rightPath?: string
+} | null | undefined): AppSettings {
   const theme = s?.theme
   return {
     theme: theme === 'dark' || theme === 'light' || theme === 'system' ? theme : defaultSettings.theme,
@@ -45,7 +53,14 @@ function normalizeSettings(s: Partial<AppSettings> | null | undefined): AppSetti
 export function useSaveSettings() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (settings: AppSettings) => SettingsService.SaveSettings(settings),
+    mutationFn: (settings: AppSettings) =>
+      SettingsService.SaveSettings({
+        theme: settings.theme,
+        showHidden: settings.showHidden,
+        showExtensions: settings.showExtensions,
+        leftPath: settings.leftPath,
+        rightPath: settings.rightPath,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.settings }),
   })
 }

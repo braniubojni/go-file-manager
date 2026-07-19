@@ -22,8 +22,19 @@ export const useSnack = create<SnackState>((set) => ({
 export function SnackbarHost() {
   const { open, message, severity, hide } = useSnack()
   return (
-    <Snackbar open={open} autoHideDuration={4000} onClose={hide} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-      <Alert onClose={hide} severity={severity} variant="filled" sx={{ width: '100%' }}>
+    <Snackbar
+      open={open}
+      autoHideDuration={4000}
+      onClose={hide}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    >
+      <Alert
+        data-testid="snackbar"
+        onClose={hide}
+        severity={severity}
+        variant="filled"
+        sx={{ width: '100%' }}
+      >
         {message}
       </Alert>
     </Snackbar>

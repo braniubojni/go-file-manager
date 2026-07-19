@@ -11,18 +11,29 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// DB wraps the application SQLite database (bookmarks only).
+// DB wraps the application SQLite database (bookmarks + encrypted prefs).
 type DB struct {
 	sql *sql.DB
+	dir string
+	key []byte
 }
 
+// EnvConfigDir matches config.EnvConfigDir — shared env for e2e isolation.
+const EnvConfigDir = "GFM_CONFIG_DIR"
+
 // Open creates (if needed) and migrates the app database under the user config dir.
+// If GFM_CONFIG_DIR is set, the DB is stored there as app.db.
 func Open(appName string) (*DB, error) {
-	cfg, err := os.UserConfigDir()
-	if err != nil {
-		return nil, err
+	var dir string
+	if override := os.Getenv(EnvConfigDir); override != "" {
+		dir = override
+	} else {
+		cfg, err := os.UserConfigDir()
+		if err != nil {
+			return nil, err
+		}
+		dir = filepath.Join(cfg, appName)
 	}
-	dir := filepath.Join(cfg, appName)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
@@ -32,17 +43,35 @@ func Open(appName string) (*DB, error) {
 
 // OpenPath opens a SQLite database at an explicit path (useful for tests).
 func OpenPath(path string) (*DB, error) {
-	sqlDB, err := sql.Open("sqlite", path)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	key, err := loadOrCreateKey(dir)
+	if err != nil {
+		return nil, fmt.Errorf("key: %w", err)
+	}
+	// modernc.org/sqlite: enable WAL + foreign keys via DSN query
+	dsn := path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)"
+	sqlDB, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 	sqlDB.SetMaxOpenConns(1)
-	db := &DB{sql: sqlDB}
+	db := &DB{sql: sqlDB, dir: dir, key: key}
 	if err := db.migrate(); err != nil {
 		_ = sqlDB.Close()
 		return nil, err
 	}
 	return db, nil
+}
+
+// Dir returns the config directory that holds app.db and app.key.
+func (db *DB) Dir() string {
+	if db == nil {
+		return ""
+	}
+	return db.dir
 }
 
 // Close closes the database.
@@ -62,8 +91,45 @@ CREATE TABLE IF NOT EXISTS bookmarks (
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS kv (
+  key   TEXT PRIMARY KEY,
+  value BLOB NOT NULL
+);
 `)
 	return err
+}
+
+// GetKV returns decrypted plaintext for key, or nil if missing.
+func (db *DB) GetKV(key string) ([]byte, error) {
+	var blob []byte
+	err := db.sql.QueryRow(`SELECT value FROM kv WHERE key = ?`, key).Scan(&blob)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return open(db.key, blob)
+}
+
+// SetKV encrypts and stores plaintext under key.
+func (db *DB) SetKV(key string, plaintext []byte) error {
+	blob, err := seal(db.key, plaintext)
+	if err != nil {
+		return err
+	}
+	_, err = db.sql.Exec(`
+INSERT INTO kv(key, value) VALUES(?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value
+`, key, blob)
+	return err
+}
+
+// HasKV reports whether key exists (without decrypting).
+func (db *DB) HasKV(key string) (bool, error) {
+	var n int
+	err := db.sql.QueryRow(`SELECT COUNT(1) FROM kv WHERE key = ?`, key).Scan(&n)
+	return n > 0, err
 }
 
 // ListBookmarks returns bookmarks ordered by sort_order then id.

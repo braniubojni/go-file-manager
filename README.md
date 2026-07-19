@@ -94,22 +94,64 @@ Config dir (macOS): `~/Library/Application Support/go-file-manager/`
 
 ## Tests
 
+### Unit (Go)
+
 ```bash
 go test ./internal/...
+# or
+wails3 task test
 ```
+
+### E2E (Playwright + Wails server mode)
+
+E2E hits the **real Go services** (file ops, settings JSON, bookmarks) via server mode — no native WebView required.
+
+```bash
+# one-time
+cd e2e && npm install && npx playwright install chromium
+
+# run
+cd e2e && npm test
+# or from root
+wails3 task test:e2e
+```
+
+Specs live under `e2e/specs/` and cover navigation, file ops (mkdir/rename/copy/move/delete/refresh), view toggles, settings/shortcuts dialogs, and bookmarks.
+
+Isolation:
+
+- Temp workspace under `$TMPDIR/gfm-e2e-workspace`
+- `GFM_CONFIG_DIR` for settings/shortcuts/db
+- Seeded left/right sandbox directories
+
+### Full gate (after every big change)
+
+```bash
+wails3 task test:all
+# = go test ./internal/...  +  e2e  +  wails3 build
+```
+
+**Process:** after any substantial feature/refactor:
+
+1. Run `wails3 task test:all` (unit + e2e + production `wails3 build`).
+2. If you added a user-facing action or setting, **add/extend an e2e case** in `e2e/specs/` (and unit tests under `internal/` when logic is pure Go).
+3. Prefer `data-testid` hooks for new UI so selectors stay stable.
 
 ## Keyboard (defaults; editable in UI / shortcuts.json)
 
 | Binding | Action |
 |---------|--------|
 | Tab | Switch active pane |
+| ↑ / ↓ | Move row selection (file list) |
+| Enter | Open folder or open file with OS app |
 | F5 | Refresh |
 | F2 | Rename |
 | Delete | Delete |
 | Mod+Shift+C / X | Copy / Move |
 | Alt+ArrowUp | Parent folder |
 | Mod+, / Mod+/ | Settings / Shortcuts |
-| Double-click | Enter directory |
+| Ctrl+` | Toggle terminal under active pane |
+| Double-click | Enter directory / open file |
 | Ctrl/Cmd+click | Multi-select |
 
 When adding a **new setting**, specify: key, type, default, allowed values, UI control, tooltip text, and where it is used.

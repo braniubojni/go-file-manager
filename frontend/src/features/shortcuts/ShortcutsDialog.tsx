@@ -69,7 +69,7 @@ export default function ShortcutsDialog({ open, onClose }: Props) {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
+    <Dialog data-testid="dialog-shortcuts" open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>Keyboard shortcuts</DialogTitle>
       <DialogContent>
         <Stack spacing={1} sx={{ mt: 1 }}>

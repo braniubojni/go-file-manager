@@ -1,23 +1,25 @@
 /** Parse "Mod+Shift+C" style bindings against a KeyboardEvent. */
 
-function isMod(e: KeyboardEvent): boolean {
-  return e.metaKey || e.ctrlKey
-}
-
 export function eventMatchesBinding(e: KeyboardEvent, binding: string): boolean {
   if (!binding) return false
   const parts = binding.split('+').map((p) => p.trim())
   if (!parts.length) return false
 
-  let needMod = false
+  let needMod = false // Cmd or Ctrl
+  let needCtrlOnly = false
+  let needMetaOnly = false
   let needShift = false
   let needAlt = false
   let keyPart = ''
 
   for (const p of parts) {
     const lower = p.toLowerCase()
-    if (lower === 'mod' || lower === 'cmd' || lower === 'ctrl' || lower === 'control' || lower === 'meta') {
+    if (lower === 'mod') {
       needMod = true
+    } else if (lower === 'ctrl' || lower === 'control') {
+      needCtrlOnly = true
+    } else if (lower === 'cmd' || lower === 'meta') {
+      needMetaOnly = true
     } else if (lower === 'shift') {
       needShift = true
     } else if (lower === 'alt' || lower === 'option') {
@@ -27,16 +29,24 @@ export function eventMatchesBinding(e: KeyboardEvent, binding: string): boolean 
     }
   }
 
-  if (needMod !== isMod(e)) return false
+  if (needCtrlOnly && !e.ctrlKey) return false
+  if (needMetaOnly && !e.metaKey) return false
+  if (needMod && !(e.metaKey || e.ctrlKey)) return false
+  // If binding says Ctrl only, reject pure Cmd
+  if (needCtrlOnly && e.metaKey && !e.ctrlKey) return false
   if (needShift !== e.shiftKey) return false
   if (needAlt !== e.altKey) return false
 
   const key = keyPart
   if (!key) return false
 
-  // Function keys
   if (/^F\d{1,2}$/i.test(key)) {
     return e.key.toLowerCase() === key.toLowerCase()
+  }
+
+  const lowerKey = key.toLowerCase()
+  if (lowerKey === 'backquote' || lowerKey === '`' || lowerKey === '~') {
+    return e.code === 'Backquote' || e.key === '`' || e.key === '~'
   }
 
   const map: Record<string, string> = {
@@ -55,7 +65,7 @@ export function eventMatchesBinding(e: KeyboardEvent, binding: string): boolean 
     '/': '/',
   }
 
-  const expected = map[key.toLowerCase()] ?? key
+  const expected = map[lowerKey] ?? key
   if (expected.length === 1) {
     return e.key.toLowerCase() === expected.toLowerCase()
   }
@@ -70,4 +80,14 @@ export function findMatchingAction(
     if (eventMatchesBinding(e, binding)) return action
   }
   return null
+}
+
+/** Match Ctrl+` specifically (not Cmd). */
+export function isCtrlBackquote(e: KeyboardEvent): boolean {
+  return (
+    e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    (e.code === 'Backquote' || e.key === '`' || e.key === '~')
+  )
 }

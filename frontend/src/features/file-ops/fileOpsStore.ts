@@ -1,26 +1,11 @@
 import { create } from 'zustand'
+import type { FileOpsAction, FileOpsRequest, FileOpsState } from './types'
 
-type FileOpsRequest =
-  | 'copy'
-  | 'move'
-  | 'delete'
-  | 'rename'
-  | 'mkdir'
-  | 'refresh'
-  | 'goParent'
-  | 'goHome'
-  | null
-
-interface FileOpsState {
-  request: FileOpsRequest
-  nonce: number
-  trigger: (request: Exclude<FileOpsRequest, null>) => void
-  consume: () => void
-}
+export type { FileOpsAction, FileOpsRequest } from './types'
 
 export const useFileOpsStore = create<FileOpsState>((set) => ({
-  request: null,
+  request: null as FileOpsRequest,
   nonce: 0,
-  trigger: (request) => set((s) => ({ request, nonce: s.nonce + 1 })),
+  trigger: (request: FileOpsAction) => set((s) => ({ request, nonce: s.nonce + 1 })),
   consume: () => set({ request: null }),
 }))

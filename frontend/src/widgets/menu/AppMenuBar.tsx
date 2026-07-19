@@ -60,11 +60,12 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
   return (
     <AppBar position="static" color="default" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
       <Toolbar variant="dense" sx={{ minHeight: 36, gap: 0.5, px: 1 }}>
-        <Button size="small" onClick={openMenu(setFileAnchor)}>
+        <Button data-testid="menu-file" size="small" onClick={openMenu(setFileAnchor)}>
           File
         </Button>
         <Menu anchorEl={fileAnchor} open={Boolean(fileAnchor)} onClose={closeAll}>
           <MenuItem
+            data-testid="menu-file-mkdir"
             onClick={() => {
               closeAll()
               onNewFolder()
@@ -73,6 +74,7 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
             New folder
           </MenuItem>
           <MenuItem
+            data-testid="menu-file-rename"
             onClick={() => {
               closeAll()
               onRename()
@@ -81,6 +83,7 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
             Rename
           </MenuItem>
           <MenuItem
+            data-testid="menu-file-delete"
             onClick={() => {
               closeAll()
               onDelete()
@@ -90,6 +93,7 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
           </MenuItem>
           <Divider />
           <MenuItem
+            data-testid="menu-file-settings"
             onClick={() => {
               closeAll()
               openSettings()
@@ -98,6 +102,7 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
             Settings…
           </MenuItem>
           <MenuItem
+            data-testid="menu-file-shortcuts"
             onClick={() => {
               closeAll()
               openShortcuts()
@@ -107,11 +112,12 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
           </MenuItem>
         </Menu>
 
-        <Button size="small" onClick={openMenu(setViewAnchor)}>
+        <Button data-testid="menu-view" size="small" onClick={openMenu(setViewAnchor)}>
           View
         </Button>
         <Menu anchorEl={viewAnchor} open={Boolean(viewAnchor)} onClose={closeAll}>
           <MenuItem
+            data-testid="menu-view-hidden"
             onClick={() => {
               void toggle('showHidden')
             }}
@@ -122,6 +128,7 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
             <ListItemText>Show hidden files</ListItemText>
           </MenuItem>
           <MenuItem
+            data-testid="menu-view-extensions"
             onClick={() => {
               void toggle('showExtensions')
             }}
@@ -132,7 +139,9 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
             <ListItemText>Show file extensions</ListItemText>
           </MenuItem>
           <Divider />
-          <MenuItem onClick={refresh}>Refresh</MenuItem>
+          <MenuItem data-testid="menu-view-refresh" onClick={refresh}>
+            Refresh
+          </MenuItem>
         </Menu>
       </Toolbar>
     </AppBar>

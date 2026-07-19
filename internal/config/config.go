@@ -17,8 +17,15 @@ type Store struct {
 	mu  sync.Mutex
 }
 
+// EnvConfigDir overrides the config directory when set (used by e2e tests).
+const EnvConfigDir = "GFM_CONFIG_DIR"
+
 // Open creates the config directory and ensures default JSON files exist.
+// If GFM_CONFIG_DIR is set, that path is used instead of the user config dir.
 func Open(appName string) (*Store, error) {
+	if dir := os.Getenv(EnvConfigDir); dir != "" {
+		return OpenDir(dir)
+	}
 	cfg, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
@@ -74,10 +81,14 @@ func DefaultShortcuts() map[string]string {
 		"mkdir":            "Mod+Shift+N",
 		"goParent":         "Alt+ArrowUp",
 		"goHome":           "Mod+Home",
+		"goBack":           "Backspace",
+		"goForward":        "Mod+]",
 		"openSettings":     "Mod+,",
 		"openShortcuts":    "Mod+/",
 		"toggleHidden":     "Mod+H",
 		"toggleExtensions": "Mod+E",
+		// Ctrl+` (same physical key as Ctrl+~ on many layouts); not Cmd on macOS.
+		"toggleTerminal": "Ctrl+Backquote",
 	}
 }
 
@@ -95,10 +106,13 @@ func ShortcutCatalog() []domain.ShortcutDef {
 		{"mkdir", "New folder", "Create a folder in the active pane"},
 		{"goParent", "Parent folder", "Go to the parent of the active pane"},
 		{"goHome", "Home", "Go to the home directory in the active pane"},
+		{"goBack", "Back", "Navigate back in the active pane history (also mouse back button)"},
+		{"goForward", "Forward", "Navigate forward in the active pane history (also mouse forward button)"},
 		{"openSettings", "Settings", "Open the settings dialog"},
 		{"openShortcuts", "Keyboard shortcuts", "Open the keyboard shortcuts dialog"},
 		{"toggleHidden", "Toggle hidden files", "Show or hide dotfiles"},
 		{"toggleExtensions", "Toggle extensions", "Show or hide file extensions in names"},
+		{"toggleTerminal", "Toggle terminal", "Show or hide the terminal under the active pane (Ctrl+`)"},
 	}
 	defaults := DefaultShortcuts()
 	out := make([]domain.ShortcutDef, 0, len(defs))
@@ -113,17 +127,9 @@ func ShortcutCatalog() []domain.ShortcutDef {
 	return out
 }
 
+// ensureDefaults used to create settings.json / shortcuts.json.
+// Prefs now live in encrypted app.db (see SettingsService); keep dir only.
 func (s *Store) ensureDefaults() error {
-	if _, err := os.Stat(s.SettingsPath()); os.IsNotExist(err) {
-		if err := s.SaveSettings(DefaultSettings()); err != nil {
-			return err
-		}
-	}
-	if _, err := os.Stat(s.ShortcutsPath()); os.IsNotExist(err) {
-		if err := s.SaveShortcuts(DefaultShortcuts()); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
