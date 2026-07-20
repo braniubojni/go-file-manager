@@ -1,22 +1,20 @@
 import FolderOpenIcon from '@mui/icons-material/FolderOpen'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  FormControlLabel,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  Switch,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import { useEffect, useState } from 'react'
+import Button from '@mui/material/Button'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
+import FormControl from '@mui/material/FormControl'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import InputLabel from '@mui/material/InputLabel'
+import MenuItem from '@mui/material/MenuItem'
+import Select from '@mui/material/Select'
+import Stack from '@mui/material/Stack'
+import Switch from '@mui/material/Switch'
+import Tooltip from '@mui/material/Tooltip'
+import Typography from '@mui/material/Typography'
+import { useEffect, useState, type FC } from 'react'
 import { useSaveSettings, useSettings } from '../../entities/file/queries'
 import type { AppSettings, ThemePreference } from '../../entities/file/types'
 import { SettingsService } from '../../shared/api/bindings'
@@ -28,7 +26,7 @@ interface Props {
   onClose: () => void
 }
 
-export default function SettingsDialog({ open, onClose }: Props) {
+const SettingsDialog: FC<Props> = ({ open, onClose }) => {
   const { data } = useSettings()
   const save = useSaveSettings()
   const show = useSnack((s) => s.show)
@@ -40,32 +38,26 @@ export default function SettingsDialog({ open, onClose }: Props) {
 
   if (!draft) return null
 
-  const onSave = async () => {
-    try {
-      await save.mutateAsync(draft)
-      show('Settings saved', 'success')
-      onClose()
-    } catch (e) {
-      show(errMessage(e), 'error')
-    }
+  const onSave = () => {
+    save.mutate(draft, {
+      onSuccess: () => {
+        show('Settings saved', 'success')
+        onClose()
+      },
+      onError: (e) => show(errMessage(e), 'error'),
+    })
   }
 
-  const reveal = async () => {
-    try {
-      const p = await SettingsService.GetSettingsPath()
-      await SettingsService.RevealInOS(p)
-    } catch (e) {
-      show(errMessage(e), 'error')
-    }
+  const reveal = () => {
+    void SettingsService.GetSettingsPath()
+      .then((p) => SettingsService.RevealInOS(p))
+      .catch((e) => show(errMessage(e), 'error'))
   }
 
-  const openFile = async () => {
-    try {
-      const p = await SettingsService.GetSettingsPath()
-      await SettingsService.OpenInOS(p)
-    } catch (e) {
-      show(errMessage(e), 'error')
-    }
+  const openFile = () => {
+    void SettingsService.GetSettingsPath()
+      .then((p) => SettingsService.OpenInOS(p))
+      .catch((e) => show(errMessage(e), 'error'))
   }
 
   return (
@@ -124,10 +116,10 @@ export default function SettingsDialog({ open, onClose }: Props) {
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, flexWrap: 'wrap', gap: 1 }}>
-        <Button startIcon={<FolderOpenIcon />} onClick={() => void reveal()}>
+        <Button startIcon={<FolderOpenIcon />} onClick={reveal}>
           Reveal file
         </Button>
-        <Button startIcon={<OpenInNewIcon />} onClick={() => void openFile()}>
+        <Button startIcon={<OpenInNewIcon />} onClick={openFile}>
           Open file
         </Button>
         <span style={{ flex: 1 }} />
@@ -135,7 +127,7 @@ export default function SettingsDialog({ open, onClose }: Props) {
         <Button
           data-testid="settings-save"
           variant="contained"
-          onClick={() => void onSave()}
+          onClick={onSave}
           disabled={save.isPending}
         >
           Save
@@ -144,3 +136,5 @@ export default function SettingsDialog({ open, onClose }: Props) {
     </Dialog>
   )
 }
+
+export default SettingsDialog

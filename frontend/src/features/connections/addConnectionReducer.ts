@@ -14,10 +14,10 @@ export const initialAddConnectionState: AddConnectionState = {
   mode: 'add',
 }
 
-export function addConnectionReducer(
+export const addConnectionReducer = (
   state: AddConnectionState,
   action: AddConnectionAction,
-): AddConnectionState {
+): AddConnectionState => {
   switch (action.type) {
     case 'open_add':
       return {

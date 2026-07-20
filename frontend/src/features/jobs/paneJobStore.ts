@@ -29,7 +29,7 @@ export const usePaneJobStore = create<PaneJobState>((set, get) => ({
 }))
 
 let jobSeq = 0
-export function newJobId(prefix = 'job'): string {
+export const newJobId = (prefix = 'job'): string => {
   jobSeq += 1
   return `${prefix}-${Date.now()}-${jobSeq}`
 }

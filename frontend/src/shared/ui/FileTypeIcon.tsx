@@ -1,3 +1,4 @@
+import type { FC } from 'react'
 import ArchiveIcon from '@mui/icons-material/Archive'
 import AudioFileIcon from '@mui/icons-material/AudioFile'
 import CodeIcon from '@mui/icons-material/Code'
@@ -17,12 +18,12 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf'
 import TableChartIcon from '@mui/icons-material/TableChart'
 import TextSnippetIcon from '@mui/icons-material/TextSnippet'
 import VideoFileIcon from '@mui/icons-material/VideoFile'
-import type { SvgIconProps } from '@mui/material'
+import type { SvgIconProps } from '@mui/material/SvgIcon'
 import type { FileEntry } from '../../entities/file/types'
 
 const size = 'small' as const
 
-export function FileTypeIcon({ entry, ...iconProps }: { entry: FileEntry } & SvgIconProps) {
+export const FileTypeIcon: FC<{ entry: FileEntry } & SvgIconProps> = ({ entry, ...iconProps }) => {
   const props = { fontSize: size, ...iconProps }
 
   if (entry.isDir) {

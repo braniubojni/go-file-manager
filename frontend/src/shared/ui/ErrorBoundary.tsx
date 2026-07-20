@@ -1,5 +1,7 @@
-import { Box, Button, Typography } from '@mui/material'
-import { Component, type ErrorInfo, type ReactNode, useEffect, useState } from 'react'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Typography from '@mui/material/Typography'
+import { Component, useEffect, useState, type ErrorInfo, type FC, type ReactNode } from 'react'
 
 type BoundaryState = { error: Error | null }
 
@@ -23,7 +25,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, BoundarySt
 }
 
 /** Catches window error / unhandledrejection and shows the same recovery UI. */
-export function GlobalErrorHost({ children }: { children: ReactNode }) {
+export const GlobalErrorHost: FC<{ children: ReactNode }> = ({ children }) => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -67,7 +69,7 @@ export function GlobalErrorHost({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-function ErrorRecovery({ message, onDismiss }: { message: string; onDismiss?: () => void }) {
+const ErrorRecovery = ({ message, onDismiss }: { message: string; onDismiss?: () => void }) => {
   const refresh = () => {
     window.location.reload()
   }

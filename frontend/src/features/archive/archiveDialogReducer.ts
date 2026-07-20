@@ -13,7 +13,7 @@ export const initialArchiveState: ArchiveState = {
   error: null,
 }
 
-export function archiveDialogReducer(state: ArchiveState, action: ArchiveAction): ArchiveState {
+export const archiveDialogReducer = (state: ArchiveState, action: ArchiveAction): ArchiveState => {
   switch (action.type) {
     case 'open':
       return {

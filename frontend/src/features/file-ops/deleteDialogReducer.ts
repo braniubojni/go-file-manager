@@ -9,10 +9,10 @@ export const initialDeleteDialogState: DeleteDialogState = {
   paths: [],
 }
 
-export function deleteDialogReducer(
+export const deleteDialogReducer = (
   state: DeleteDialogState,
   action: DeleteDialogAction,
-): DeleteDialogState {
+): DeleteDialogState => {
   switch (action.type) {
     case 'open_confirm':
       return { ...state, confirmOpen: true, paths: action.paths }

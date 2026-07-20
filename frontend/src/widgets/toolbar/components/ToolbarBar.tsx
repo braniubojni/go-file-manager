@@ -1,3 +1,4 @@
+import type { FC } from 'react'
 import ArchiveIcon from '@mui/icons-material/Archive'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
@@ -13,7 +14,13 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness'
 import SettingsIcon from '@mui/icons-material/Settings'
 import UnarchiveIcon from '@mui/icons-material/Unarchive'
-import { AppBar, Box, Button, Divider, IconButton, Toolbar as MuiToolbar, Tooltip } from '@mui/material'
+import AppBar from '@mui/material/AppBar'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Divider from '@mui/material/Divider'
+import IconButton from '@mui/material/IconButton'
+import MuiToolbar from '@mui/material/Toolbar'
+import Tooltip from '@mui/material/Tooltip'
 import type { ThemePreference } from '../../../entities/file/types'
 import type { ToolbarBarProps } from '../types'
 import { BookmarksSelect } from './BookmarksSelect'
@@ -21,13 +28,13 @@ import { ConnectionsMenu } from './ConnectionsMenu'
 
 export type { ToolbarBarProps } from '../types'
 
-function themeIcon(theme: ThemePreference) {
+const themeIcon = (theme: ThemePreference) => {
   if (theme === 'system') return <SettingsBrightnessIcon />
   if (theme === 'dark') return <DarkModeIcon />
   return <LightModeIcon />
 }
 
-export function ToolbarBar(p: ToolbarBarProps) {
+export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
   return (
     <AppBar position="static" color="default" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
       <MuiToolbar variant="dense" sx={{ gap: 0.5, minHeight: 48 }}>

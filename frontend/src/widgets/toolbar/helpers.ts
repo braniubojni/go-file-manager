@@ -9,7 +9,7 @@ export type { SnackShow, ToolbarRequestHandlers } from './types'
 
 // --- errors ---
 
-export function isPermissionError(msg: string): boolean {
+export const isPermissionError = (msg: string): boolean => {
   const m = msg.toLowerCase()
   return m.includes('permission denied') || m.includes('cannot delete')
 }
@@ -17,7 +17,7 @@ export function isPermissionError(msg: string): boolean {
 // --- paths ---
 
 /** Parent directory for local or ssh:// virtual paths. */
-export function parentPath(activePath: string): string {
+export const parentPath = (activePath: string): string => {
   if (activePath.startsWith('ssh://')) {
     const m = activePath.match(/^(ssh:\/\/[^/]+)(\/.*)?$/)
     if (!m) return activePath
@@ -35,7 +35,7 @@ export function parentPath(activePath: string): string {
 }
 
 /** Multi-select for actions: selection if any, else focus; never includes `..`. */
-export function resolveActionPaths(selection: string[], focus: string): string[] {
+export const resolveActionPaths = (selection: string[], focus: string): string[] => {
   const sel = selection.filter((p) => p.split(/[/\\]/).pop() !== '..')
   if (sel.length) return sel
   if (focus && focus.split(/[/\\]/).pop() !== '..') return [focus]
@@ -45,7 +45,7 @@ export function resolveActionPaths(selection: string[], focus: string): string[]
 // --- pane jobs ---
 
 /** Start a pane job, run work, finish job; handles cancel messages. */
-export async function runPaneJob(opts: RunPaneJobOptions): Promise<void> {
+export const runPaneJob = async (opts: RunPaneJobOptions): Promise<void> => {
   const { pane, kind, label, show, work, onSuccess, finishBackendJob } = opts
   const startJob = usePaneJobStore.getState().start
   const finishJob = usePaneJobStore.getState().finish
@@ -99,9 +99,9 @@ export async function runPaneJob(opts: RunPaneJobOptions): Promise<void> {
  * Build a complete handlers map for toolbar requests.
  * Missing handlers become no-ops so lookup is always safe.
  */
-export function createToolbarRequestHandlers(
+export const createToolbarRequestHandlers = (
   partial: Partial<ToolbarRequestHandlers>,
-): ToolbarRequestHandlers {
+): ToolbarRequestHandlers => {
   const noop = () => undefined
   const all: FileOpsAction[] = [
     'copy',
@@ -126,15 +126,15 @@ export function createToolbarRequestHandlers(
 }
 
 /** Run the handler for a request (map lookup — no switch). */
-export function runToolbarRequest(
+export const runToolbarRequest = (
   request: FileOpsAction,
   handlers: ToolbarRequestHandlers,
-): void {
+): void => {
   handlers[request]()
 }
 
 /** Click the per-pane folder-sizes control (lives on pane header). */
-export function triggerCalcSizes(pane: PaneId): void {
+export const triggerCalcSizes = (pane: PaneId): void => {
   const btn = document.querySelector(
     `[data-testid="btn-folder-sizes-${pane}"]`,
   ) as HTMLButtonElement | null

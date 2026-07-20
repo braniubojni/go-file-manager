@@ -1,6 +1,6 @@
 /** Parse "Mod+Shift+C" style bindings against a KeyboardEvent. */
 
-export function eventMatchesBinding(e: KeyboardEvent, binding: string): boolean {
+export const eventMatchesBinding = (e: KeyboardEvent, binding: string): boolean => {
   if (!binding) return false
   const parts = binding.split('+').map((p) => p.trim())
   if (!parts.length) return false
@@ -72,10 +72,10 @@ export function eventMatchesBinding(e: KeyboardEvent, binding: string): boolean 
   return e.key === expected
 }
 
-export function findMatchingAction(
+export const findMatchingAction = (
   e: KeyboardEvent,
   shortcuts: Record<string, string>,
-): string | null {
+): string | null => {
   for (const [action, binding] of Object.entries(shortcuts)) {
     if (eventMatchesBinding(e, binding)) return action
   }
@@ -83,7 +83,7 @@ export function findMatchingAction(
 }
 
 /** Match Ctrl+` specifically (not Cmd). */
-export function isCtrlBackquote(e: KeyboardEvent): boolean {
+export const isCtrlBackquote = (e: KeyboardEvent): boolean => {
   return (
     e.ctrlKey &&
     !e.metaKey &&

@@ -1,8 +1,10 @@
-import { Box, Typography } from '@mui/material'
+import type { FC } from 'react'
+import Box from '@mui/material/Box'
+import Typography from '@mui/material/Typography'
 import { useDirListing, useSettings } from '../../entities/file/queries'
 import { usePaneStore } from '../../features/pane/paneStore'
 
-export function StatusBar() {
+export const StatusBar: FC = () => {
   const activePane = usePaneStore((s) => s.activePane)
   const path = usePaneStore((s) => (s.activePane === 'left' ? s.leftPath : s.rightPath))
   const selection = usePaneStore((s) =>

@@ -10,7 +10,7 @@ export const initialExtractState: ExtractState = {
   itemCount: 0,
 }
 
-export function extractDialogReducer(state: ExtractState, action: ExtractAction): ExtractState {
+export const extractDialogReducer = (state: ExtractState, action: ExtractAction): ExtractState => {
   switch (action.type) {
     case 'open':
       return { ...initialExtractState, open: true, itemCount: action.itemCount }

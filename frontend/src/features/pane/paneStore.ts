@@ -3,12 +3,12 @@ import type { PaneId } from '../../entities/file/types'
 
 const MAX_HISTORY = 100
 
-function isParentEntry(path: string): boolean {
+const isParentEntry = (path: string): boolean => {
   const base = path.split(/[/\\]/).pop()
   return base === '..'
 }
 
-function pushCapped(stack: string[], path: string): string[] {
+const pushCapped = (stack: string[], path: string): string[] => {
   const next = [...stack, path]
   if (next.length > MAX_HISTORY) return next.slice(next.length - MAX_HISTORY)
   return next

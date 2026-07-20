@@ -11,7 +11,7 @@ import { ConnectionService } from '../../../shared/api/bindings'
 import { errMessage } from '../../../shared/lib/format'
 import { useSnack } from '../../../shared/ui/SnackbarHost'
 
-export function useConnections() {
+export const useConnections = () => {
   const [anchor, setAnchor] = useState<null | HTMLElement>(null)
   const [dialog, dispatch] = useReducer(addConnectionReducer, initialAddConnectionState)
   const show = useSnack((s) => s.show)

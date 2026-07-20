@@ -13,12 +13,12 @@ import { useSnack } from '../../../shared/ui/SnackbarHost'
 import { runPaneJob } from '../helpers'
 import type { ArchiveExtractArgs } from '../types'
 
-export function useArchiveExtract({
+export const useArchiveExtract = ({
   activePane,
   activePath,
   realSelection,
   clearSelection,
-}: ArchiveExtractArgs) {
+}: ArchiveExtractArgs) => {
   const show = useSnack((s) => s.show)
   const qc = useQueryClient()
   const [archive, dispatchArchive] = useReducer(archiveDialogReducer, initialArchiveState)

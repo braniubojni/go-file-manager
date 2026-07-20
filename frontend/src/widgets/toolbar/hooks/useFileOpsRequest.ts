@@ -10,7 +10,7 @@ import type { ToolbarRequestHandlers } from '../types'
  * Pass a stable-enough handlers object each render; latest handlers are
  * read via ref so the effect only re-runs on `nonce`.
  */
-export function useFileOpsRequest(handlers: ToolbarRequestHandlers): void {
+export const useFileOpsRequest = (handlers: ToolbarRequestHandlers): void => {
   const nonce = useFileOpsStore((s) => s.nonce)
   const handlersRef = useRef(handlers)
   handlersRef.current = handlers

@@ -1,9 +1,10 @@
-import { CssBaseline, ThemeProvider, createTheme } from '@mui/material'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import CssBaseline from '@mui/material/CssBaseline'
+import { ThemeProvider, createTheme } from '@mui/material/styles'
+import { useEffect, useMemo, useState, type FC, type ReactNode } from 'react'
 import { useSettings } from '../entities/file/queries'
 import type { ThemePreference } from '../entities/file/types'
 
-function useSystemDark(): boolean {
+const useSystemDark = (): boolean => {
   const [dark, setDark] = useState(() =>
     typeof window !== 'undefined'
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -20,13 +21,13 @@ function useSystemDark(): boolean {
   return dark
 }
 
-function resolveMode(pref: ThemePreference, systemDark: boolean): 'light' | 'dark' {
+const resolveMode = (pref: ThemePreference, systemDark: boolean): 'light' | 'dark' => {
   if (pref === 'light') return 'light'
   if (pref === 'dark') return 'dark'
   return systemDark ? 'dark' : 'light'
 }
 
-export function AppThemeProvider({ children }: { children: ReactNode }) {
+export const AppThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { data: settings } = useSettings()
   const pref: ThemePreference = settings?.theme ?? 'system'
   const systemDark = useSystemDark()

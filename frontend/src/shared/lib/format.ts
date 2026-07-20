@@ -1,4 +1,4 @@
-export function formatSize(bytes: number, isDir: boolean): string {
+export const formatSize = (bytes: number, isDir: boolean): string => {
   if (isDir) return '<DIR>'
   if (bytes < 1024) return `${bytes} B`
   const units = ['KB', 'MB', 'GB', 'TB']
@@ -11,7 +11,7 @@ export function formatSize(bytes: number, isDir: boolean): string {
   return `${value.toFixed(value >= 100 ? 0 : 1)} ${units[unit]}`
 }
 
-export function formatModTime(ms: number): string {
+export const formatModTime = (ms: number): string => {
   if (!ms) return ''
   const d = new Date(ms)
   return d.toLocaleString(undefined, {
@@ -23,7 +23,7 @@ export function formatModTime(ms: number): string {
   })
 }
 
-export function errMessage(err: unknown): string {
+export const errMessage = (err: unknown): string => {
   if (err instanceof Error) return err.message
   if (typeof err === 'string') return err
   try {

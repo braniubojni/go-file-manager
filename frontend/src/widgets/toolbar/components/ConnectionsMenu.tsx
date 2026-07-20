@@ -1,21 +1,20 @@
+import type { FC } from 'react'
 import AddIcon from '@mui/icons-material/Add'
 import CloudIcon from '@mui/icons-material/Cloud'
 import DeleteIcon from '@mui/icons-material/Delete'
 import LinkOffIcon from '@mui/icons-material/LinkOff'
-import {
-  Box,
-  Divider,
-  IconButton,
-  ListSubheader,
-  Menu,
-  MenuItem,
-  Tooltip,
-  Typography,
-} from '@mui/material'
+import Box from '@mui/material/Box'
+import Divider from '@mui/material/Divider'
+import IconButton from '@mui/material/IconButton'
+import ListSubheader from '@mui/material/ListSubheader'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import Tooltip from '@mui/material/Tooltip'
+import Typography from '@mui/material/Typography'
 import { useConnections } from '../hooks/useConnections'
 import { ConnectionDialog } from './ConnectionDialog'
 
-export function ConnectionsMenu() {
+export const ConnectionsMenu: FC = () => {
   const {
     anchor,
     setAnchor,

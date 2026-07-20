@@ -1,4 +1,6 @@
-import { Alert, Snackbar } from '@mui/material'
+import type { FC } from 'react'
+import Alert from '@mui/material/Alert'
+import Snackbar from '@mui/material/Snackbar'
 import { create } from 'zustand'
 
 type Severity = 'success' | 'error' | 'info' | 'warning'
@@ -19,7 +21,7 @@ export const useSnack = create<SnackState>((set) => ({
   hide: () => set({ open: false }),
 }))
 
-export function SnackbarHost() {
+export const SnackbarHost: FC = () => {
   const { open, message, severity, hide } = useSnack()
   return (
     <Snackbar

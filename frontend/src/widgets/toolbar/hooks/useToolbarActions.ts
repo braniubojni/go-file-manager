@@ -17,7 +17,7 @@ import { useArchiveExtract } from './useArchiveExtract'
 import { useFileOpDialogs } from './useFileOpDialogs'
 import { useFileOpsRequest } from './useFileOpsRequest'
 
-export function useToolbarActions() {
+export const useToolbarActions = () => {
   const activePane = usePaneStore((s) => s.activePane)
   const leftPath = usePaneStore((s) => s.leftPath)
   const rightPath = usePaneStore((s) => s.rightPath)
@@ -58,7 +58,9 @@ export function useToolbarActions() {
   const theme = settings?.theme ?? 'system'
   const cycleTheme = () => {
     const order: ThemePreference[] = ['system', 'dark', 'light']
-    void setTheme.mutateAsync(order[(order.indexOf(theme) + 1) % order.length])
+    setTheme.mutate(order[(order.indexOf(theme) + 1) % order.length], {
+      onError: (e) => show(errMessage(e), 'error'),
+    })
   }
   const refreshAll = () => void qc.invalidateQueries({ queryKey: ['dir'] })
 

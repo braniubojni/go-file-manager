@@ -13,7 +13,7 @@ export const queryKeys = {
   pathCompletions: (partial: string) => ['pathCompletions', partial] as const,
 }
 
-export function useHomeDir() {
+export const useHomeDir = () => {
   return useQuery({
     queryKey: queryKeys.home,
     queryFn: () => FileService.GetHomeDir() as Promise<string>,
@@ -21,7 +21,7 @@ export function useHomeDir() {
   })
 }
 
-export function useSettings() {
+export const useSettings = () => {
   return useQuery({
     queryKey: queryKeys.settings,
     queryFn: async () => {
@@ -33,13 +33,13 @@ export function useSettings() {
 }
 
 /** Accept loose binding payloads (generated types use string theme, etc.). */
-function normalizeSettings(s: {
+const normalizeSettings = (s: {
   theme?: string
   showHidden?: boolean
   showExtensions?: boolean
   leftPath?: string
   rightPath?: string
-} | null | undefined): AppSettings {
+} | null | undefined): AppSettings => {
   const theme = s?.theme
   return {
     theme: theme === 'dark' || theme === 'light' || theme === 'system' ? theme : defaultSettings.theme,
@@ -50,7 +50,7 @@ function normalizeSettings(s: {
   }
 }
 
-export function useSaveSettings() {
+export const useSaveSettings = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (settings: AppSettings) =>
@@ -61,24 +61,36 @@ export function useSaveSettings() {
         leftPath: settings.leftPath,
         rightPath: settings.rightPath,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.settings }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.settings })
+    },
   })
 }
 
-export function usePatchSettings() {
+export const usePatchSettings = () => {
   const qc = useQueryClient()
-  const save = useSaveSettings()
-  return async (patch: Partial<AppSettings>) => {
-    const current =
-      (qc.getQueryData<AppSettings>(queryKeys.settings) as AppSettings | undefined) ??
-      normalizeSettings(await SettingsService.GetSettings())
-    const next = { ...current, ...patch }
-    await save.mutateAsync(next)
-    return next
-  }
+  return useMutation({
+    mutationFn: async (patch: Partial<AppSettings>) => {
+      const current =
+        (qc.getQueryData<AppSettings>(queryKeys.settings) as AppSettings | undefined) ??
+        normalizeSettings(await SettingsService.GetSettings())
+      const next = { ...current, ...patch }
+      await SettingsService.SaveSettings({
+        theme: next.theme,
+        showHidden: next.showHidden,
+        showExtensions: next.showExtensions,
+        leftPath: next.leftPath,
+        rightPath: next.rightPath,
+      })
+      return next
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.settings })
+    },
+  })
 }
 
-export function useDirListing(path: string | undefined, showHidden: boolean) {
+export const useDirListing = (path: string | undefined, showHidden: boolean) => {
   return useQuery({
     queryKey: queryKeys.dir(path ?? '', showHidden),
     queryFn: async () => {
@@ -89,7 +101,7 @@ export function useDirListing(path: string | undefined, showHidden: boolean) {
   })
 }
 
-export function usePathCompletions(partial: string, enabled: boolean) {
+export const usePathCompletions = (partial: string, enabled: boolean) => {
   return useQuery({
     queryKey: queryKeys.pathCompletions(partial),
     queryFn: async () => {
@@ -101,7 +113,7 @@ export function usePathCompletions(partial: string, enabled: boolean) {
   })
 }
 
-export function useBookmarks() {
+export const useBookmarks = () => {
   return useQuery({
     queryKey: queryKeys.bookmarks,
     queryFn: async () => {
@@ -111,7 +123,7 @@ export function useBookmarks() {
   })
 }
 
-export function useShortcutDefs() {
+export const useShortcutDefs = () => {
   return useQuery({
     queryKey: queryKeys.shortcutDefs,
     queryFn: async () => {
@@ -121,7 +133,7 @@ export function useShortcutDefs() {
   })
 }
 
-export function useSaveShortcuts() {
+export const useSaveShortcuts = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (map: Record<string, string>) => SettingsService.SaveShortcuts(map),
@@ -132,24 +144,36 @@ export function useSaveShortcuts() {
   })
 }
 
-export function useSavePanePaths() {
+export const useSavePanePaths = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ left, right }: PanePaths) => {
       await SettingsService.SavePanePaths(left, right)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.settings }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.settings })
+    },
   })
 }
 
-export function useSetTheme() {
+/** Theme-only settings patch — use mutate / onSuccess / onError. */
+export const useSetTheme = () => {
   const patch = usePatchSettings()
   return {
-    mutateAsync: (theme: ThemePreference) => patch({ theme }),
+    mutate: (
+      theme: ThemePreference,
+      options?: {
+        onSuccess?: () => void
+        onError?: (e: unknown) => void
+      },
+    ) => {
+      patch.mutate({ theme }, options)
+    },
+    isPending: patch.isPending,
   }
 }
 
-export function useInvalidateDirs() {
+export const useInvalidateDirs = () => {
   const qc = useQueryClient()
   return (...paths: string[]) => {
     for (const p of paths) {
@@ -158,7 +182,7 @@ export function useInvalidateDirs() {
   }
 }
 
-export function useFileOps() {
+export const useFileOps = () => {
   const invalidate = useInvalidateDirs()
   const qc = useQueryClient()
 
@@ -194,18 +218,22 @@ export function useFileOps() {
   const addBookmark = useMutation({
     mutationFn: ({ name, path }: { name: string; path: string }) =>
       BookmarkService.Add(name, path),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.bookmarks }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.bookmarks })
+    },
   })
 
   const removeBookmark = useMutation({
     mutationFn: (id: number) => BookmarkService.Remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.bookmarks }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.bookmarks })
+    },
   })
 
   return { copy, move, del, rename, mkdir, addBookmark, removeBookmark }
 }
 
-function parentDirs(paths: string[]): string[] {
+const parentDirs = (paths: string[]): string[] => {
   const set = new Set<string>()
   for (const p of paths) {
     const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'))

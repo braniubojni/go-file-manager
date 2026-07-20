@@ -1,12 +1,19 @@
-import { Box, MenuItem, Select, Typography } from '@mui/material'
+import Box from '@mui/material/Box'
+import MenuItem from '@mui/material/MenuItem'
+import Select from '@mui/material/Select'
+import Typography from '@mui/material/Typography'
+import type { FC } from 'react'
 import { useBookmarks, useFileOps } from '../../../entities/file/queries'
 import { usePaneStore } from '../../../features/pane/paneStore'
+import { errMessage } from '../../../shared/lib/format'
+import { useSnack } from '../../../shared/ui/SnackbarHost'
 import type { BookmarksSelectProps } from '../types'
 
-export function BookmarksSelect({ activePane }: BookmarksSelectProps) {
+export const BookmarksSelect: FC<BookmarksSelectProps> = ({ activePane }) => {
   const { data: bookmarks = [] } = useBookmarks()
   const ops = useFileOps()
   const navigateStore = usePaneStore((s) => s.navigate)
+  const show = useSnack((s) => s.show)
 
   return (
     <Select
@@ -36,7 +43,9 @@ export function BookmarksSelect({ activePane }: BookmarksSelectProps) {
               color="error"
               onClick={(ev) => {
                 ev.stopPropagation()
-                void ops.removeBookmark.mutateAsync(b.id)
+                ops.removeBookmark.mutate(b.id, {
+                  onError: (e) => show(errMessage(e), 'error'),
+                })
               }}
             >
               remove

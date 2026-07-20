@@ -1,17 +1,16 @@
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Typography,
-} from '@mui/material'
+import type { FC } from 'react'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogTitle from '@mui/material/DialogTitle'
+import Typography from '@mui/material/Typography'
 import type { RefObject } from 'react'
 import type { DeleteDialogsProps } from '../types'
 
-export function DeleteDialogs({ del, dispatch, paths, deleteBtnRef, onConfirm }: DeleteDialogsProps) {
+export const DeleteDialogs: FC<DeleteDialogsProps> = ({ del, dispatch, paths, deleteBtnRef, onConfirm }) => {
   const listed = del.paths.length ? del.paths : paths
 
   return (

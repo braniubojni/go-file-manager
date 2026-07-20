@@ -1,29 +1,23 @@
 import CheckIcon from '@mui/icons-material/Check'
-import {
-  AppBar,
-  Box,
-  Button,
-  Divider,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
-  Toolbar,
-} from '@mui/material'
+import AppBar from '@mui/material/AppBar'
+import Box from '@mui/material/Box'
+import Button from '@mui/material/Button'
+import Divider from '@mui/material/Divider'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import ListItemText from '@mui/material/ListItemText'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import Toolbar from '@mui/material/Toolbar'
 import { useQueryClient } from '@tanstack/react-query'
-import { useState, type MouseEvent } from 'react'
+import { useState, type FC, type MouseEvent } from 'react'
 import { usePatchSettings, useSettings } from '../../entities/file/queries'
 import { useDialogStore } from '../../features/ui/dialogStore'
 import { errMessage } from '../../shared/lib/format'
 import { useSnack } from '../../shared/ui/SnackbarHost'
+import { appBarSx, checkPlaceholderSx, listItemIconSx, toolbarSx } from './styles'
+import type { AppMenuBarProps } from './types'
 
-interface Props {
-  onNewFolder: () => void
-  onRename: () => void
-  onDelete: () => void
-}
-
-export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
+export const AppMenuBar: FC<AppMenuBarProps> = ({ onNewFolder, onRename, onDelete }) => {
   const { data: settings } = useSettings()
   const patch = usePatchSettings()
   const show = useSnack((s) => s.show)
@@ -39,12 +33,11 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
     setViewAnchor(null)
   }
 
-  const toggle = async (key: 'showHidden' | 'showExtensions') => {
-    try {
-      await patch({ [key]: !settings?.[key] })
-    } catch (e) {
-      show(errMessage(e), 'error')
-    }
+  const toggle = (key: 'showHidden' | 'showExtensions') => {
+    patch.mutate(
+      { [key]: !settings?.[key] },
+      { onError: (e) => show(errMessage(e), 'error') },
+    )
   }
 
   const refresh = () => {
@@ -58,8 +51,8 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
     }
 
   return (
-    <AppBar position="static" color="default" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-      <Toolbar variant="dense" sx={{ minHeight: 36, gap: 0.5, px: 1 }}>
+    <AppBar position="static" color="default" elevation={0} sx={appBarSx}>
+      <Toolbar variant="dense" sx={toolbarSx}>
         <Button data-testid="menu-file" size="small" onClick={openMenu(setFileAnchor)}>
           File
         </Button>
@@ -116,25 +109,19 @@ export function AppMenuBar({ onNewFolder, onRename, onDelete }: Props) {
           View
         </Button>
         <Menu anchorEl={viewAnchor} open={Boolean(viewAnchor)} onClose={closeAll}>
-          <MenuItem
-            data-testid="menu-view-hidden"
-            onClick={() => {
-              void toggle('showHidden')
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 28 }}>
-              {settings?.showHidden ? <CheckIcon fontSize="small" /> : <Box sx={{ width: 18 }} />}
+          <MenuItem data-testid="menu-view-hidden" onClick={() => toggle('showHidden')}>
+            <ListItemIcon sx={listItemIconSx}>
+              {settings?.showHidden ? <CheckIcon fontSize="small" /> : <Box sx={checkPlaceholderSx} />}
             </ListItemIcon>
             <ListItemText>Show hidden files</ListItemText>
           </MenuItem>
-          <MenuItem
-            data-testid="menu-view-extensions"
-            onClick={() => {
-              void toggle('showExtensions')
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 28 }}>
-              {settings?.showExtensions ? <CheckIcon fontSize="small" /> : <Box sx={{ width: 18 }} />}
+          <MenuItem data-testid="menu-view-extensions" onClick={() => toggle('showExtensions')}>
+            <ListItemIcon sx={listItemIconSx}>
+              {settings?.showExtensions ? (
+                <CheckIcon fontSize="small" />
+              ) : (
+                <Box sx={checkPlaceholderSx} />
+              )}
             </ListItemIcon>
             <ListItemText>Show file extensions</ListItemText>
           </MenuItem>

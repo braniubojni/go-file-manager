@@ -7,10 +7,10 @@ export const initialNameDialogState: NameDialogState = {
   name: '',
 }
 
-export function nameDialogReducer(
+export const nameDialogReducer = (
   state: NameDialogState,
   action: NameDialogAction,
-): NameDialogState {
+): NameDialogState => {
   switch (action.type) {
     case 'open':
       return { open: true, name: action.name }

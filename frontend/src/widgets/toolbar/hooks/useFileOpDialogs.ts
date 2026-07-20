@@ -8,17 +8,17 @@ import {
   initialNameDialogState,
   nameDialogReducer,
 } from '../../../features/file-ops/nameDialogReducer'
-import { useSnack } from '../../../shared/ui/SnackbarHost'
 import { errMessage } from '../../../shared/lib/format'
+import { useSnack } from '../../../shared/ui/SnackbarHost'
 import { isPermissionError } from '../helpers'
 import type { FileOpDialogsArgs } from '../types'
 
-export function useFileOpDialogs({
+export const useFileOpDialogs = ({
   activePath,
   realSelection,
   destPath,
   clearSelection,
-}: FileOpDialogsArgs) {
+}: FileOpDialogsArgs) => {
   const ops = useFileOps()
   const show = useSnack((s) => s.show)
   const [mkdir, dispatchMkdir] = useReducer(nameDialogReducer, initialNameDialogState)
@@ -26,32 +26,40 @@ export function useFileOpDialogs({
   const [del, dispatchDelete] = useReducer(deleteDialogReducer, initialDeleteDialogState)
   const deleteBtnRef = useRef<HTMLButtonElement | null>(null)
 
-  const run = useCallback(
-    async (label: string, fn: () => Promise<unknown>) => {
-      try {
-        await fn()
-        show(`${label} completed`, 'success')
-        clearSelection()
-      } catch (e) {
-        const msg = errMessage(e)
-        if (isPermissionError(msg)) {
-          dispatchDelete({ type: 'open_permission', message: msg })
-        } else {
-          show(msg, 'error')
-        }
+  const onOpError = useCallback(
+    (e: unknown) => {
+      const msg = errMessage(e)
+      if (isPermissionError(msg)) {
+        dispatchDelete({ type: 'open_permission', message: msg })
+      } else {
+        show(msg, 'error')
       }
+    },
+    [show],
+  )
+
+  const onOpSuccess = useCallback(
+    (label: string) => {
+      show(`${label} completed`, 'success')
+      clearSelection()
     },
     [show, clearSelection],
   )
 
   const onCopy = () => {
     if (!realSelection.length) return show('Select files to copy', 'warning')
-    void run('Copy', () => ops.copy.mutateAsync({ sources: realSelection, destDir: destPath }))
+    ops.copy.mutate(
+      { sources: realSelection, destDir: destPath },
+      { onSuccess: () => onOpSuccess('Copy'), onError: onOpError },
+    )
   }
 
   const onMove = () => {
     if (!realSelection.length) return show('Select files to move', 'warning')
-    void run('Move', () => ops.move.mutateAsync({ sources: realSelection, destDir: destPath }))
+    ops.move.mutate(
+      { sources: realSelection, destDir: destPath },
+      { onSuccess: () => onOpSuccess('Move'), onError: onOpError },
+    )
   }
 
   const onDelete = () => {
@@ -62,7 +70,10 @@ export function useFileOpDialogs({
   const confirmDelete = () => {
     const paths = del.paths.length ? del.paths : realSelection
     dispatchDelete({ type: 'close_confirm' })
-    void run('Delete', () => ops.del.mutateAsync(paths))
+    ops.del.mutate(paths, {
+      onSuccess: () => onOpSuccess('Delete'),
+      onError: onOpError,
+    })
   }
 
   const onMkdir = () => dispatchMkdir({ type: 'open', name: 'New Folder' })
@@ -70,7 +81,10 @@ export function useFileOpDialogs({
   const confirmMkdir = () => {
     const name = mkdir.name.trim()
     dispatchMkdir({ type: 'close' })
-    void run('Create folder', () => ops.mkdir.mutateAsync({ parent: activePath, name }))
+    ops.mkdir.mutate(
+      { parent: activePath, name },
+      { onSuccess: () => onOpSuccess('Create folder'), onError: onOpError },
+    )
   }
 
   const onRename = () => {
@@ -83,11 +97,17 @@ export function useFileOpDialogs({
     const newName = rename.name.trim()
     const oldPath = realSelection[0]
     dispatchRename({ type: 'close' })
-    void run('Rename', () => ops.rename.mutateAsync({ oldPath, newName }))
+    ops.rename.mutate(
+      { oldPath, newName },
+      { onSuccess: () => onOpSuccess('Rename'), onError: onOpError },
+    )
   }
 
   const onBookmark = () => {
-    void run('Bookmark', () => ops.addBookmark.mutateAsync({ name: '', path: activePath }))
+    ops.addBookmark.mutate(
+      { name: '', path: activePath },
+      { onSuccess: () => onOpSuccess('Bookmark'), onError: onOpError },
+    )
   }
 
   useEffect(() => {

@@ -1,12 +1,16 @@
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import HomeIcon from '@mui/icons-material/Home'
-import { Autocomplete, Box, IconButton, TextField, Tooltip } from '@mui/material'
-import { useEffect, useState } from 'react'
+import Autocomplete from '@mui/material/Autocomplete'
+import Box from '@mui/material/Box'
+import IconButton from '@mui/material/IconButton'
+import TextField from '@mui/material/TextField'
+import Tooltip from '@mui/material/Tooltip'
+import { useEffect, useState, type FC } from 'react'
 import { usePathCompletions } from '../../entities/file/queries'
 import type { PathBarProps } from './types'
 
 /** Normalize path for navigation: trim, strip trailing slashes (except root). */
-export function normalizeNavPath(value: string): string {
+export const normalizeNavPath = (value: string): string => {
   const trimmed = value.trim()
   if (!trimmed) return '/'
   // Keep Windows drive roots like C:\
@@ -17,7 +21,7 @@ export function normalizeNavPath(value: string): string {
   return stripped || '/'
 }
 
-export function PathBar({ paneId, path, onNavigate, onUp, onHome, onFocusPane }: PathBarProps) {
+export const PathBar: FC<PathBarProps> = ({ paneId, path, onNavigate, onUp, onHome, onFocusPane }) => {
   const [draft, setDraft] = useState(path)
   const [open, setOpen] = useState(false)
   const completions = usePathCompletions(draft, open || draft !== path)

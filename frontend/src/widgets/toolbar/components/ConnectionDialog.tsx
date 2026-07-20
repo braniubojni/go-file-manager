@@ -1,17 +1,16 @@
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  TextField,
-  Typography,
-} from '@mui/material'
+import type { FC } from 'react'
+import Button from '@mui/material/Button'
+import Checkbox from '@mui/material/Checkbox'
+import Dialog from '@mui/material/Dialog'
+import DialogActions from '@mui/material/DialogActions'
+import DialogContent from '@mui/material/DialogContent'
+import DialogTitle from '@mui/material/DialogTitle'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import TextField from '@mui/material/TextField'
+import Typography from '@mui/material/Typography'
 import type { ConnectionDialogProps } from '../types'
 
-export function ConnectionDialog({ dialog, dispatch, onSubmit }: ConnectionDialogProps) {
+export const ConnectionDialog: FC<ConnectionDialogProps> = ({ dialog, dispatch, onSubmit }) => {
   return (
     <Dialog
       data-testid="dialog-connection"

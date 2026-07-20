@@ -1,3 +1,4 @@
+import type { FC } from 'react'
 import { ArchiveDialog } from './components/ArchiveDialog'
 import { DeleteDialogs } from './components/DeleteDialogs'
 import { ExtractDialog } from './components/ExtractDialog'
@@ -5,7 +6,7 @@ import { NameDialog } from './components/NameDialog'
 import { ToolbarBar } from './components/ToolbarBar'
 import { useToolbarActions } from './hooks/useToolbarActions'
 
-export const Toolbar = () => {
+export const Toolbar: FC = () => {
   const a = useToolbarActions()
 
   return (

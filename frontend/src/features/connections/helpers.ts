@@ -1,4 +1,4 @@
-export function isAuthErrorMessage(msg: string): boolean {
+export const isAuthErrorMessage = (msg: string): boolean => {
   const m = msg.toLowerCase()
   return (
     m.includes('authentication required') ||

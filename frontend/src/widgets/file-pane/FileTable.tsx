@@ -1,12 +1,14 @@
-import { Box, CircularProgress, Typography } from '@mui/material'
-import {
-  DataGrid,
-  useGridApiRef,
-  type GridColDef,
-  type GridRowClassNameParams,
-  type GridRowParams,
-  type GridSortModel,
-} from '@mui/x-data-grid'
+import Box from '@mui/material/Box'
+import CircularProgress from '@mui/material/CircularProgress'
+import Typography from '@mui/material/Typography'
+import { useGridApiRef } from '@mui/x-data-grid'
+import { DataGrid } from '@mui/x-data-grid/DataGrid'
+import type {
+  GridColDef,
+  GridRowClassNameParams,
+  GridRowParams,
+  GridSortModel,
+} from '@mui/x-data-grid/models'
 import {
   useCallback,
   useEffect,
@@ -14,6 +16,7 @@ import {
   useRef,
   useState,
   type DragEvent,
+  type FC,
   type KeyboardEvent,
 } from 'react'
 import type { FileEntry } from '../../entities/file/types'
@@ -26,32 +29,32 @@ export type { DragPayload } from './types'
 
 const DND_MIME = 'application/x-gfm-paths'
 
-function displayName(e: FileEntry, showExtensions: boolean): string {
+const displayName = (e: FileEntry, showExtensions: boolean): string => {
   if (e.isDir || showExtensions || e.name === '..') return e.name
   const i = e.name.lastIndexOf('.')
   if (i <= 0) return e.name
   return e.name.slice(0, i)
 }
 
-function isParentPath(path: string): boolean {
+const isParentPath = (path: string): boolean => {
   return path.split(/[/\\]/).pop() === '..'
 }
 
-function sizeValue(e: FileEntry, folderSizes?: Record<string, number>): number {
+const sizeValue = (e: FileEntry, folderSizes?: Record<string, number>): number => {
   if (e.isDir && folderSizes && folderSizes[e.path] != null) return folderSizes[e.path]
   return e.size
 }
 
-function typeValue(e: FileEntry): string {
+const typeValue = (e: FileEntry): string => {
   return e.isDir ? 'dir' : e.ext || 'file'
 }
 
-function compareRows(
+const compareRows = (
   a: FileTableRow,
   b: FileTableRow,
   field: string,
   folderSizes?: Record<string, number>,
-): number {
+): number => {
   switch (field) {
     case 'displayName': {
       const an = a.displayName.toLowerCase()
@@ -77,11 +80,11 @@ function compareRows(
  * 2. folders (sorted by active column)
  * 3. files (sorted by active column)
  */
-export function sortRowsPinParent(
+export const sortRowsPinParent = (
   rows: FileTableRow[],
   sortModel: GridSortModel,
   folderSizes?: Record<string, number>,
-): FileTableRow[] {
+): FileTableRow[] => {
   const parent = rows.find((r) => r.name === '..')
   const rest = rows.filter((r) => r.name !== '..')
   const dirs = rest.filter((r) => r.isDir)
@@ -103,7 +106,7 @@ export function sortRowsPinParent(
   return parent ? [parent, ...dirs, ...files] : [...dirs, ...files]
 }
 
-export function FileTable({
+export const FileTable: FC<FileTableProps> = ({
   paneId,
   panePath,
   entries,
@@ -123,7 +126,7 @@ export function FileTable({
   onOpen,
   onDropPaths,
   onSortedPathsChange,
-}: FileTableProps) {
+}) => {
   const apiRef = useGridApiRef()
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const widths = useColumnStore((s) => s.widths)

@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { type ReactNode, useState } from 'react'
+import { useState, type FC, type ReactNode } from 'react'
 import { ErrorBoundary, GlobalErrorHost } from '../shared/ui/ErrorBoundary'
 import { SnackbarHost } from '../shared/ui/SnackbarHost'
 import { AppThemeProvider } from './theme'
 
-export function Providers({ children }: { children: ReactNode }) {
+export const Providers: FC<{ children: ReactNode }> = ({ children }) => {
   const [client] = useState(
     () =>
       new QueryClient({
