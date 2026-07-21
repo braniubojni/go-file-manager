@@ -61,9 +61,7 @@ export const ArchiveDialog: FC<ArchiveDialogProps> = ({
                 <Checkbox
                   checked={archive.encrypt}
                   disabled={archive.busy}
-                  onChange={(e) =>
-                    dispatch({ type: 'set', patch: { encrypt: e.target.checked } })
-                  }
+                  onChange={(e) => dispatch({ type: 'set', patch: { encrypt: e.target.checked } })}
                   data-testid="archive-encrypt-toggle"
                   size="small"
                 />
@@ -79,9 +77,7 @@ export const ArchiveDialog: FC<ArchiveDialogProps> = ({
                 data-testid="input-archive-password"
                 value={archive.password}
                 disabled={archive.busy}
-                onChange={(e) =>
-                  dispatch({ type: 'set', patch: { password: e.target.value } })
-                }
+                onChange={(e) => dispatch({ type: 'set', patch: { password: e.target.value } })}
               />
             )}
           </Box>

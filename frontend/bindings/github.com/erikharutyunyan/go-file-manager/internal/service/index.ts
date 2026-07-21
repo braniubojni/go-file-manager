@@ -6,10 +6,12 @@ import * as ConnectionService from "./connectionservice.js";
 import * as FileService from "./fileservice.js";
 import * as SettingsService from "./settingsservice.js";
 import * as TerminalService from "./terminalservice.js";
+import * as UpdateService from "./updateservice.js";
 export {
     BookmarkService,
     ConnectionService,
     FileService,
     SettingsService,
-    TerminalService
+    TerminalService,
+    UpdateService
 };

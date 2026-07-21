@@ -35,11 +35,36 @@ const (
 
 // Settings is the contents of settings.json.
 type Settings struct {
-	Theme          string `json:"theme"`
-	ShowHidden     bool   `json:"showHidden"`
-	ShowExtensions bool   `json:"showExtensions"`
-	LeftPath       string `json:"leftPath"`
-	RightPath      string `json:"rightPath"`
+	Theme                   string `json:"theme"`
+	ShowHidden              bool   `json:"showHidden"`
+	ShowExtensions          bool   `json:"showExtensions"`
+	UseBuiltInEditor        bool   `json:"useBuiltInEditor"`
+	AutoCheckUpdates        bool   `json:"autoCheckUpdates"`
+	UpdateCheckIntervalDays int    `json:"updateCheckIntervalDays"`
+	LastUpdateCheckAt       string `json:"lastUpdateCheckAt"`  // RFC3339; empty if never
+	SkippedUpdateVersion    string `json:"skippedUpdateVersion"` // remote version user skipped
+	LeftPath                string `json:"leftPath"`
+	RightPath               string `json:"rightPath"`
+}
+
+// UpdateInfo is the result of checking GitHub Releases for a newer version.
+type UpdateInfo struct {
+	CurrentVersion string `json:"currentVersion"`
+	LatestVersion  string `json:"latestVersion"`
+	Notes          string `json:"notes"`
+	HTMLURL        string `json:"htmlUrl"`
+	AssetName      string `json:"assetName"`
+	AssetURL       string `json:"assetUrl"`
+	AssetSize      int64  `json:"assetSize"`
+	Available      bool   `json:"available"`
+}
+
+// SearchHit is one result from nested file/folder search (Go-to).
+type SearchHit struct {
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	IsDir   bool   `json:"isDir"`
+	RelPath string `json:"relPath"`
 }
 
 // ShortcutDef describes one bindable action (for UI + docs).

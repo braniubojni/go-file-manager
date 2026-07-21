@@ -9,6 +9,8 @@ import DarkModeIcon from '@mui/icons-material/DarkMode'
 import DeleteIcon from '@mui/icons-material/Delete'
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove'
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline'
+import EditIcon from '@mui/icons-material/Edit'
+import NoteAddIcon from '@mui/icons-material/NoteAdd'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness'
@@ -36,7 +38,12 @@ const themeIcon = (theme: ThemePreference) => {
 
 export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
   return (
-    <AppBar position="static" color="default" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
+    <AppBar
+      position="static"
+      color="default"
+      elevation={0}
+      sx={{ borderBottom: 1, borderColor: 'divider' }}
+    >
       <MuiToolbar variant="dense" sx={{ gap: 0.5, minHeight: 48 }}>
         <Tooltip title="Back (Backspace)">
           <span>
@@ -68,10 +75,25 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
         <Button data-testid="btn-mkdir" startIcon={<CreateNewFolderIcon />} onClick={p.onMkdir}>
           New folder
         </Button>
-        <Button data-testid="btn-rename" startIcon={<DriveFileRenameOutlineIcon />} onClick={p.onRename}>
+        <Button data-testid="btn-mkfile" startIcon={<NoteAddIcon />} onClick={p.onMkfile}>
+          New file
+        </Button>
+        <Button data-testid="btn-edit" startIcon={<EditIcon />} onClick={p.onEditFile}>
+          Edit
+        </Button>
+        <Button
+          data-testid="btn-rename"
+          startIcon={<DriveFileRenameOutlineIcon />}
+          onClick={p.onRename}
+        >
           Rename
         </Button>
-        <Button data-testid="btn-delete" color="error" startIcon={<DeleteIcon />} onClick={p.onDelete}>
+        <Button
+          data-testid="btn-delete"
+          color="error"
+          startIcon={<DeleteIcon />}
+          onClick={p.onDelete}
+        >
           Delete
         </Button>
 

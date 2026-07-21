@@ -33,7 +33,8 @@ info:
 # Dev mode configuration
 dev_mode:
   root_path: .
-  log_level: warn
+  # Use info so Go + frontend proxy issues surface during `wails3 dev`
+  log_level: info
   debounce: 1000
   ignore:
     dir:

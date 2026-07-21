@@ -61,11 +61,16 @@ func (s *Store) ShortcutsPath() string {
 
 func DefaultSettings() domain.Settings {
 	return domain.Settings{
-		Theme:          domain.ThemeSystem,
-		ShowHidden:     false,
-		ShowExtensions: true,
-		LeftPath:       "",
-		RightPath:      "",
+		Theme:                   domain.ThemeSystem,
+		ShowHidden:              false,
+		ShowExtensions:          true,
+		UseBuiltInEditor:        true,
+		AutoCheckUpdates:        true,
+		UpdateCheckIntervalDays: 10,
+		LastUpdateCheckAt:       "",
+		SkippedUpdateVersion:    "",
+		LeftPath:                "",
+		RightPath:               "",
 	}
 }
 
@@ -79,6 +84,9 @@ func DefaultShortcuts() map[string]string {
 		"delete":           "Delete",
 		"rename":           "F2",
 		"mkdir":            "Mod+Shift+N",
+		"mkfile":           "Mod+N",
+		"editFile":         "F4",
+		"goTo":             "Mod+P",
 		"goParent":         "Alt+ArrowUp",
 		"goHome":           "Mod+Home",
 		"goBack":           "Backspace",
@@ -104,6 +112,9 @@ func ShortcutCatalog() []domain.ShortcutDef {
 		{"delete", "Delete", "Delete selection (with confirmation)"},
 		{"rename", "Rename", "Rename the single selected item"},
 		{"mkdir", "New folder", "Create a folder in the active pane"},
+		{"mkfile", "New file", "Create an empty file in the active pane"},
+		{"editFile", "Edit file", "Open the selected file in the built-in editor"},
+		{"goTo", "Go to file/folder", "Quick open nested files and folders in the active pane (Mod+P)"},
 		{"goParent", "Parent folder", "Go to the parent of the active pane"},
 		{"goHome", "Home", "Go to the home directory in the active pane"},
 		{"goBack", "Back", "Navigate back in the active pane history (also mouse back button)"},
@@ -162,6 +173,11 @@ func normalizeSettings(in domain.Settings) domain.Settings {
 	// zero value of bool is false, so we must detect presence via a second parse if needed.
 	// Callers pass full struct on save; on load we use explicit JSON with defaults merge.
 	out.ShowExtensions = in.ShowExtensions
+	out.UseBuiltInEditor = in.UseBuiltInEditor
+	out.AutoCheckUpdates = in.AutoCheckUpdates
+	out.UpdateCheckIntervalDays = in.UpdateCheckIntervalDays
+	out.LastUpdateCheckAt = in.LastUpdateCheckAt
+	out.SkippedUpdateVersion = in.SkippedUpdateVersion
 	// If file was empty object, ShowExtensions false is wrong — handle via pointer load.
 	out.LeftPath = in.LeftPath
 	out.RightPath = in.RightPath
@@ -196,6 +212,21 @@ func (s *Store) LoadSettingsStrict() (domain.Settings, error) {
 	}
 	if v, ok := m["showExtensions"].(bool); ok {
 		out.ShowExtensions = v
+	}
+	if v, ok := m["useBuiltInEditor"].(bool); ok {
+		out.UseBuiltInEditor = v
+	}
+	if v, ok := m["autoCheckUpdates"].(bool); ok {
+		out.AutoCheckUpdates = v
+	}
+	if v, ok := m["updateCheckIntervalDays"].(float64); ok && int(v) > 0 {
+		out.UpdateCheckIntervalDays = int(v)
+	}
+	if v, ok := m["lastUpdateCheckAt"].(string); ok {
+		out.LastUpdateCheckAt = v
+	}
+	if v, ok := m["skippedUpdateVersion"].(string); ok {
+		out.SkippedUpdateVersion = v
 	}
 	if v, ok := m["leftPath"].(string); ok {
 		out.LeftPath = v

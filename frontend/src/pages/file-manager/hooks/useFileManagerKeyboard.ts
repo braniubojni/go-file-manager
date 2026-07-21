@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { usePatchSettings, useSettings, useShortcutDefs } from '../../../entities/file/queries'
+import { useEditorStore } from '../../../features/editor/editorStore'
 import { useFileOpsStore } from '../../../features/file-ops/fileOpsStore'
+import { useGoToStore } from '../../../features/go-to/goToStore'
 import { usePaneStore } from '../../../features/pane/paneStore'
 import { useTerminalStore } from '../../../features/terminal/terminalStore'
 import { useDialogStore } from '../../../features/ui/dialogStore'
@@ -18,12 +20,25 @@ export const useFileManagerKeyboard = () => {
   const openShortcuts = useDialogStore((s) => s.openShortcuts)
   const trigger = useFileOpsStore((s) => s.trigger)
   const toggleTerminal = useTerminalStore((s) => s.toggleActive)
+  const openGoTo = useGoToStore((s) => s.openGoTo)
 
   useEffect(() => {
     const map = buildShortcutMap(shortcutDefs)
 
     const onKey = (e: KeyboardEvent) => {
+      const editorOpen = useEditorStore.getState().open
+
+      // Go-to: Mod+P — disabled while Monaco workspace is open
+      if (!editorOpen && findMatchingAction(e, map) === 'goTo') {
+        e.preventDefault()
+        const path = usePaneStore.getState().getPath(usePaneStore.getState().activePane)
+        if (path.startsWith('ssh://')) return
+        openGoTo()
+        return
+      }
+
       if (isCtrlBackquote(e) || findMatchingAction(e, map) === 'toggleTerminal') {
+        if (editorOpen) return
         if (isCtrlBackquote(e) || map.toggleTerminal) {
           const action = findMatchingAction(e, map)
           if (action === 'toggleTerminal' || isCtrlBackquote(e)) {
@@ -32,6 +47,20 @@ export const useFileManagerKeyboard = () => {
             return
           }
         }
+      }
+
+      // While editor open, only allow a few globals (settings/shortcuts)
+      if (editorOpen) {
+        if (isEditableTarget(e.target)) return
+        const action = findMatchingAction(e, map)
+        if (action === 'openSettings') {
+          e.preventDefault()
+          openSettings()
+        } else if (action === 'openShortcuts') {
+          e.preventDefault()
+          openShortcuts()
+        }
+        return
       }
 
       if (isEditableTarget(e.target)) return
@@ -141,6 +170,15 @@ export const useFileManagerKeyboard = () => {
         case 'mkdir':
           trigger('mkdir')
           break
+        case 'mkfile':
+          trigger('mkfile')
+          break
+        case 'editFile':
+          trigger('editFile')
+          break
+        case 'goTo':
+          openGoTo()
+          break
         case 'goParent':
           trigger('goParent')
           break
@@ -184,5 +222,6 @@ export const useFileManagerKeyboard = () => {
     toggleTerminal,
     goBack,
     goForward,
+    openGoTo,
   ])
 }

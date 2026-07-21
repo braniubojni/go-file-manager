@@ -55,10 +55,76 @@ This builds Go, generates bindings, runs the Vite frontend, and opens the app.
 ## Build
 
 ```bash
+# Current platform (production)
 wails3 build
+
+# Cross-platform (https://v3.wails.io/guides/build/cross-platform/)
+# One-time Docker image for non-native targets (~800MB):
+wails3 task setup:docker
+
+wails3 build GOOS=windows              # works from any host (CGO off by default)
+wails3 build GOOS=linux                # Docker on macOS/Windows
+wails3 build GOOS=darwin GOARCH=arm64  # Docker on Linux/Windows
+wails3 build GOOS=darwin GOARCH=amd64
+
+# Or Task helpers (pass VERSION for updater-compatible builds):
+task build:windows VERSION=0.1.0 ARCH=amd64
+task build:linux VERSION=0.1.0 ARCH=amd64
+task build:darwin VERSION=0.1.0 ARCH=arm64
 ```
 
 Output is under `bin/`.
+
+### Version injection
+
+Runtime version comes from `internal/version.Version` (default `0.0.0-dev`).  
+Pass `VERSION=x.y.z` into Task builds; production ldflags inject:
+
+```text
+-X github.com/erikharutyunyan/go-file-manager/internal/version.Version=x.y.z
+```
+
+## Updates (GitHub Releases)
+
+- **Repo:** `braniubojni/go-file-manager`
+- Settings → **Updates**: show version, check now, auto-check every **10 days** (default on)
+- Flow: check → confirm → download platform asset (if present) → open package → quit to finish install
+- If no matching asset: **Open releases page**
+
+### Releasing
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+GitHub Actions (`.github/workflows/release.yml`) builds on **native runners** (recommended by Wails):
+
+| Runner | Artifact |
+|--------|----------|
+| `ubuntu-latest` | `go-file-manager_{ver}_linux_amd64.tar.gz` |
+| `macos-latest` | `go-file-manager_{ver}_darwin_arm64.zip` (`.app` inside) |
+| `windows-latest` | `go-file-manager_{ver}_windows_amd64.zip` (`.exe` inside) |
+
+Then creates a GitHub Release with notes + those assets (+ `VERSION` file).
+
+The in-app updater matches `_{os}_{arch}` in asset names (`darwin`/`windows`/`linux`, `arm64`/`amd64`).
+
+**Note:** macOS artifacts from CI are ad-hoc signed only (not Developer ID). Users may need right-click → Open the first time.
+
+## Quality / CI
+
+```bash
+# Go
+go test ./internal/...
+gofmt -l .
+go vet ./...
+
+# Frontend
+cd frontend && npm run typecheck && npm run lint && npm run format:check && npm run build
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs these on PRs and `main`.
 
 ## Project layout
 

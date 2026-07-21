@@ -186,6 +186,21 @@ func parseSettingsJSON(data []byte) domain.Settings {
 	if v, ok := m["showExtensions"].(bool); ok {
 		out.ShowExtensions = v
 	}
+	if v, ok := m["useBuiltInEditor"].(bool); ok {
+		out.UseBuiltInEditor = v
+	}
+	if v, ok := m["autoCheckUpdates"].(bool); ok {
+		out.AutoCheckUpdates = v
+	}
+	if v, ok := m["updateCheckIntervalDays"].(float64); ok && int(v) > 0 {
+		out.UpdateCheckIntervalDays = int(v)
+	}
+	if v, ok := m["lastUpdateCheckAt"].(string); ok {
+		out.LastUpdateCheckAt = v
+	}
+	if v, ok := m["skippedUpdateVersion"].(string); ok {
+		out.SkippedUpdateVersion = v
+	}
 	if v, ok := m["leftPath"].(string); ok {
 		out.LeftPath = v
 	}
@@ -201,6 +216,9 @@ func normalizeSettingsForSave(in domain.Settings) domain.Settings {
 	case domain.ThemeSystem, domain.ThemeDark, domain.ThemeLight:
 	default:
 		out.Theme = domain.ThemeSystem
+	}
+	if out.UpdateCheckIntervalDays <= 0 {
+		out.UpdateCheckIntervalDays = 10
 	}
 	return out
 }

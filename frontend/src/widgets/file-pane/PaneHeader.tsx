@@ -106,7 +106,9 @@ export const PaneHeader: FC<Props> = ({
       </IconButton>
     </Tooltip>
     <Tooltip
-      title={path.startsWith('ssh://') ? 'Terminal unavailable on remote' : 'Toggle terminal (Ctrl+`)'}
+      title={
+        path.startsWith('ssh://') ? 'Terminal unavailable on remote' : 'Toggle terminal (Ctrl+`)'
+      }
     >
       <span>
         <IconButton

@@ -1,6 +1,11 @@
 import type { Dispatch, RefObject } from 'react'
 import type { PaneId, ThemePreference } from '../../entities/file/types'
-import type { ArchiveAction, ArchiveState, ExtractAction, ExtractState } from '../../features/archive/types'
+import type {
+  ArchiveAction,
+  ArchiveState,
+  ExtractAction,
+  ExtractState,
+} from '../../features/archive/types'
 import type { AddConnectionAction, AddConnectionState } from '../../features/connections/types'
 import type {
   DeleteDialogAction,
@@ -28,6 +33,8 @@ export type ToolbarBarProps = {
   onCopy: () => void
   onMove: () => void
   onMkdir: () => void
+  onMkfile: () => void
+  onEditFile: () => void
   onRename: () => void
   onDelete: () => void
   onArchive: () => void

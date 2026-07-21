@@ -9,6 +9,7 @@ require (
 	github.com/wailsapp/wails/v3 v3.0.0-alpha2.117
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
 	golang.org/x/crypto v0.54.0
+	golang.org/x/mod v0.38.0
 	modernc.org/sqlite v1.54.0
 )
 

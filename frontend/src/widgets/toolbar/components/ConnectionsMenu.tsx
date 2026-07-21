@@ -130,11 +130,7 @@ export const ConnectionsMenu: FC = () => {
         </MenuItem>
       </Menu>
 
-      <ConnectionDialog
-        dialog={dialog}
-        dispatch={dispatch}
-        onSubmit={() => void submitDialog()}
-      />
+      <ConnectionDialog dialog={dialog} dispatch={dispatch} onSubmit={() => void submitDialog()} />
     </>
   )
 }

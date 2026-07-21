@@ -23,8 +23,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   isOpen: (id) => (id === 'left' ? get().leftOpen : get().rightOpen),
 
-  setOpen: (id, open) =>
-    set(id === 'left' ? { leftOpen: open } : { rightOpen: open }),
+  setOpen: (id, open) => set(id === 'left' ? { leftOpen: open } : { rightOpen: open }),
 
   toggle: (id) => {
     if (id === 'left') set((s) => ({ leftOpen: !s.leftOpen }))

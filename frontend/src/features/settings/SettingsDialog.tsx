@@ -20,6 +20,7 @@ import type { AppSettings, ThemePreference } from '../../entities/file/types'
 import { SettingsService } from '../../shared/api/bindings'
 import { errMessage } from '../../shared/lib/format'
 import { useSnack } from '../../shared/ui/SnackbarHost'
+import { UpdatesSection } from './UpdatesSection'
 
 interface Props {
   open: boolean
@@ -73,9 +74,7 @@ const SettingsDialog: FC<Props> = ({ open, onClose }) => {
                 labelId="theme-label"
                 label="Theme"
                 value={draft.theme}
-                onChange={(e) =>
-                  setDraft({ ...draft, theme: e.target.value as ThemePreference })
-                }
+                onChange={(e) => setDraft({ ...draft, theme: e.target.value as ThemePreference })}
               >
                 <MenuItem value="system">System</MenuItem>
                 <MenuItem value="dark">Dark</MenuItem>
@@ -109,6 +108,21 @@ const SettingsDialog: FC<Props> = ({ open, onClose }) => {
               label="Show file extensions"
             />
           </Tooltip>
+
+          <Tooltip title="Open text files in the built-in editor instead of the system app.">
+            <FormControlLabel
+              control={
+                <Switch
+                  data-testid="settings-use-builtin-editor"
+                  checked={draft.useBuiltInEditor}
+                  onChange={(_, v) => setDraft({ ...draft, useBuiltInEditor: v })}
+                />
+              }
+              label="Use built-in editor"
+            />
+          </Tooltip>
+
+          <UpdatesSection draft={draft} onChange={setDraft} />
 
           <Typography variant="caption" color="text.secondary">
             Pane paths are saved automatically when you navigate. Bookmarks use SQLite separately.

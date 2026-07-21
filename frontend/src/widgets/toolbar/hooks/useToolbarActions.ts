@@ -2,6 +2,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { useSetTheme, useSettings } from '../../../entities/file/queries'
 import type { ThemePreference } from '../../../entities/file/types'
+import { parentDirOf, useEditorStore } from '../../../features/editor/editorStore'
+import { useGoToStore } from '../../../features/go-to/goToStore'
 import { usePaneStore } from '../../../features/pane/paneStore'
 import { useDialogStore } from '../../../features/ui/dialogStore'
 import { FileService } from '../../../shared/api/bindings'
@@ -35,6 +37,9 @@ export const useToolbarActions = () => {
   const clearSelection = usePaneStore((s) => s.clearSelection)
   const otherPane = usePaneStore((s) => s.otherPane)
   const openSettings = useDialogStore((s) => s.openSettings)
+  const openWorkspace = useEditorStore((s) => s.openWorkspace)
+  const openGoTo = useGoToStore((s) => s.openGoTo)
+  const editorOpen = useEditorStore((s) => s.open)
 
   const canBack = activePane === 'left' ? leftBack.length > 0 : rightBack.length > 0
   const canForward = activePane === 'left' ? leftForward.length > 0 : rightForward.length > 0
@@ -85,6 +90,32 @@ export const useToolbarActions = () => {
     }
   }
 
+  const onEditFile = () => {
+    if (realSelection.length !== 1) {
+      show('Select exactly one file to edit', 'warning')
+      return
+    }
+    const path = realSelection[0]
+    if (path.startsWith('ssh://')) {
+      show('Built-in editor is not available on remote connections yet', 'warning')
+      return
+    }
+    if (settings?.useBuiltInEditor === false) {
+      void FileService.Open(path).catch((e) => show(errMessage(e), 'error'))
+      return
+    }
+    openWorkspace(parentDirOf(path), path)
+  }
+
+  const onGoTo = () => {
+    if (editorOpen) return
+    if (activePath.startsWith('ssh://')) {
+      show('Go-to is not available on remote connections yet', 'warning')
+      return
+    }
+    openGoTo()
+  }
+
   useFileOpsRequest(
     createToolbarRequestHandlers({
       copy: fileOps.onCopy,
@@ -92,6 +123,9 @@ export const useToolbarActions = () => {
       delete: fileOps.onDelete,
       rename: fileOps.onRename,
       mkdir: fileOps.onMkdir,
+      mkfile: fileOps.onMkfile,
+      editFile: onEditFile,
+      goTo: onGoTo,
       refresh: refreshAll,
       goParent: () => void goParent(),
       goHome: () => void goHome(),
@@ -116,6 +150,8 @@ export const useToolbarActions = () => {
     openSettings,
     cycleTheme,
     refreshAll,
+    onEditFile,
+    onGoTo,
     ...fileOps,
     ...archiveOps,
   }

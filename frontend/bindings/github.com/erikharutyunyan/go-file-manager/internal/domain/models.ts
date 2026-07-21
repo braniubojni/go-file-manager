@@ -90,12 +90,35 @@ export interface PanePaths {
 }
 
 /**
+ * SearchHit is one result from nested file/folder search (Go-to).
+ */
+export interface SearchHit {
+    "name": string;
+    "path": string;
+    "isDir": boolean;
+    "relPath": string;
+}
+
+/**
  * Settings is the contents of settings.json.
  */
 export interface Settings {
     "theme": string;
     "showHidden": boolean;
     "showExtensions": boolean;
+    "useBuiltInEditor": boolean;
+    "autoCheckUpdates": boolean;
+    "updateCheckIntervalDays": number;
+
+    /**
+     * RFC3339; empty if never
+     */
+    "lastUpdateCheckAt": string;
+
+    /**
+     * remote version user skipped
+     */
+    "skippedUpdateVersion": string;
     "leftPath": string;
     "rightPath": string;
 }
@@ -108,4 +131,18 @@ export interface ShortcutDef {
     "label": string;
     "description": string;
     "binding": string;
+}
+
+/**
+ * UpdateInfo is the result of checking GitHub Releases for a newer version.
+ */
+export interface UpdateInfo {
+    "currentVersion": string;
+    "latestVersion": string;
+    "notes": string;
+    "htmlUrl": string;
+    "assetName": string;
+    "assetUrl": string;
+    "assetSize": number;
+    "available": boolean;
 }

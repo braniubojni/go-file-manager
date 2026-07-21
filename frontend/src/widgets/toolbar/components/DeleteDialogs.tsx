@@ -10,7 +10,13 @@ import Typography from '@mui/material/Typography'
 import type { RefObject } from 'react'
 import type { DeleteDialogsProps } from '../types'
 
-export const DeleteDialogs: FC<DeleteDialogsProps> = ({ del, dispatch, paths, deleteBtnRef, onConfirm }) => {
+export const DeleteDialogs: FC<DeleteDialogsProps> = ({
+  del,
+  dispatch,
+  paths,
+  deleteBtnRef,
+  onConfirm,
+}) => {
   const listed = del.paths.length ? del.paths : paths
 
   return (
@@ -65,8 +71,8 @@ export const DeleteDialogs: FC<DeleteDialogsProps> = ({ del, dispatch, paths, de
         <DialogContent>
           <DialogContentText sx={{ mb: 1 }}>{del.permissionMessage}</DialogContentText>
           <DialogContentText variant="body2">
-            The system blocked this delete. On macOS, grant the app access under System Settings → Privacy
-            &amp; Security → Files and Folders (or Full Disk Access), then try again.
+            The system blocked this delete. On macOS, grant the app access under System Settings →
+            Privacy &amp; Security → Files and Folders (or Full Disk Access), then try again.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

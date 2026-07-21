@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookmarkService, FileService, SettingsService } from '../../shared/api/bindings'
-import type { AppSettings, Bookmark, FileEntry, PanePaths, ShortcutDef, ThemePreference } from './types'
+import type {
+  AppSettings,
+  Bookmark,
+  FileEntry,
+  PanePaths,
+  SearchHit,
+  ShortcutDef,
+  ThemePreference,
+} from './types'
 import { defaultSettings } from './types'
 
 export const queryKeys = {
@@ -33,34 +41,60 @@ export const useSettings = () => {
 }
 
 /** Accept loose binding payloads (generated types use string theme, etc.). */
-const normalizeSettings = (s: {
-  theme?: string
-  showHidden?: boolean
-  showExtensions?: boolean
-  leftPath?: string
-  rightPath?: string
-} | null | undefined): AppSettings => {
+const normalizeSettings = (
+  s:
+    | {
+        theme?: string
+        showHidden?: boolean
+        showExtensions?: boolean
+        useBuiltInEditor?: boolean
+        autoCheckUpdates?: boolean
+        updateCheckIntervalDays?: number
+        lastUpdateCheckAt?: string
+        skippedUpdateVersion?: string
+        leftPath?: string
+        rightPath?: string
+      }
+    | null
+    | undefined,
+): AppSettings => {
   const theme = s?.theme
+  const interval = s?.updateCheckIntervalDays
   return {
-    theme: theme === 'dark' || theme === 'light' || theme === 'system' ? theme : defaultSettings.theme,
+    theme:
+      theme === 'dark' || theme === 'light' || theme === 'system' ? theme : defaultSettings.theme,
     showHidden: Boolean(s?.showHidden),
     showExtensions: s?.showExtensions !== false,
+    useBuiltInEditor: s?.useBuiltInEditor !== false,
+    autoCheckUpdates: s?.autoCheckUpdates !== false,
+    updateCheckIntervalDays:
+      typeof interval === 'number' && interval > 0
+        ? interval
+        : defaultSettings.updateCheckIntervalDays,
+    lastUpdateCheckAt: s?.lastUpdateCheckAt ?? '',
+    skippedUpdateVersion: s?.skippedUpdateVersion ?? '',
     leftPath: s?.leftPath ?? '',
     rightPath: s?.rightPath ?? '',
   }
 }
 
+const settingsPayload = (settings: AppSettings) => ({
+  theme: settings.theme,
+  showHidden: settings.showHidden,
+  showExtensions: settings.showExtensions,
+  useBuiltInEditor: settings.useBuiltInEditor,
+  autoCheckUpdates: settings.autoCheckUpdates,
+  updateCheckIntervalDays: settings.updateCheckIntervalDays,
+  lastUpdateCheckAt: settings.lastUpdateCheckAt,
+  skippedUpdateVersion: settings.skippedUpdateVersion,
+  leftPath: settings.leftPath,
+  rightPath: settings.rightPath,
+})
+
 export const useSaveSettings = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (settings: AppSettings) =>
-      SettingsService.SaveSettings({
-        theme: settings.theme,
-        showHidden: settings.showHidden,
-        showExtensions: settings.showExtensions,
-        leftPath: settings.leftPath,
-        rightPath: settings.rightPath,
-      }),
+    mutationFn: (settings: AppSettings) => SettingsService.SaveSettings(settingsPayload(settings)),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.settings })
     },
@@ -75,18 +109,29 @@ export const usePatchSettings = () => {
         (qc.getQueryData<AppSettings>(queryKeys.settings) as AppSettings | undefined) ??
         normalizeSettings(await SettingsService.GetSettings())
       const next = { ...current, ...patch }
-      await SettingsService.SaveSettings({
-        theme: next.theme,
-        showHidden: next.showHidden,
-        showExtensions: next.showExtensions,
-        leftPath: next.leftPath,
-        rightPath: next.rightPath,
-      })
+      await SettingsService.SaveSettings(settingsPayload(next))
       return next
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.settings })
     },
+  })
+}
+
+export const useSearchTree = (
+  root: string | undefined,
+  query: string,
+  showHidden: boolean,
+  enabled: boolean,
+) => {
+  return useQuery({
+    queryKey: ['searchTree', root ?? '', query, showHidden] as const,
+    queryFn: async () => {
+      const rows = await FileService.SearchTree(root!, query, showHidden, 80)
+      return (rows ?? []) as SearchHit[]
+    },
+    enabled: Boolean(enabled && root && !root.startsWith('ssh://')),
+    staleTime: 2_000,
   })
 }
 
@@ -215,9 +260,14 @@ export const useFileOps = () => {
     onSuccess: (_d, v) => invalidate(v.parent),
   })
 
+  const mkfile = useMutation({
+    mutationFn: ({ parent, name }: { parent: string; name: string }) =>
+      FileService.CreateFile(parent, name),
+    onSuccess: (_d, v) => invalidate(v.parent),
+  })
+
   const addBookmark = useMutation({
-    mutationFn: ({ name, path }: { name: string; path: string }) =>
-      BookmarkService.Add(name, path),
+    mutationFn: ({ name, path }: { name: string; path: string }) => BookmarkService.Add(name, path),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.bookmarks })
     },
@@ -230,7 +280,7 @@ export const useFileOps = () => {
     },
   })
 
-  return { copy, move, del, rename, mkdir, addBookmark, removeBookmark }
+  return { copy, move, del, rename, mkdir, mkfile, addBookmark, removeBookmark }
 }
 
 const parentDirs = (paths: string[]): string[] => {

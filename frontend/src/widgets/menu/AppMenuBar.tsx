@@ -17,7 +17,13 @@ import { useSnack } from '../../shared/ui/SnackbarHost'
 import { appBarSx, checkPlaceholderSx, listItemIconSx, toolbarSx } from './styles'
 import type { AppMenuBarProps } from './types'
 
-export const AppMenuBar: FC<AppMenuBarProps> = ({ onNewFolder, onRename, onDelete }) => {
+export const AppMenuBar: FC<AppMenuBarProps> = ({
+  onNewFolder,
+  onNewFile,
+  onEditFile,
+  onRename,
+  onDelete,
+}) => {
   const { data: settings } = useSettings()
   const patch = usePatchSettings()
   const show = useSnack((s) => s.show)
@@ -34,10 +40,7 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({ onNewFolder, onRename, onDelet
   }
 
   const toggle = (key: 'showHidden' | 'showExtensions') => {
-    patch.mutate(
-      { [key]: !settings?.[key] },
-      { onError: (e) => show(errMessage(e), 'error') },
-    )
+    patch.mutate({ [key]: !settings?.[key] }, { onError: (e) => show(errMessage(e), 'error') })
   }
 
   const refresh = () => {
@@ -45,10 +48,9 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({ onNewFolder, onRename, onDelet
     closeAll()
   }
 
-  const openMenu =
-    (setter: (el: HTMLElement | null) => void) => (e: MouseEvent<HTMLElement>) => {
-      setter(e.currentTarget)
-    }
+  const openMenu = (setter: (el: HTMLElement | null) => void) => (e: MouseEvent<HTMLElement>) => {
+    setter(e.currentTarget)
+  }
 
   return (
     <AppBar position="static" color="default" elevation={0} sx={appBarSx}>
@@ -65,6 +67,24 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({ onNewFolder, onRename, onDelet
             }}
           >
             New folder
+          </MenuItem>
+          <MenuItem
+            data-testid="menu-file-mkfile"
+            onClick={() => {
+              closeAll()
+              onNewFile()
+            }}
+          >
+            New file
+          </MenuItem>
+          <MenuItem
+            data-testid="menu-file-edit"
+            onClick={() => {
+              closeAll()
+              onEditFile()
+            }}
+          >
+            Edit
           </MenuItem>
           <MenuItem
             data-testid="menu-file-rename"
@@ -111,7 +131,11 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({ onNewFolder, onRename, onDelet
         <Menu anchorEl={viewAnchor} open={Boolean(viewAnchor)} onClose={closeAll}>
           <MenuItem data-testid="menu-view-hidden" onClick={() => toggle('showHidden')}>
             <ListItemIcon sx={listItemIconSx}>
-              {settings?.showHidden ? <CheckIcon fontSize="small" /> : <Box sx={checkPlaceholderSx} />}
+              {settings?.showHidden ? (
+                <CheckIcon fontSize="small" />
+              ) : (
+                <Box sx={checkPlaceholderSx} />
+              )}
             </ListItemIcon>
             <ListItemText>Show hidden files</ListItemText>
           </MenuItem>

@@ -41,7 +41,10 @@ export const useArchiveExtract = ({
     }
     const base =
       realSelection.length === 1
-        ? realSelection[0].split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') || 'archive'
+        ? realSelection[0]
+            .split(/[/\\]/)
+            .pop()
+            ?.replace(/\.[^.]+$/, '') || 'archive'
         : 'archive'
     dispatchArchive({ type: 'open', defaultName: base, formats })
   }

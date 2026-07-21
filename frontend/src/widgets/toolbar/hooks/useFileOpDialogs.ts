@@ -22,6 +22,7 @@ export const useFileOpDialogs = ({
   const ops = useFileOps()
   const show = useSnack((s) => s.show)
   const [mkdir, dispatchMkdir] = useReducer(nameDialogReducer, initialNameDialogState)
+  const [mkfile, dispatchMkfile] = useReducer(nameDialogReducer, initialNameDialogState)
   const [rename, dispatchRename] = useReducer(nameDialogReducer, initialNameDialogState)
   const [del, dispatchDelete] = useReducer(deleteDialogReducer, initialDeleteDialogState)
   const deleteBtnRef = useRef<HTMLButtonElement | null>(null)
@@ -76,7 +77,12 @@ export const useFileOpDialogs = ({
     })
   }
 
-  const onMkdir = () => dispatchMkdir({ type: 'open', name: 'New Folder' })
+  const onMkdir = () => {
+    if (activePath.startsWith('ssh://')) {
+      return show('Not available on remote connections yet', 'warning')
+    }
+    dispatchMkdir({ type: 'open', name: 'New Folder' })
+  }
 
   const confirmMkdir = () => {
     const name = mkdir.name.trim()
@@ -84,6 +90,22 @@ export const useFileOpDialogs = ({
     ops.mkdir.mutate(
       { parent: activePath, name },
       { onSuccess: () => onOpSuccess('Create folder'), onError: onOpError },
+    )
+  }
+
+  const onMkfile = () => {
+    if (activePath.startsWith('ssh://')) {
+      return show('Not available on remote connections yet', 'warning')
+    }
+    dispatchMkfile({ type: 'open', name: 'untitled.txt' })
+  }
+
+  const confirmMkfile = () => {
+    const name = mkfile.name.trim()
+    dispatchMkfile({ type: 'close' })
+    ops.mkfile.mutate(
+      { parent: activePath, name },
+      { onSuccess: () => onOpSuccess('Create file'), onError: onOpError },
     )
   }
 
@@ -118,19 +140,23 @@ export const useFileOpDialogs = ({
 
   return {
     mkdir,
+    mkfile,
     rename,
     del,
     deleteBtnRef,
     dispatchMkdir,
+    dispatchMkfile,
     dispatchRename,
     dispatchDelete,
     onCopy,
     onMove,
     onDelete,
     onMkdir,
+    onMkfile,
     onRename,
     onBookmark,
     confirmMkdir,
+    confirmMkfile,
     confirmRename,
     confirmDelete,
   }

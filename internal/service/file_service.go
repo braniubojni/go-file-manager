@@ -144,6 +144,38 @@ func (s *FileService) Mkdir(parent, name string) (string, error) {
 	return filesystem.Mkdir(parent, name)
 }
 
+// CreateFile creates an empty file under parent (local only).
+func (s *FileService) CreateFile(parent, name string) (string, error) {
+	if remote.IsRemote(parent) {
+		return "", fmt.Errorf("create file is not available on remote connections yet")
+	}
+	return filesystem.CreateFile(parent, name)
+}
+
+// ReadTextFile reads a local text file for the built-in editor.
+func (s *FileService) ReadTextFile(path string) (string, error) {
+	if remote.IsRemote(path) {
+		return "", fmt.Errorf("built-in editor is not available on remote connections yet")
+	}
+	return filesystem.ReadTextFile(path)
+}
+
+// WriteTextFile writes a local text file from the built-in editor.
+func (s *FileService) WriteTextFile(path, content string) error {
+	if remote.IsRemote(path) {
+		return fmt.Errorf("built-in editor is not available on remote connections yet")
+	}
+	return filesystem.WriteTextFile(path, content)
+}
+
+// SearchTree finds nested files/folders under root (local only; Go-to).
+func (s *FileService) SearchTree(root, query string, showHidden bool, limit int) ([]domain.SearchHit, error) {
+	if remote.IsRemote(root) {
+		return nil, fmt.Errorf("go-to is not available on remote connections yet")
+	}
+	return filesystem.SearchTree(root, query, showHidden, limit)
+}
+
 // Open opens a path with the OS default application.
 func (s *FileService) Open(path string) error {
 	if remote.IsRemote(path) {

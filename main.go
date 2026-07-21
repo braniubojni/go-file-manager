@@ -31,6 +31,7 @@ func main() {
 	bookmarkSvc := service.NewBookmarkService(db)
 	termSvc := service.NewTerminalService()
 	connSvc := service.NewConnectionService(db, remoteMgr)
+	updateSvc := service.NewUpdateService()
 
 	app := application.New(application.Options{
 		Name:        "go-file-manager",
@@ -41,6 +42,7 @@ func main() {
 			application.NewService(bookmarkSvc),
 			application.NewService(termSvc),
 			application.NewService(connSvc),
+			application.NewService(updateSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

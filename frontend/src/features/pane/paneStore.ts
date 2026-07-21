@@ -75,7 +75,7 @@ export const usePaneStore = create<PaneState>((set, get) => ({
   setActivePane: (id) => set({ activePane: id }),
 
   setPath: (id, path) =>
-    set((s) =>
+    set(() =>
       id === 'left'
         ? { leftPath: path, leftSelection: [], leftFocus: '', leftAnchor: '' }
         : { rightPath: path, rightSelection: [], rightFocus: '', rightAnchor: '' },
@@ -243,7 +243,9 @@ export const usePaneStore = create<PaneState>((set, get) => ({
   getFocus: (id) => (id === 'left' ? get().leftFocus : get().rightFocus),
 
   getActionPaths: (id) => {
-    const sel = get().getSelection(id).filter((p) => !isParentEntry(p))
+    const sel = get()
+      .getSelection(id)
+      .filter((p) => !isParentEntry(p))
     if (sel.length) return sel
     const focus = get().getFocus(id)
     if (focus && !isParentEntry(focus)) return [focus]

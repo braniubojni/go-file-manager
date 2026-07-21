@@ -22,6 +22,8 @@ export const Toolbar: FC = () => {
         onCopy={a.onCopy}
         onMove={a.onMove}
         onMkdir={a.onMkdir}
+        onMkfile={a.onMkfile}
+        onEditFile={a.onEditFile}
         onRename={a.onRename}
         onDelete={a.onDelete}
         onArchive={() => void a.openArchiveDialog()}
@@ -42,6 +44,18 @@ export const Toolbar: FC = () => {
         state={a.mkdir}
         dispatch={a.dispatchMkdir}
         onConfirm={a.confirmMkdir}
+      />
+
+      <NameDialog
+        testId="dialog-mkfile"
+        title="Create file"
+        label="File name"
+        inputTestId="input-mkfile-name"
+        confirmTestId="btn-mkfile-confirm"
+        confirmLabel="Create"
+        state={a.mkfile}
+        dispatch={a.dispatchMkfile}
+        onConfirm={a.confirmMkfile}
       />
 
       <NameDialog

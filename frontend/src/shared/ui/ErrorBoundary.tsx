@@ -107,7 +107,12 @@ const ErrorRecovery = ({ message, onDismiss }: { message: string; onDismiss?: ()
           {message || 'An unexpected error occurred.'}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Button variant="contained" color="primary" onClick={refresh} data-testid="btn-error-refresh">
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={refresh}
+            data-testid="btn-error-refresh"
+          >
             Refresh
           </Button>
           {onDismiss && (

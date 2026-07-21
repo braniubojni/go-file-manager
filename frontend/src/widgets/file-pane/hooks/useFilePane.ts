@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useDirListing, useHomeDir, useSettings } from '../../../entities/file/queries'
 import type { FileEntry, PaneId } from '../../../entities/file/types'
+import { parentDirOf, useEditorStore } from '../../../features/editor/editorStore'
 import { useFolderSizeStore } from '../../../features/folder-size/folderSizeStore'
 import { newJobId, usePaneJobStore } from '../../../features/jobs/paneJobStore'
 import { usePaneStore } from '../../../features/pane/paneStore'
@@ -70,9 +71,19 @@ export const useFilePane = (id: PaneId) => {
     if (home) navigate(home)
   }
 
+  const openWorkspace = useEditorStore((s) => s.openWorkspace)
+
   const openEntry = (entry: FileEntry) => {
     if (entry.isDir) {
       navigate(entry.path)
+      return
+    }
+    if (entry.path.startsWith('ssh://')) {
+      show('Built-in editor is not available on remote connections yet', 'warning')
+      return
+    }
+    if (settings?.useBuiltInEditor !== false) {
+      openWorkspace(parentDirOf(entry.path), entry.path)
       return
     }
     void FileService.Open(entry.path).catch((e) => show(errMessage(e), 'error'))

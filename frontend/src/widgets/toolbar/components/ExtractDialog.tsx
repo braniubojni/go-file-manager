@@ -9,7 +9,12 @@ import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import type { ExtractDialogProps } from '../types'
 
-export const ExtractDialog: FC<ExtractDialogProps> = ({ extract, dispatch, selectionCount, onConfirm }) => {
+export const ExtractDialog: FC<ExtractDialogProps> = ({
+  extract,
+  dispatch,
+  selectionCount,
+  onConfirm,
+}) => {
   return (
     <Dialog
       data-testid="dialog-extract"

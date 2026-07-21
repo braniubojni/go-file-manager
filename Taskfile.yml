@@ -23,11 +23,51 @@ tasks:
     summary: Builds the application
     cmds:
       - task: "{{.GOOS}}:build"
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          DEV: '{{.DEV}}'
+          OUTPUT: '{{.OUTPUT}}'
+          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
+          OBFUSCATED: '{{.OBFUSCATED}}'
+          GARBLE_ARGS: '{{.GARBLE_ARGS}}'
+          CGO_ENABLED: '{{.CGO_ENABLED}}'
 
   package:
     summary: Packages a production build of the application
     cmds:
       - task: "{{.GOOS}}:package"
+        vars:
+          ARCH: '{{.ARCH}}'
+          VERSION: '{{.VERSION}}'
+          DEV: '{{.DEV}}'
+
+  # Local cross-compile helpers (see https://v3.wails.io/guides/build/cross-platform/)
+  # One-time for non-native targets: wails3 task setup:docker
+  build:windows:
+    summary: Cross-build Windows (native Go; set CGO_ENABLED=1 for Docker CGO)
+    cmds:
+      - task: windows:build
+        vars:
+          ARCH: '{{.ARCH | default "amd64"}}'
+          VERSION: '{{.VERSION}}'
+          CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
+
+  build:linux:
+    summary: Cross-build Linux (Docker on macOS/Windows, or native with gcc)
+    cmds:
+      - task: linux:build
+        vars:
+          ARCH: '{{.ARCH | default "amd64"}}'
+          VERSION: '{{.VERSION}}'
+
+  build:darwin:
+    summary: Cross-build macOS (Docker on Linux/Windows, native on macOS)
+    cmds:
+      - task: darwin:build
+        vars:
+          ARCH: '{{.ARCH | default ARCH}}'
+          VERSION: '{{.VERSION}}'
 
   run:
     summary: Runs the application
@@ -43,6 +83,20 @@ tasks:
     summary: Unit tests (Go)
     cmds:
       - go test ./internal/...
+
+  lint:
+    summary: Go + frontend lint/format/typecheck
+    cmds:
+      - gofmt -l .
+      - go vet ./...
+      - task: frontend:lint
+
+  frontend:lint:
+    dir: frontend
+    cmds:
+      - npm run typecheck
+      - npm run lint
+      - npm run format:check
 
   test:e2e:
     summary: Playwright e2e against Wails server mode

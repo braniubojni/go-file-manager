@@ -538,10 +538,10 @@ export const FileTable: FC<FileTableProps> = ({
           boxShadow: (t) => `inset 0 0 0 3px ${t.palette.success.main}`,
           zIndex: 1,
         },
-        '& .MuiDataGrid-row:hover': dropActive
-          ? { bgcolor: 'transparent' }
-          : undefined,
-        '&:focus': { outlineColor: dropActive ? 'success.main' : active ? 'primary.main' : 'divider' },
+        '& .MuiDataGrid-row:hover': dropActive ? { bgcolor: 'transparent' } : undefined,
+        '&:focus': {
+          outlineColor: dropActive ? 'success.main' : active ? 'primary.main' : 'divider',
+        },
       }}
     >
       {isLoading && !entries ? (

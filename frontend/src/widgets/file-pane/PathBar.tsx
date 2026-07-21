@@ -17,11 +17,18 @@ export const normalizeNavPath = (value: string): string => {
   if (/^[a-zA-Z]:\\?$/.test(trimmed)) {
     return trimmed.endsWith('\\') ? trimmed : `${trimmed}\\`
   }
-  const stripped = trimmed.replace(/[\/\\]+$/, '')
+  const stripped = trimmed.replace(/[/\\]+$/, '')
   return stripped || '/'
 }
 
-export const PathBar: FC<PathBarProps> = ({ paneId, path, onNavigate, onUp, onHome, onFocusPane }) => {
+export const PathBar: FC<PathBarProps> = ({
+  paneId,
+  path,
+  onNavigate,
+  onUp,
+  onHome,
+  onFocusPane,
+}) => {
   const [draft, setDraft] = useState(path)
   const [open, setOpen] = useState(false)
   const completions = usePathCompletions(draft, open || draft !== path)

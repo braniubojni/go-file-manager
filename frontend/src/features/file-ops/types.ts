@@ -4,9 +4,7 @@ export type NameDialogState = {
 }
 
 export type NameDialogAction =
-  | { type: 'open'; name: string }
-  | { type: 'close' }
-  | { type: 'set_name'; name: string }
+  { type: 'open'; name: string } | { type: 'close' } | { type: 'set_name'; name: string }
 
 export type DeleteDialogState = {
   confirmOpen: boolean
@@ -28,6 +26,9 @@ export type FileOpsRequest =
   | 'delete'
   | 'rename'
   | 'mkdir'
+  | 'mkfile'
+  | 'editFile'
+  | 'goTo'
   | 'refresh'
   | 'goParent'
   | 'goHome'

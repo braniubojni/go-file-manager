@@ -8,6 +8,8 @@ export type {
     ConnectionProfile,
     FileEntry,
     PanePaths,
+    SearchHit,
     Settings,
-    ShortcutDef
+    ShortcutDef,
+    UpdateInfo
 } from "./models.js";

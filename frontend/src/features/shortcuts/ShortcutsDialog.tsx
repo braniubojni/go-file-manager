@@ -91,9 +91,7 @@ const ShortcutsDialog: FC<Props> = ({ open, onClose }) => {
                       size="small"
                       fullWidth
                       value={bindings[row.id] ?? ''}
-                      onChange={(e) =>
-                        setBindings((b) => ({ ...b, [row.id]: e.target.value }))
-                      }
+                      onChange={(e) => setBindings((b) => ({ ...b, [row.id]: e.target.value }))}
                       slotProps={{ htmlInput: { spellCheck: false } }}
                     />
                   </TableCell>

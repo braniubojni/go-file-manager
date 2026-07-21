@@ -41,6 +41,13 @@ export function Copy(sources: string[] | null, destDir: string): $CancellablePro
     return $Call.ByID(3419756089, sources, destDir);
 }
 
+/**
+ * CreateFile creates an empty file under parent (local only).
+ */
+export function CreateFile(parent: string, name: string): $CancellablePromise<string> {
+    return $Call.ByID(1566414454, parent, name);
+}
+
 export function Delete(paths: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(4015740351, paths);
 }
@@ -113,6 +120,27 @@ export function Open(path: string): $CancellablePromise<void> {
     return $Call.ByID(2881462676, path);
 }
 
+/**
+ * ReadTextFile reads a local text file for the built-in editor.
+ */
+export function ReadTextFile(path: string): $CancellablePromise<string> {
+    return $Call.ByID(2975228065, path);
+}
+
 export function Rename(oldPath: string, newName: string): $CancellablePromise<string> {
     return $Call.ByID(2594677718, oldPath, newName);
+}
+
+/**
+ * SearchTree finds nested files/folders under root (local only; Go-to).
+ */
+export function SearchTree(root: string, query: string, showHidden: boolean, limit: number): $CancellablePromise<domain$0.SearchHit[] | null> {
+    return $Call.ByID(3279656272, root, query, showHidden, limit);
+}
+
+/**
+ * WriteTextFile writes a local text file from the built-in editor.
+ */
+export function WriteTextFile(path: string, content: string): $CancellablePromise<void> {
+    return $Call.ByID(1752048786, path, content);
 }

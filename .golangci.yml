@@ -1,0 +1,16 @@
+version: "2"
+run:
+  timeout: 3m
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+  exclusions:
+    paths:
+      - frontend/
+      - bin/
+      - e2e/
