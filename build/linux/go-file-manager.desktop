@@ -5,6 +5,6 @@ Exec=go-file-manager
 Icon=go-file-manager
 Categories=Development;
 Terminal=false
-Keywords=wails
+Keywords=wails;
 Version=1.0
 StartupNotify=false
