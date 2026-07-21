@@ -23,6 +23,11 @@ jobs:
             echo "$out"
             exit 1
           fi
+      # main.go embeds frontend/dist; create a stub so go tools work without a full UI build.
+      - name: Stub frontend embed assets
+        run: |
+          mkdir -p frontend/dist
+          printf '%s\n' '<!doctype html><title>ci-stub</title>' > frontend/dist/index.html
       - name: Vet
         run: go vet ./...
       - name: Test
