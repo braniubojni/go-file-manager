@@ -95,7 +95,7 @@ tasks:
     cmds:
       # Inject app version into binary when VERSION is set (docker build.sh has no VERSION hook)
       - |
-        set -euo pipefail
+        set -eu
         EXTRA="{{.DOCKER_EXTRA_TAGS}}"
         VER="{{.VERSION}}"
         LDFLAGS="-s -w"
