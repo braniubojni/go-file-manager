@@ -11,8 +11,8 @@ jobs:
     name: Go
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
 
@@ -43,10 +43,11 @@ jobs:
       - name: Test
         run: go test ./internal/...
 
+      # v2.4+ required for go1.25 (binary must be built with Go >= go.mod version).
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.1.6
+          version: v2.12.2
           args: --timeout=3m
 
   frontend:
@@ -56,13 +57,12 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+          cache-dependency-path: frontend/package-lock.json      - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run knip
