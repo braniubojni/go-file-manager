@@ -72,7 +72,7 @@ func (s *UpdateService) CheckForUpdate() (domain.UpdateInfo, error) {
 	if err != nil {
 		return info, fmt.Errorf("update check failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusNotFound {
 		// No releases yet — treat as up to date.
 		info.LatestVersion = stripV(current)
@@ -125,7 +125,7 @@ func (s *UpdateService) DownloadUpdate(assetURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("download failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("download HTTP %s", resp.Status)
 	}
@@ -148,8 +148,12 @@ func (s *UpdateService) DownloadUpdate(assetURL string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 	if _, err := io.Copy(out, resp.Body); err != nil {
+		_ = os.Remove(named)
+		return "", err
+	}
+	if err := out.Close(); err != nil {
 		_ = os.Remove(named)
 		return "", err
 	}

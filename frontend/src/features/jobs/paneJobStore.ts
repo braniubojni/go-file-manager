@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import type { PaneJobState } from './types'
 
-export type { PaneJob, PaneJobKind } from './types'
-
 export const usePaneJobStore = create<PaneJobState>((set, get) => ({
   left: null,
   right: null,

@@ -54,12 +54,17 @@ tasks:
           CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
 
   build:linux:
-    summary: Cross-build Linux (Docker on macOS/Windows, or native with gcc)
+    summary: Cross-build Linux (Docker on macOS/Windows uses gtk3; native Linux uses GTK4)
+    desc: |
+      From macOS/Windows: uses wails-cross Docker + gtk3 tag (image has GTK 4.8 only).
+      From Linux with gcc: native GTK4 build.
+      Example: task build:linux ARCH=arm64 VERSION=0.1.0
     cmds:
       - task: linux:build
         vars:
           ARCH: '{{.ARCH | default "amd64"}}'
           VERSION: '{{.VERSION}}'
+          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
 
   build:darwin:
     summary: Cross-build macOS (Docker on Linux/Windows, native on macOS)
@@ -84,10 +89,24 @@ tasks:
     cmds:
       - go test ./internal/...
 
+  ci:go:
+    summary: Run Go CI steps in Docker (Linux + Wails GTK; mirrors .github/workflows/ci.yml)
+    desc: |
+      Requires Docker image wails-cross (task setup:docker).
+      Reproduces gofmt, embed stub, go vet, and go test on Linux.
+    cmds:
+      - bash ./scripts/ci-go-docker.sh
+
   lint:
     summary: Go + frontend lint/format/typecheck
     cmds:
-      - gofmt -l .
+      - |
+        out=$(gofmt -l .)
+        if [ -n "$out" ]; then
+          echo "gofmt needed on:"
+          echo "$out"
+          exit 1
+        fi
       - go vet ./...
       - task: frontend:lint
 

@@ -11,10 +11,11 @@ jobs:
     name: Go
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+
       - name: Format
         run: |
           out=$(gofmt -l .)
@@ -23,14 +24,30 @@ jobs:
             echo "$out"
             exit 1
           fi
+
+      # main.go embeds frontend/dist; stub so go tools work without a full UI build.
+      - name: Stub frontend embed assets
+        run: |
+          mkdir -p frontend/dist
+          printf '%s\n' '<!doctype html><title>ci-stub</title>' > frontend/dist/index.html
+
+      # Wails v3 Linux stack needs GTK4 + WebKitGTK 6.0 for CGO (main + terminal service).
+      - name: Install Wails Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+
       - name: Vet
         run: go vet ./...
+
       - name: Test
         run: go test ./internal/...
+
+      # v2.4+ required for go1.25 (binary must be built with Go >= go.mod version).
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.1.6
+          version: v2.12.2
           args: --timeout=3m
 
   frontend:
@@ -40,14 +57,15 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm run knip
       - run: npm run format:check
       - run: npm run build

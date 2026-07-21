@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { UpdateInfo } from '../../entities/file/types'
 
-export type UpdatePhase = 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'error'
+type UpdatePhase = 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'error'
 
 type UpdateState = {
   phase: UpdatePhase

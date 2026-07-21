@@ -11,7 +11,7 @@ import type {
 } from './types'
 import { defaultSettings } from './types'
 
-export const queryKeys = {
+const queryKeys = {
   dir: (path: string, showHidden: boolean) => ['dir', path, showHidden] as const,
   home: ['home'] as const,
   settings: ['settings'] as const,
@@ -218,7 +218,7 @@ export const useSetTheme = () => {
   }
 }
 
-export const useInvalidateDirs = () => {
+const useInvalidateDirs = () => {
   const qc = useQueryClient()
   return (...paths: string[]) => {
     for (const p of paths) {

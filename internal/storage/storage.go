@@ -142,7 +142,7 @@ ORDER BY sort_order ASC, id ASC
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var list []domain.Bookmark
 	for rows.Next() {

@@ -4,11 +4,11 @@ import "testing"
 
 func TestParseSpec(t *testing.T) {
 	cases := []struct {
-		in       string
-		user     string
-		host     string
-		port     int
-		wantErr  bool
+		in      string
+		user    string
+		host    string
+		port    int
+		wantErr bool
 	}{
 		{"ssh username@ip", "username", "ip", 22, false},
 		{"user@192.168.1.1", "user", "192.168.1.1", 22, false},

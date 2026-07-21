@@ -5,7 +5,7 @@ import { FileService } from '../../shared/api/bindings'
 import { errMessage } from '../../shared/lib/format'
 import type { RunPaneJobOptions, ToolbarRequestHandlers } from './types'
 
-export type { SnackShow, ToolbarRequestHandlers } from './types'
+export type { ToolbarRequestHandlers } from './types'
 
 // --- errors ---
 

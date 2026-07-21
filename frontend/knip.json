@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "index.html!"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "bindings/**/*.ts"
+  ],
+  "ignore": [
+    "bindings/**"
+  ],
+  "vite": true
+}

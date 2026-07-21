@@ -1,9 +1,7 @@
-export type ArchiveFormat = string
-
 export type ArchiveState = {
   open: boolean
   formats: string[]
-  format: ArchiveFormat
+  format: string
   name: string
   encrypt: boolean
   password: string

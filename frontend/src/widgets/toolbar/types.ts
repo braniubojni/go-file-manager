@@ -17,7 +17,7 @@ import type {
 import type { PaneJobKind } from '../../features/jobs/types'
 
 /** Snackbar show callback used by toolbar helpers. */
-export type SnackShow = (msg: string, severity?: 'success' | 'error' | 'info' | 'warning') => void
+type SnackShow = (msg: string, severity?: 'success' | 'error' | 'info' | 'warning') => void
 
 /** One handler per file-ops store action (shortcuts, menu triggers). */
 export type ToolbarRequestHandlers = Record<FileOpsAction, () => void>

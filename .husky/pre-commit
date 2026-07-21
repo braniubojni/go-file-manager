@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+set -e
+# Format staged Go (gofmt) and frontend (prettier) files before commit.
+# Prevents CI gofmt / format:check failures.
+npx lint-staged

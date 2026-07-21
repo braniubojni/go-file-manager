@@ -1,6 +1,6 @@
 /** Parse "Mod+Shift+C" style bindings against a KeyboardEvent. */
 
-export const eventMatchesBinding = (e: KeyboardEvent, binding: string): boolean => {
+const eventMatchesBinding = (e: KeyboardEvent, binding: string): boolean => {
   if (!binding) return false
   const parts = binding.split('+').map((p) => p.trim())
   if (!parts.length) return false

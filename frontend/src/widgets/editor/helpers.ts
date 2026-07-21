@@ -13,7 +13,7 @@ import type { Extension } from '@codemirror/state'
 
 export const basename = (path: string): string => path.split(/[/\\]/).pop() || path
 
-export const extFromPath = (path: string): string => {
+const extFromPath = (path: string): string => {
   const base = path.split(/[/\\]/).pop() || ''
   const i = base.lastIndexOf('.')
   return i >= 0 ? base.slice(i + 1).toLowerCase() : ''

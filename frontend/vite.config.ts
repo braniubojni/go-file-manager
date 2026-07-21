@@ -21,7 +21,9 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: isDev ? true : 'hidden',
-      minify: isDev ? false : 'esbuild',
+      // Vite 8 / Rolldown: do not force esbuild (not installed by default).
+      // false = readable stacks in DEV builds; true = default Oxc minify in production.
+      minify: isDev ? false : true,
     },
     optimizeDeps: {
       include: [

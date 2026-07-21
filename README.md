@@ -63,15 +63,17 @@ wails3 build
 wails3 task setup:docker
 
 wails3 build GOOS=windows              # works from any host (CGO off by default)
-wails3 build GOOS=linux                # Docker on macOS/Windows
+wails3 build GOOS=linux                # Docker on macOS/Windows (auto gtk3 — see below)
+wails3 build GOOS=linux GOARCH=arm64   # Apple Silicon host → linux arm64
 wails3 build GOOS=darwin GOARCH=arm64  # Docker on Linux/Windows
-wails3 build GOOS=darwin GOARCH=amd64
 
 # Or Task helpers (pass VERSION for updater-compatible builds):
 task build:windows VERSION=0.1.0 ARCH=amd64
-task build:linux VERSION=0.1.0 ARCH=amd64
+task build:linux VERSION=0.1.0 ARCH=arm64
 task build:darwin VERSION=0.1.0 ARCH=arm64
 ```
+
+**Linux from macOS/Windows:** the `wails-cross` image has **GTK 4.8**, while default Wails v3 needs **GTK 4.10+** (`GtkFileDialog`). Cross-builds therefore use the legacy **`gtk3`** tag automatically. GitHub Actions builds Linux natively on Ubuntu 24.04 (full GTK4).
 
 Output is under `bin/`.
 
@@ -115,16 +117,32 @@ The in-app updater matches `_{os}_{arch}` in asset names (`darwin`/`windows`/`li
 ## Quality / CI
 
 ```bash
-# Go
+# Go (on macOS, go vet of the main package needs a frontend/dist stub; Linux CI also installs GTK4)
+mkdir -p frontend/dist && echo '<!doctype html><title>stub</title>' > frontend/dist/index.html
 go test ./internal/...
 gofmt -l .
-go vet ./...
+go vet ./...   # Linux requires: libgtk-4-dev libwebkitgtk-6.0-dev
 
 # Frontend
-cd frontend && npm run typecheck && npm run lint && npm run format:check && npm run build
+cd frontend && npm run typecheck && npm run lint && npm run knip && npm run format:check && npm run build
+
+# Mirror the Go GitHub Actions job in Docker (Ubuntu 24.04 + GTK4)
+task ci:go
+# or: bash scripts/ci-go-docker.sh
 ```
 
 GitHub Actions (`.github/workflows/ci.yml`) runs these on PRs and `main`.
+
+### Git hooks (Husky)
+
+Root `npm install` installs [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged). On every commit:
+
+- staged `*.go` → `gofmt -w`
+- staged `frontend/src/**/*.{ts,tsx,css,json}` → Prettier
+
+```bash
+npm install   # once (runs prepare → husky)
+```
 
 ## Project layout
 

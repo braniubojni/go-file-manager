@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=go-file-manager
+Exec=go-file-manager
+Icon=go-file-manager
+Categories=Development;
+Terminal=false
+Keywords=wails;
+Version=1.0
+StartupNotify=false
