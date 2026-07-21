@@ -95,7 +95,7 @@ tasks:
     cmds:
       # Inject app version into binary when VERSION is set (docker build.sh has no VERSION hook)
       - |
-        set -euo pipefail
+        set -eu
         EXTRA="{{.DOCKER_EXTRA_TAGS}}"
         VER="{{.VERSION}}"
         LDFLAGS="-s -w"
@@ -130,7 +130,7 @@ tasks:
       - mkdir -p {{.BIN_DIR}}
       - mv "bin/{{.APP_NAME}}-linux-{{.DOCKER_ARCH}}" "{{.OUTPUT}}"
     vars:
-      DOCKER_ARCH: '{{.ARCH | default "amd64"}}'
+      DOCKER_ARCH: '{{if or (eq (.ARCH | default "amd64") "arm64") (eq (.ARCH | default "amd64") "aarch64")}}arm64{{else}}amd64{{end}}'
       # wails-cross = Debian 12 / GTK 4.8 → default gtk3 for cross-compile from macOS/Windows
       DOCKER_EXTRA_TAGS: '{{if .EXTRA_TAGS}}{{.EXTRA_TAGS}}{{else}}gtk3{{end}}'
       VERSION: '{{.VERSION | default ""}}'
