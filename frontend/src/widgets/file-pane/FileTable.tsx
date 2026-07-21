@@ -25,8 +25,6 @@ import { formatModTime, formatSize } from '../../shared/lib/format'
 import { FileTypeIcon } from '../../shared/ui/FileTypeIcon'
 import type { DragPayload, FileTableProps, FileTableRow } from './types'
 
-export type { DragPayload } from './types'
-
 const DND_MIME = 'application/x-gfm-paths'
 
 const displayName = (e: FileEntry, showExtensions: boolean): string => {
@@ -80,7 +78,7 @@ const compareRows = (
  * 2. folders (sorted by active column)
  * 3. files (sorted by active column)
  */
-export const sortRowsPinParent = (
+const sortRowsPinParent = (
   rows: FileTableRow[],
   sortModel: GridSortModel,
   folderSizes?: Record<string, number>,

@@ -21,7 +21,7 @@ type Props = {
   onClose: () => void
 }
 
-export const GoToDialog: FC<Props> = ({ open, onClose }) => {
+const GoToDialog: FC<Props> = ({ open, onClose }) => {
   const activePane = usePaneStore((s) => s.activePane)
   const path = usePaneStore((s) => (s.activePane === 'left' ? s.leftPath : s.rightPath))
   const navigate = usePaneStore((s) => s.navigate)

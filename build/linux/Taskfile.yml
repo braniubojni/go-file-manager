@@ -72,6 +72,11 @@ tasks:
 
   build:docker:
     summary: Builds for Linux using Docker (for non-Linux hosts or when no C compiler available)
+    desc: |
+      The stock wails-cross image uses Debian 12 with GTK 4.8. Wails v3 default Linux
+      backend needs GTK 4.10+ (GtkFileDialog). Cross-builds therefore default to the
+      legacy `gtk3` tag (WebKit2GTK 4.1). Override with EXTRA_TAGS if needed.
+      Prefer native Ubuntu 24.04 CI for full GTK4 builds (see .github/workflows/release.yml).
     internal: true
     deps:
       - task: common:build:frontend
@@ -88,13 +93,47 @@ tasks:
           Docker image '{{.CROSS_IMAGE}}' not found.
           Build it first: wails3 task setup:docker
     cmds:
-      - docker run --rm -v "{{.ROOT_DIR}}:/app" {{.DOCKER_MOUNTS}} -e APP_NAME="{{.APP_NAME}}" {{if .EXTRA_TAGS}}-e EXTRA_TAGS="{{.EXTRA_TAGS}}"{{end}} {{if eq .OBFUSCATED "true"}}-e OBFUSCATED=true{{end}} {{if .GARBLE_ARGS}}-e GARBLE_ARGS="{{.GARBLE_ARGS}}"{{end}} "{{.CROSS_IMAGE}}" linux {{.DOCKER_ARCH}}
+      # Inject app version into binary when VERSION is set (docker build.sh has no VERSION hook)
+      - |
+        set -euo pipefail
+        EXTRA="{{.DOCKER_EXTRA_TAGS}}"
+        VER="{{.VERSION}}"
+        LDFLAGS="-s -w"
+        if [ -n "$VER" ]; then
+          LDFLAGS="$LDFLAGS -X github.com/erikharutyunyan/go-file-manager/internal/version.Version=$VER"
+        fi
+        docker run --rm \
+          -v "{{.ROOT_DIR}}:/app" {{.DOCKER_MOUNTS}} \
+          -e APP_NAME="{{.APP_NAME}}" \
+          -e EXTRA_TAGS="$EXTRA" \
+          {{if eq .OBFUSCATED "true"}}-e OBFUSCATED=true{{end}} \
+          {{if .GARBLE_ARGS}}-e GARBLE_ARGS="{{.GARBLE_ARGS}}"{{end}} \
+          --entrypoint sh \
+          "{{.CROSS_IMAGE}}" \
+          -c "
+            set -e
+            case '{{.DOCKER_ARCH}}' in
+              arm64|aarch64) export GOARCH=arm64 ;;
+              *) export GOARCH=amd64 ;;
+            esac
+            export GOOS=linux CC=gcc CGO_ENABLED=1 CGO_CFLAGS=-w
+            TAGS=production
+            if [ -n \"\$EXTRA_TAGS\" ]; then TAGS=\"\$TAGS,\$EXTRA_TAGS\"; fi
+            if [ \"\$OBFUSCATED\" = true ]; then TAGS=\"\$TAGS,wails_obfuscated\"; COMPILER=\"garble \$GARBLE_ARGS build\"; else COMPILER='go build'; fi
+            mkdir -p bin
+            # Prefer host-built frontend/dist
+            \$COMPILER -tags \"\$TAGS\" -trimpath -buildvcs=false -ldflags='$LDFLAGS' -o bin/{{.APP_NAME}}-linux-\$GOARCH .
+            echo Built: bin/{{.APP_NAME}}-linux-\$GOARCH
+          "
       - cmd: docker run --rm -v "{{.ROOT_DIR}}:/app" alpine chown -R $(id -u):$(id -g) /app/bin
         platforms: [linux, darwin]
       - mkdir -p {{.BIN_DIR}}
       - mv "bin/{{.APP_NAME}}-linux-{{.DOCKER_ARCH}}" "{{.OUTPUT}}"
     vars:
       DOCKER_ARCH: '{{.ARCH | default "amd64"}}'
+      # wails-cross = Debian 12 / GTK 4.8 → default gtk3 for cross-compile from macOS/Windows
+      DOCKER_EXTRA_TAGS: '{{if .EXTRA_TAGS}}{{.EXTRA_TAGS}}{{else}}gtk3{{end}}'
+      VERSION: '{{.VERSION | default ""}}'
       DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
       OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
       # Generate Docker volume mounts: Go module cache + go.mod replace directives

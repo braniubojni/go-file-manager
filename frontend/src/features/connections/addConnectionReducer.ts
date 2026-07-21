@@ -1,6 +1,6 @@
 import type { AddConnectionAction, AddConnectionState } from './types'
 
-export type { AddConnectionAction, AddConnectionMode, AddConnectionState } from './types'
+export type { AddConnectionAction, AddConnectionState } from './types'
 
 export const initialAddConnectionState: AddConnectionState = {
   open: false,

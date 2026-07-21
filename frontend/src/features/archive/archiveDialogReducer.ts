@@ -1,6 +1,6 @@
 import type { ArchiveAction, ArchiveState } from './types'
 
-export type { ArchiveAction, ArchiveFormat, ArchiveState } from './types'
+export type { ArchiveAction, ArchiveState } from './types'
 
 export const initialArchiveState: ArchiveState = {
   open: false,

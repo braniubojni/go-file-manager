@@ -1,5 +1,3 @@
-export type AddConnectionMode = 'add' | 'password'
-
 export type AddConnectionState = {
   open: boolean
   spec: string
@@ -10,7 +8,7 @@ export type AddConnectionState = {
   error: string
   /** When re-prompting password for an existing profile connect */
   profileId: string
-  mode: AddConnectionMode
+  mode: 'add' | 'password'
 }
 
 export type AddConnectionAction =

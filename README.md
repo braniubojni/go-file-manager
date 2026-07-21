@@ -63,15 +63,17 @@ wails3 build
 wails3 task setup:docker
 
 wails3 build GOOS=windows              # works from any host (CGO off by default)
-wails3 build GOOS=linux                # Docker on macOS/Windows
+wails3 build GOOS=linux                # Docker on macOS/Windows (auto gtk3 — see below)
+wails3 build GOOS=linux GOARCH=arm64   # Apple Silicon host → linux arm64
 wails3 build GOOS=darwin GOARCH=arm64  # Docker on Linux/Windows
-wails3 build GOOS=darwin GOARCH=amd64
 
 # Or Task helpers (pass VERSION for updater-compatible builds):
 task build:windows VERSION=0.1.0 ARCH=amd64
-task build:linux VERSION=0.1.0 ARCH=amd64
+task build:linux VERSION=0.1.0 ARCH=arm64
 task build:darwin VERSION=0.1.0 ARCH=arm64
 ```
+
+**Linux from macOS/Windows:** the `wails-cross` image has **GTK 4.8**, while default Wails v3 needs **GTK 4.10+** (`GtkFileDialog`). Cross-builds therefore use the legacy **`gtk3`** tag automatically. GitHub Actions builds Linux natively on Ubuntu 24.04 (full GTK4).
 
 Output is under `bin/`.
 

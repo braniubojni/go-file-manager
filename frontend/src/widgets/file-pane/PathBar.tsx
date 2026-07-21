@@ -10,7 +10,7 @@ import { usePathCompletions } from '../../entities/file/queries'
 import type { PathBarProps } from './types'
 
 /** Normalize path for navigation: trim, strip trailing slashes (except root). */
-export const normalizeNavPath = (value: string): string => {
+const normalizeNavPath = (value: string): string => {
   const trimmed = value.trim()
   if (!trimmed) return '/'
   // Keep Windows drive roots like C:\
