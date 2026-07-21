@@ -128,6 +128,17 @@ cd frontend && npm run typecheck && npm run lint && npm run format:check && npm 
 
 GitHub Actions (`.github/workflows/ci.yml`) runs these on PRs and `main`.
 
+### Git hooks (Husky)
+
+Root `npm install` installs [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged). On every commit:
+
+- staged `*.go` → `gofmt -w`
+- staged `frontend/src/**/*.{ts,tsx,css,json}` → Prettier
+
+```bash
+npm install   # once (runs prepare → husky)
+```
+
 ## Project layout
 
 ```text

@@ -92,7 +92,13 @@ tasks:
   lint:
     summary: Go + frontend lint/format/typecheck
     cmds:
-      - gofmt -l .
+      - |
+        out=$(gofmt -l .)
+        if [ -n "$out" ]; then
+          echo "gofmt needed on:"
+          echo "$out"
+          exit 1
+        fi
       - go vet ./...
       - task: frontend:lint
 

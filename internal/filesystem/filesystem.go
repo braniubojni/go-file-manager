@@ -119,11 +119,11 @@ func ListDir(path string, showHidden bool) ([]domain.FileEntry, error) {
 }
 
 type completionItem struct {
-	full      string
-	name      string
-	isDir     bool
+	full       string
+	name       string
+	isDir      bool
 	startsWith bool
-	isDot     bool
+	isDot      bool
 }
 
 // ListPathCompletions returns absolute path suggestions for partial input (max 50).

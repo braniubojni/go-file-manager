@@ -41,7 +41,7 @@ type Settings struct {
 	UseBuiltInEditor        bool   `json:"useBuiltInEditor"`
 	AutoCheckUpdates        bool   `json:"autoCheckUpdates"`
 	UpdateCheckIntervalDays int    `json:"updateCheckIntervalDays"`
-	LastUpdateCheckAt       string `json:"lastUpdateCheckAt"`  // RFC3339; empty if never
+	LastUpdateCheckAt       string `json:"lastUpdateCheckAt"`    // RFC3339; empty if never
 	SkippedUpdateVersion    string `json:"skippedUpdateVersion"` // remote version user skipped
 	LeftPath                string `json:"leftPath"`
 	RightPath               string `json:"rightPath"`
@@ -87,7 +87,7 @@ type ConnectionProfile struct {
 
 // ActiveSession is a live remote connection for UI.
 type ActiveSession struct {
-	Key      string `json:"key"`      // user@host:port
+	Key      string `json:"key"` // user@host:port
 	Protocol string `json:"protocol"`
 	User     string `json:"user"`
 	Host     string `json:"host"`
