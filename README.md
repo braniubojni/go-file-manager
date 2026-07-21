@@ -117,13 +117,18 @@ The in-app updater matches `_{os}_{arch}` in asset names (`darwin`/`windows`/`li
 ## Quality / CI
 
 ```bash
-# Go
+# Go (on macOS, go vet of the main package needs a frontend/dist stub; Linux CI also installs GTK4)
+mkdir -p frontend/dist && echo '<!doctype html><title>stub</title>' > frontend/dist/index.html
 go test ./internal/...
 gofmt -l .
-go vet ./...
+go vet ./...   # Linux requires: libgtk-4-dev libwebkitgtk-6.0-dev
 
 # Frontend
-cd frontend && npm run typecheck && npm run lint && npm run format:check && npm run build
+cd frontend && npm run typecheck && npm run lint && npm run knip && npm run format:check && npm run build
+
+# Mirror the Go GitHub Actions job in Docker (Ubuntu 24.04 + GTK4)
+task ci:go
+# or: bash scripts/ci-go-docker.sh
 ```
 
 GitHub Actions (`.github/workflows/ci.yml`) runs these on PRs and `main`.

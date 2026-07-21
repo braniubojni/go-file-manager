@@ -15,6 +15,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
       - name: Format
         run: |
           out=$(gofmt -l .)
@@ -23,15 +24,25 @@ jobs:
             echo "$out"
             exit 1
           fi
-      # main.go embeds frontend/dist; create a stub so go tools work without a full UI build.
+
+      # main.go embeds frontend/dist; stub so go tools work without a full UI build.
       - name: Stub frontend embed assets
         run: |
           mkdir -p frontend/dist
           printf '%s\n' '<!doctype html><title>ci-stub</title>' > frontend/dist/index.html
+
+      # Wails v3 Linux stack needs GTK4 + WebKitGTK 6.0 for CGO (main + terminal service).
+      - name: Install Wails Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+
       - name: Vet
         run: go vet ./...
+
       - name: Test
         run: go test ./internal/...
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:

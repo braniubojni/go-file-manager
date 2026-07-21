@@ -89,6 +89,14 @@ tasks:
     cmds:
       - go test ./internal/...
 
+  ci:go:
+    summary: Run Go CI steps in Docker (Linux + Wails GTK; mirrors .github/workflows/ci.yml)
+    desc: |
+      Requires Docker image wails-cross (task setup:docker).
+      Reproduces gofmt, embed stub, go vet, and go test on Linux.
+    cmds:
+      - bash ./scripts/ci-go-docker.sh
+
   lint:
     summary: Go + frontend lint/format/typecheck
     cmds:
