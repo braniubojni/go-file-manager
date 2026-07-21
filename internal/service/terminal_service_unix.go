@@ -4,7 +4,6 @@ package service
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"sync"
@@ -52,7 +51,7 @@ func (t *TerminalService) Start(paneID, cwd string) error {
 	if s, ok := t.sessions[paneID]; ok && s.cmd.Process != nil {
 		// Already running — optionally cd
 		if cwd != "" {
-			_, _ = s.ptmx.WriteString(fmt.Sprintf("cd %q\n", cwd))
+			_, _ = fmt.Fprintf(s.ptmx, "cd %q\n", cwd)
 		}
 		return nil
 	}
@@ -96,9 +95,7 @@ func (t *TerminalService) readLoop(paneID string, s *termSession) {
 			})
 		}
 		if err != nil {
-			if err != io.EOF {
-				// still emit exit
-			}
+			// EOF or read error: session ended — emit exit either way.
 			code := 0
 			if s.cmd.ProcessState != nil {
 				code = s.cmd.ProcessState.ExitCode()
@@ -185,6 +182,6 @@ func (t *TerminalService) SetCwd(paneID, cwd string) error {
 	if !ok || s.ptmx == nil {
 		return nil
 	}
-	_, err := s.ptmx.WriteString(fmt.Sprintf("cd %q\n", cwd))
+	_, err := fmt.Fprintf(s.ptmx, "cd %q\n", cwd)
 	return err
 }

@@ -14,3 +14,5 @@ linters:
       - frontend/
       - bin/
       - e2e/
+      # Wails platform scaffolding (ios/android/docker helpers); not part of desktop CI build.
+      - build/

@@ -210,7 +210,7 @@ func (m *Manager) ListDir(vpath string, showHidden bool) ([]domain.FileEntry, er
 		parent := ParentRemote(loc)
 		result = append(result, domain.FileEntry{
 			Name:  "..",
-			Path:  parent.Spec.JoinPath(parent.RemotePath),
+			Path:  parent.JoinPath(parent.RemotePath),
 			IsDir: true,
 		})
 	}
@@ -238,7 +238,7 @@ func (m *Manager) ListDir(vpath string, showHidden bool) ([]domain.FileEntry, er
 		}
 		result = append(result, domain.FileEntry{
 			Name:      name,
-			Path:      loc.Spec.JoinPath(child),
+			Path:      loc.JoinPath(child),
 			IsDir:     isDir,
 			Size:      e.Size(),
 			ModTime:   e.ModTime().UnixMilli(),
@@ -291,7 +291,7 @@ func (m *Manager) Mkdir(parentV, name string) (string, error) {
 	if err := s.sftp.Mkdir(full); err != nil {
 		return "", err
 	}
-	return loc.Spec.JoinPath(full), nil
+	return loc.JoinPath(full), nil
 }
 
 // Rename renames a remote entry (newName is basename only).
@@ -313,7 +313,7 @@ func (m *Manager) Rename(oldV, newName string) (string, error) {
 	if err := s.sftp.Rename(loc.RemotePath, next); err != nil {
 		return "", err
 	}
-	return loc.Spec.JoinPath(next), nil
+	return loc.JoinPath(next), nil
 }
 
 // Delete removes remote paths (files or recursive dirs).
@@ -438,14 +438,16 @@ func copyRemote(c *sftp.Client, src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	out, err := c.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
+	defer func() { _ = out.Close() }()
+	if _, err = io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Close()
 }
 
 func buildAuthMethods(user, password string) []ssh.AuthMethod {

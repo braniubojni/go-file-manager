@@ -63,10 +63,6 @@ func DirChildSizesCtx(ctx context.Context, dir string) (map[string]int64, error)
 	return out, nil
 }
 
-func dirSize(root string) (int64, error) {
-	return dirSizeCtx(context.Background(), root)
-}
-
 func dirSizeCtx(ctx context.Context, root string) (int64, error) {
 	var total int64
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
