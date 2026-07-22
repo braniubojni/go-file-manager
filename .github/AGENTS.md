@@ -47,7 +47,7 @@ task ci:go
 
 ## Actions versions (current)
 
-- `actions/checkout@v5`
+- `actions/checkout@v5` (CI + release build job); release publish job still uses `actions/checkout@v4`
 - `actions/setup-go@v6`
 - `actions/setup-node@v6`
 - `golangci/golangci-lint-action@v9`
