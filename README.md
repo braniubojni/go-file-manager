@@ -144,6 +144,15 @@ Root `npm install` installs [Husky](https://typicode.github.io/husky/) + [lint-s
 npm install   # once (runs prepare → husky)
 ```
 
+## Agent memory
+
+Compressed instructions for AI agents (lazy-loaded by directory):
+
+- Root: [`AGENTS.md`](./AGENTS.md) (index + hard rules) · [`CLAUDE.md`](./CLAUDE.md) (thin pointer)
+- Modules: `frontend/AGENTS.md`, `internal/AGENTS.md`, `build/AGENTS.md`, `.github/AGENTS.md`, `e2e/AGENTS.md`
+
+Keep each file ≤200 lines; update when conventions change.
+
 ## Project layout
 
 ```text
