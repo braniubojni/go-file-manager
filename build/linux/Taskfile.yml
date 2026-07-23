@@ -77,6 +77,11 @@ tasks:
       backend needs GTK 4.10+ (GtkFileDialog). Cross-builds therefore default to the
       legacy `gtk3` tag (WebKit2GTK 4.1). Override with EXTRA_TAGS if needed.
       Prefer native Ubuntu 24.04 CI for full GTK4 builds (see .github/workflows/release.yml).
+
+      Linux CGO needs a matching container arch (native GCC + GTK libs). The image is
+      single-arch; rebuild for the target with: task setup:docker ARCH=amd64|arm64
+      On Apple Silicon, default dist linux/amd64 needs: task setup:docker ARCH=amd64
+      (QEMU, slower). Or build host-native: task dist VERSION=x.y.z LINUX_ARCH=arm64
     internal: true
     deps:
       - task: common:build:frontend
@@ -92,6 +97,24 @@ tasks:
         msg: |
           Docker image '{{.CROSS_IMAGE}}' not found.
           Build it first: wails3 task setup:docker
+          For linux/{{.DOCKER_ARCH}}: wails3 task setup:docker ARCH={{.DOCKER_ARCH}}
+      # GTK CGO cannot mix host gcc with a foreign GOARCH (gcc: unrecognized -m64 on arm64).
+      # Image must be the same arch as the Linux target (or multi-arch via --platform).
+      - sh: |
+          img="$(docker image inspect {{.CROSS_IMAGE}} --format '{{`{{.Architecture}}`}}' 2>/dev/null || true)"
+          case "$img" in
+            amd64|x86_64) img=amd64 ;;
+            arm64|aarch64) img=arm64 ;;
+          esac
+          test "$img" = "{{.DOCKER_ARCH}}"
+        msg: |
+          Docker image '{{.CROSS_IMAGE}}' arch does not match Linux target {{.DOCKER_ARCH}}.
+          Linux CGO needs matching GCC/GTK inside the container (not GOARCH alone).
+
+          Fix (pick one):
+            wails3 task setup:docker ARCH={{.DOCKER_ARCH}}   # rebuild image for this arch (amd64 on Apple Silicon uses QEMU)
+            task dist VERSION=… LINUX_ARCH=arm64             # on Apple Silicon: match host-built image
+            task build:linux ARCH=arm64 VERSION=…            # single-platform build
     cmds:
       # Inject app version into binary when VERSION is set (docker build.sh has no VERSION hook)
       - |
@@ -102,7 +125,9 @@ tasks:
         if [ -n "$VER" ]; then
           LDFLAGS="$LDFLAGS -X github.com/erikharutyunyan/go-file-manager/internal/version.Version=$VER"
         fi
+        # --platform keeps container CPU arch aligned with GOARCH (required for CGO/GTK).
         docker run --rm \
+          --platform "linux/{{.DOCKER_ARCH}}" \
           -v "{{.ROOT_DIR}}:/app" {{.DOCKER_MOUNTS}} \
           -e APP_NAME="{{.APP_NAME}}" \
           -e EXTRA_TAGS="$EXTRA" \

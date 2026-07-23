@@ -5,11 +5,11 @@
 	"info": {
 		"0000": {
 			"ProductVersion": "0.1.0",
-			"CompanyName": "My Company",
-			"FileDescription": "A go-file-manager application",
-			"LegalCopyright": "© 2026, My Company",
-			"ProductName": "My Product",
-			"Comments": "This is a comment"
+			"CompanyName": "braniubojni",
+			"FileDescription": "Dual-pane desktop file manager",
+			"LegalCopyright": "© 2026, braniubojni",
+			"ProductName": "Go File Manager",
+			"Comments": "Go File Manager"
 		}
 	}
 }

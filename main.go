@@ -34,7 +34,7 @@ func main() {
 	updateSvc := service.NewUpdateService()
 
 	app := application.New(application.Options{
-		Name:        "go-file-manager",
+		Name:        "Go File Manager",
 		Description: "Dual-pane file manager (Double Commander style)",
 		Services: []application.Service{
 			application.NewService(fileSvc),

@@ -330,8 +330,24 @@ tasks:
     desc: |
       Builds the Docker image needed for cross-compiling to any platform.
       Run this once to enable cross-platform builds from any OS.
+
+      The image is single-arch (host by default). Linux CGO builds must use the same
+      arch as the target. On Apple Silicon, for dist's default linux/amd64:
+
+        task setup:docker ARCH=amd64
+
+      (uses QEMU; slower). For native linux/arm64: task setup:docker  (or ARCH=arm64)
     cmds:
-      - docker build -t wails-cross -f build/docker/Dockerfile.cross build/docker/
+      - |
+        set -eu
+        ARCH="{{.DOCKER_ARCH}}"
+        PLATFORM="linux/${ARCH}"
+        echo "Building wails-cross for ${PLATFORM}…"
+        docker build --platform "${PLATFORM}" -t wails-cross -f build/docker/Dockerfile.cross build/docker/
+        echo "OK: wails-cross ($(docker image inspect wails-cross --format '{{`{{.Architecture}}`}}'))"
+    vars:
+      # ARCH=amd64|arm64 — defaults to host (task ARCH / uname via Taskfile ARCH)
+      DOCKER_ARCH: '{{if or (eq (.ARCH | default ARCH) "arm64") (eq (.ARCH | default ARCH) "aarch64")}}arm64{{else if or (eq (.ARCH | default ARCH) "amd64") (eq (.ARCH | default ARCH) "x86_64")}}amd64{{else}}{{if eq ARCH "arm64"}}arm64{{else}}amd64{{end}}{{end}}'
     preconditions:
       - sh: docker info > /dev/null 2>&1
         msg: "Docker is required. Please install Docker first."

@@ -55,8 +55,15 @@ This builds Go, generates bindings, runs the Vite frontend, and opens the app.
 ## Build
 
 ```bash
-# Current platform (production)
+# Current platform — production *binary* only (under bin/)
 wails3 build
+
+# macOS: Applications-ready .app (icon + Info.plist; drag to /Applications)
+# Do not double-click the bare bin/go-file-manager binary — Finder treats it as a
+# CLI tool (Terminal icon). Use the .app instead:
+wails3 package
+# or: wails3 task package:darwin VERSION=0.1.0
+open bin/go-file-manager.app
 
 # Cross-platform (https://v3.wails.io/guides/build/cross-platform/)
 # One-time Docker image for non-native targets (~800MB):
@@ -65,17 +72,50 @@ wails3 task setup:docker
 wails3 build GOOS=windows              # works from any host (CGO off by default)
 wails3 build GOOS=linux                # Docker on macOS/Windows (auto gtk3 — see below)
 wails3 build GOOS=linux GOARCH=arm64   # Apple Silicon host → linux arm64
-wails3 build GOOS=darwin GOARCH=arm64  # Docker on Linux/Windows
+wails3 build GOOS=darwin GOARCH=arm64  # Docker on Linux/Windows (binary only)
 
 # Or Task helpers (pass VERSION for updater-compatible builds):
-task build:windows VERSION=0.1.0 ARCH=amd64
-task build:linux VERSION=0.1.0 ARCH=arm64
-task build:darwin VERSION=0.1.0 ARCH=arm64
+wails3 task build:windows VERSION=0.1.0 ARCH=amd64
+wails3 task build:linux VERSION=0.1.0 ARCH=arm64
+wails3 task build:darwin VERSION=0.1.0 ARCH=arm64   # bare binary
+wails3 task package:darwin VERSION=0.1.0 ARCH=arm64  # .app for macOS
+```
+
+### Build all platforms (one command)
+
+From macOS (Windows = native Go cross-compile; Linux = Docker):
+
+```bash
+wails3 task setup:docker          # once, ~800MB (host arch)
+wails3 task dist VERSION=0.1.0
+# → dist/go-file-manager_0.1.0_darwin_arm64.zip   (.app inside)
+# → dist/go-file-manager_0.1.0_windows_amd64.zip
+# → dist/go-file-manager_0.1.0_linux_<host-arch>.tar.gz  (arm64 on Apple Silicon)
+```
+
+Override arches if needed: `DARWIN_ARCH`, `WINDOWS_ARCH`, `LINUX_ARCH`.
+
+**linux/amd64 from Apple Silicon** (needs amd64 image via QEMU):
+
+```bash
+wails3 task setup:docker ARCH=amd64
+wails3 task dist VERSION=0.1.0 LINUX_ARCH=amd64
 ```
 
 **Linux from macOS/Windows:** the `wails-cross` image has **GTK 4.8**, while default Wails v3 needs **GTK 4.10+** (`GtkFileDialog`). Cross-builds therefore use the legacy **`gtk3`** tag automatically. GitHub Actions builds Linux natively on Ubuntu 24.04 (full GTK4).
 
-Output is under `bin/`.
+Raw binaries live under `bin/`; release-shaped archives under `dist/`.
+
+### App icon
+
+Single source: **`build/appicon.png`** (1024²). Packaging regenerates:
+
+- `build/darwin/icons.icns` → macOS `.app`
+- `build/windows/icon.ico` → Windows `.exe` (via syso)
+
+```bash
+wails3 task common:generate:icons
+```
 
 ### Version injection
 
@@ -92,15 +132,21 @@ Pass `VERSION=x.y.z` into Task builds; production ldflags inject:
 - Settings → **Updates**: show version, check now, auto-check every **10 days** (default on)
 - Flow: check → confirm → download platform asset (if present) → open package → quit to finish install
 - If no matching asset: **Open releases page**
+- Asset names must include `_{os}_{arch}` (see Releasing below)
+
+Custom in-app updater (not the Wails `app.Updater` yet): download + open is intentional for ad-hoc-signed mac builds. Wails’ built-in updater is a possible later migration; asset naming already matches its GitHub provider defaults.
 
 ### Releasing
 
+GitHub Releases stay empty until you **push a version tag**. The workflow (`.github/workflows/release.yml`) only runs on tags matching `v*`.
+
 ```bash
+# After packaging/docs land on main:
+git checkout main && git pull
 git tag v0.1.0
 git push origin v0.1.0
+# Actions → “Release” → creates the GitHub Release with binaries
 ```
-
-GitHub Actions (`.github/workflows/release.yml`) builds on **native runners** (recommended by Wails):
 
 | Runner | Artifact |
 |--------|----------|
@@ -108,7 +154,12 @@ GitHub Actions (`.github/workflows/release.yml`) builds on **native runners** (r
 | `macos-latest` | `go-file-manager_{ver}_darwin_arm64.zip` (`.app` inside) |
 | `windows-latest` | `go-file-manager_{ver}_windows_amd64.zip` (`.exe` inside) |
 
-Then creates a GitHub Release with notes + those assets (+ `VERSION` file).
+Or build locally and attach assets yourself:
+
+```bash
+wails3 task dist VERSION=0.1.0
+# create a release in the GitHub UI and upload dist/*
+```
 
 The in-app updater matches `_{os}_{arch}` in asset names (`darwin`/`windows`/`linux`, `arm64`/`amd64`).
 

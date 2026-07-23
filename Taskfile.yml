@@ -67,12 +67,127 @@ tasks:
           EXTRA_TAGS: '{{.EXTRA_TAGS}}'
 
   build:darwin:
-    summary: Cross-build macOS (Docker on Linux/Windows, native on macOS)
+    summary: Cross-build macOS binary only (Docker on Linux/Windows, native on macOS)
+    desc: |
+      Emits bin/go-file-manager (raw executable — Terminal icon in Finder).
+      For an Applications-ready .app on macOS, use: task package:darwin
     cmds:
       - task: darwin:build
         vars:
           ARCH: '{{.ARCH | default ARCH}}'
           VERSION: '{{.VERSION}}'
+      - cmd: 'echo "Tip: for Applications / Dock icon, run: wails3 package (or task package:darwin)"'
+        platforms: [darwin]
+
+  package:darwin:
+    summary: Package macOS .app bundle (icon + Info.plist; drag to Applications)
+    desc: |
+      Builds then creates bin/go-file-manager.app with icons from build/appicon.png.
+      Example: task package:darwin VERSION=0.1.0 ARCH=arm64
+    cmds:
+      - task: darwin:package
+        vars:
+          ARCH: '{{.ARCH | default ARCH}}'
+          VERSION: '{{.VERSION}}'
+
+  # Local multi-platform release archives (mirrors .github/workflows/release.yml naming).
+  # Requires Docker image for Linux: task setup:docker
+  dist:
+    summary: Build darwin .app + windows + linux archives into dist/ for all platforms
+    desc: |
+      VERSION is required (injected into binaries and used in asset names).
+      Defaults: darwin/arm64, windows/amd64, linux/<host arch>.
+      Linux defaults to the host arch so Apple Silicon + host-built wails-cross works
+      without QEMU. For CI-like linux/amd64 on arm64 Mac:
+        task setup:docker ARCH=amd64 && task dist VERSION=0.1.0 LINUX_ARCH=amd64
+      Example: task dist VERSION=0.1.0
+      Upload dist/* to a GitHub Release, or push tag v* to let CI do it.
+    vars:
+      DARWIN_ARCH: '{{.DARWIN_ARCH | default "arm64"}}'
+      WINDOWS_ARCH: '{{.WINDOWS_ARCH | default "amd64"}}'
+      # Host arch (Task ARCH) — arm64 on Apple Silicon, amd64 on Intel/x86_64 Linux.
+      LINUX_ARCH: '{{.LINUX_ARCH | default ARCH}}'
+    preconditions:
+      - sh: test -n "{{.VERSION}}"
+        msg: "VERSION is required, e.g. task dist VERSION=0.1.0"
+    cmds:
+      - task: dist:build
+        vars:
+          VERSION: '{{.VERSION}}'
+          DARWIN_ARCH: '{{.DARWIN_ARCH}}'
+          WINDOWS_ARCH: '{{.WINDOWS_ARCH}}'
+          LINUX_ARCH: '{{.LINUX_ARCH}}'
+      - task: dist:archive
+        vars:
+          VERSION: '{{.VERSION}}'
+          DARWIN_ARCH: '{{.DARWIN_ARCH}}'
+          WINDOWS_ARCH: '{{.WINDOWS_ARCH}}'
+          LINUX_ARCH: '{{.LINUX_ARCH}}'
+
+  dist:build:
+    summary: Compile all platform artifacts for dist/
+    internal: true
+    cmds:
+      # Package .app first (embeds darwin binary under Contents/MacOS).
+      - task: darwin:package
+        vars:
+          VERSION: '{{.VERSION}}'
+          ARCH: '{{.DARWIN_ARCH}}'
+      - task: windows:build
+        vars:
+          VERSION: '{{.VERSION}}'
+          ARCH: '{{.WINDOWS_ARCH}}'
+          CGO_ENABLED: "0"
+      # Separate OUTPUT so we do not clobber the darwin bare binary path mid-run.
+      - task: linux:build
+        vars:
+          VERSION: '{{.VERSION}}'
+          ARCH: '{{.LINUX_ARCH}}'
+          OUTPUT: 'bin/go-file-manager-linux-{{.LINUX_ARCH}}'
+
+  dist:archive:
+    summary: Zip/tar built artifacts into dist/ with updater-compatible names
+    internal: true
+    cmds:
+      - |
+        set -euo pipefail
+        VER="{{.VERSION}}"
+        D_ARCH="{{.DARWIN_ARCH}}"
+        W_ARCH="{{.WINDOWS_ARCH}}"
+        L_ARCH="{{.LINUX_ARCH}}"
+        LINUX_BIN="bin/go-file-manager-linux-${L_ARCH}"
+        mkdir -p dist
+        rm -f "dist/go-file-manager_${VER}_darwin_${D_ARCH}.zip" \
+              "dist/go-file-manager_${VER}_windows_${W_ARCH}.zip" \
+              "dist/go-file-manager_${VER}_linux_${L_ARCH}.tar.gz"
+
+        if [ ! -d "bin/go-file-manager.app" ]; then
+          echo "Expected bin/go-file-manager.app (darwin package failed?)" >&2
+          ls -la bin/ || true
+          exit 1
+        fi
+        (cd bin && zip -ry "../dist/go-file-manager_${VER}_darwin_${D_ARCH}.zip" go-file-manager.app)
+
+        if [ ! -f "bin/go-file-manager.exe" ]; then
+          echo "Expected bin/go-file-manager.exe" >&2
+          ls -la bin/ || true
+          exit 1
+        fi
+        (cd bin && zip -9 "../dist/go-file-manager_${VER}_windows_${W_ARCH}.zip" go-file-manager.exe)
+
+        if [ ! -f "$LINUX_BIN" ]; then
+          echo "Expected $LINUX_BIN" >&2
+          ls -la bin/ || true
+          exit 1
+        fi
+        # Archive member name must be go-file-manager (matches CI + updater docs).
+        STAGE=$(mktemp -d)
+        cp "$LINUX_BIN" "$STAGE/go-file-manager"
+        tar -C "$STAGE" -czf "dist/go-file-manager_${VER}_linux_${L_ARCH}.tar.gz" go-file-manager
+        rm -rf "$STAGE"
+
+        echo "=== dist/ ready ==="
+        ls -lh dist/
 
   run:
     summary: Runs the application

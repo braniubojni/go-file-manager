@@ -58,8 +58,11 @@ scripts/ci-go-docker.sh # local Linux Go CI mirror
 ```bash
 # Dev / build
 wails3 dev
-wails3 build
-task build:linux VERSION=0.1.0 ARCH=arm64   # cross helpers in Taskfile.yml
+wails3 build                              # bare binary (bin/)
+wails3 package                            # macOS .app (Applications / Dock icon)
+task package:darwin VERSION=0.1.0
+task build:linux VERSION=0.1.0 ARCH=arm64 # cross helpers in Taskfile.yml
+task dist VERSION=0.1.0                   # all platforms → dist/ (Linux arch = host)
 
 # Quality
 gofmt -l .

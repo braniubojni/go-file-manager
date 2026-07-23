@@ -20,10 +20,37 @@ wails3 generate icons -input appicon.png \
 - Task `common:generate:icons` in `build/Taskfile.yml` (sources: `appicon.png` only).
 - **Do not** keep product icons under `frontend/public`.
 - No `appicon.icon` composer package required for desktop (Assets.car optional/stale OK if icns present).
+- macOS Dock/Finder icon only appears on **`.app`** (`darwin:package` / `wails3 package`), not bare `bin/go-file-manager`.
+
+## macOS package vs build
+
+| Command | Output |
+|---------|--------|
+| `wails3 build` / `darwin:build` | Bare Mach-O → Terminal icon if double-clicked |
+| `wails3 package` / `task package:darwin` | `bin/go-file-manager.app` (drag to Applications) |
+
+Brand metadata: `build/config.yml` + `darwin/Info.plist` (`Go File Manager`, `com.braniubojni.go-file-manager`).
+
+## Multi-platform local dist
+
+```bash
+task setup:docker          # once (Linux cross) — host arch image
+task dist VERSION=0.1.0    # → dist/* named for updater + release.yml
+```
+
+Defaults: darwin/arm64 `.app` zip, windows/amd64 zip, **linux/\<host arch\>** tar.gz
+(so Apple Silicon produces `linux_arm64` and matches host `wails-cross`).
+
+```bash
+# CI-like linux/amd64 from Apple Silicon (QEMU image — slow):
+task setup:docker ARCH=amd64
+task dist VERSION=0.1.0 LINUX_ARCH=amd64
+```
 
 ## Linux cross-compile (macOS/Windows hosts)
 
 - Image: `wails-cross` (`task setup:docker` / `wails3 task setup:docker`).
+- **Single-arch:** Linux target arch must match image arch (`--platform linux/<arch>`).
 - Image has **GTK 4.8**; Wails default needs **GtkFileDialog (GTK 4.10+)**.
 - **Fix:** Docker Linux builds use **`EXTRA_TAGS=gtk3`** (Taskfile default for docker path).
 - **Native Ubuntu 24.04 CI/release:** full **GTK4** (no gtk3 tag).
@@ -52,3 +79,4 @@ build/ios|android/          # mobile scaffolding (golangci-excluded)
 
 - “Fix” Linux docker by forcing GTK4 APIs without upgrading the cross image.
 - Commit machine-local mobile overlays (`build/ios/xcode/`, `build/android/gen/` — gitignored).
+- Expect a custom Dock icon from a bare `wails3 build` binary on macOS.

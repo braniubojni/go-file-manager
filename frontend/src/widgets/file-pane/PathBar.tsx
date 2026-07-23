@@ -3,9 +3,10 @@ import HomeIcon from '@mui/icons-material/Home'
 import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import IconButton from '@mui/material/IconButton'
+import ListItem from '@mui/material/ListItem'
 import TextField from '@mui/material/TextField'
 import Tooltip from '@mui/material/Tooltip'
-import { useEffect, useState, type FC } from 'react'
+import { useEffect, useRef, useState, type FC } from 'react'
 import { usePathCompletions } from '../../entities/file/queries'
 import type { PathBarProps } from './types'
 
@@ -29,6 +30,7 @@ export const PathBar: FC<PathBarProps> = ({
   onHome,
   onFocusPane,
 }) => {
+  const highlightedRef = useRef<string | null>(null)
   const [draft, setDraft] = useState(path)
   const [open, setOpen] = useState(false)
   const completions = usePathCompletions(draft, open || draft !== path)
@@ -42,6 +44,7 @@ export const PathBar: FC<PathBarProps> = ({
     const next = normalizeNavPath(value)
     if (next) onNavigate(next)
     setOpen(false)
+    highlightedRef.current = null
   }
 
   /** Pick best option for Enter: exact path match, else first ranked suggestion. */
@@ -90,11 +93,17 @@ export const PathBar: FC<PathBarProps> = ({
         size="small"
         open={open}
         onOpen={() => setOpen(true)}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false)
+          highlightedRef.current = null
+        }}
         options={options}
         inputValue={draft}
         autoHighlight
         filterOptions={(x) => x}
+        onHighlightChange={(_, option) => {
+          highlightedRef.current = typeof option === 'string' ? option : null
+        }}
         onInputChange={(_, v, reason) => {
           if (reason === 'reset') return
           setDraft(v)
@@ -118,16 +127,20 @@ export const PathBar: FC<PathBarProps> = ({
               if (e.key === 'Escape') {
                 setDraft(path)
                 setOpen(false)
+                highlightedRef.current = null
                 return
               }
               if (e.key !== 'Enter') return
 
-              // Always take over Enter so we never submit a partial draft while
-              // ranked completions exist (that caused "Path not found: …/scr").
               e.preventDefault()
               e.stopPropagation()
-
-              // Prefer a completion even if the popup closed (fill/automation).
+              if (open && highlightedRef.current) {
+                const pick = highlightedRef.current
+                setDraft(pick)
+                submit(pick)
+                return
+              }
+              // Fallback: best completion for partial draft, else raw path.
               if (options.length > 0 && draft.trim() !== path) {
                 const pick = pickFromOptions(draft)
                 if (pick) {
@@ -145,6 +158,11 @@ export const PathBar: FC<PathBarProps> = ({
               },
             }}
           />
+        )}
+        renderOption={(props, option) => (
+          <ListItem {...props} key={option} aria-label={`path-option-${option}`}>
+            {option}
+          </ListItem>
         )}
       />
     </Box>

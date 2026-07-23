@@ -39,11 +39,13 @@ task ci:go
 
 ## Release job
 
+- Triggers only on tags **`v*`** (no tags → empty GitHub Releases page).
 - Matrix: linux/amd64, darwin/arm64, windows/amd64 (native runners).
 - Linux deps: **GTK4** packages (same as CI), not gtk3.
 - Inject version from tag into ldflags + `build/config.yml`.
 - Asset naming for updater: include `_{os}_{arch}` (see `UpdateService` / README).
-- macOS CI: ad-hoc sign only (users may need right-click Open).
+- macOS CI: `darwin:package` → zip of `.app`; ad-hoc sign only (users may need right-click Open).
+- Local mirror of asset layout: root task **`dist`** (`task dist VERSION=x.y.z`).
 
 ## Actions versions (current)
 
