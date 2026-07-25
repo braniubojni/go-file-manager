@@ -13,6 +13,6 @@
   },
   "lint-staged": {
     "*.go": "gofmt -w",
-    "frontend/src/**/*.{ts,tsx,css,json}": "oxfmt --write --config frontend/.oxfmt.json"
+    "frontend/src/**/*.{ts,tsx,css,json}": "oxfmt --write --config frontend/.oxfmtrc.json"
   }
 }
