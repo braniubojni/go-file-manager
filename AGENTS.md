@@ -6,13 +6,13 @@ Human docs: `README.md`. Feature backlog: `todo.features.md`. **≤200 lines per
 
 ## Module map (lazy-load before editing)
 
-| Area | Read first |
-|------|------------|
-| UI / Vite / knip | `frontend/AGENTS.md` |
-| Go domain/services | `internal/AGENTS.md` |
-| Icons / cross-build / Taskfiles | `build/AGENTS.md` |
-| GitHub Actions / release | `.github/AGENTS.md` |
-| Playwright | `e2e/AGENTS.md` |
+| Area                            | Read first           |
+| ------------------------------- | -------------------- |
+| UI / Vite / knip                | `frontend/AGENTS.md` |
+| Go domain/services              | `internal/AGENTS.md` |
+| Icons / cross-build / Taskfiles | `build/AGENTS.md`    |
+| GitHub Actions / release        | `.github/AGENTS.md`  |
+| Playwright                      | `e2e/AGENTS.md`      |
 
 Claude Code: also see root `CLAUDE.md` (pointer only).
 
@@ -31,20 +31,21 @@ scripts/ci-go-docker.sh # local Linux Go CI mirror
 
 ## Stack
 
-| Layer | Choice |
-|-------|--------|
-| Shell | Wails v3 (`v3.0.0-alpha2.x`) |
-| Go | 1.25+ (`go.mod`) |
-| Prefs | `settings.json` + `shortcuts.json` |
-| DB | SQLite bookmarks only (`modernc.org/sqlite`) |
-| UI | React 18, MUI 9, MUI X DataGrid, Zustand, TanStack Query |
-| Editor | **CodeMirror 6** (`@uiw/react-codemirror`) — **not** Monaco |
-| Terminal | xterm.js + Go PTY service |
+| Layer    | Choice                                                      |
+| -------- | ----------------------------------------------------------- |
+| Shell    | Wails v3 (`v3.0.0-alpha2.x`)                                |
+| Go       | 1.25+ (`go.mod`)                                            |
+| Prefs    | `settings.json` + `shortcuts.json`                          |
+| DB       | SQLite bookmarks only (`modernc.org/sqlite`)                |
+| UI       | React 18, MUI 9, MUI X DataGrid, Zustand, TanStack Query    |
+| Editor   | **CodeMirror 6** (`@uiw/react-codemirror`) — **not** Monaco |
+| Terminal | xterm.js + Go PTY service                                   |
 
 ## Hard rules (all agents)
 
+- **Questions ≠ work:** If the user asks a **question** (research, “do we have…?”, “will X work?”, “how does…?”), **only research and answer**. Do **not** edit, implement, refactor, commit, or run write-side actions. Start implementation **only** when they explicitly ask you to **do** something (e.g. “add”, “fix”, “implement”, “change”).
 - **Do not invent features** without user ask; check `todo.features.md`.
-- **gofmt** before commit; root **husky** + lint-staged (`gofmt`, prettier).
+- **gofmt** before commit; root **husky** + lint-staged (`gofmt`, `oxfmt`).
 - Frontend components **~100–150 lines**; styles/helpers **colocated**.
 - MUI: **path imports** (`@mui/material/Button`) — no barrel `@mui/material`.
 - React Query: **`mutate` + `onSuccess`/`onError`**, not `mutateAsync`.
@@ -92,4 +93,4 @@ task test:e2e
 ## Deferred / partial
 
 - Tabs: open in `todo.features.md`.
-- Remote SSH: implemented; deep “live remote” UX still evolving — don’t rip out without ask.
+- Remote SSH: list/ops + local↔remote copy/move; `~/.ssh/config` re-resolve + IdentityFile + workdir picker; deep “live remote” UX still evolving — don’t rip out without ask.

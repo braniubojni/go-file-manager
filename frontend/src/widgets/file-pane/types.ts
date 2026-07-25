@@ -41,7 +41,8 @@ export type FileTableProps = {
   onSelectRange: (orderedPaths: string[], toPath: string) => void
   onActivate: () => void
   onOpen: (entry: FileEntry) => void
-  onDropPaths: (paths: string[], destDir: string, sourcePane: PaneId) => void
+  /** mode: default drop is copy; Ctrl-drop is move. */
+  onDropPaths: (paths: string[], destDir: string, sourcePane: PaneId, mode: 'copy' | 'move') => void
   /** Optional: notify parent of sorted row paths for range select / keyboard */
   onSortedPathsChange?: (paths: string[]) => void
 }

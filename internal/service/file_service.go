@@ -101,23 +101,98 @@ func (s *FileService) Exists(path string) (bool, error) {
 }
 
 func (s *FileService) Copy(sources []string, destDir string) error {
-	if anyRemote(sources) || remote.IsRemote(destDir) {
-		if !allRemote(sources) || !remote.IsRemote(destDir) {
-			return fmt.Errorf("copy between local and remote is not supported yet")
+	kind, err := transferKind(sources, destDir)
+	if err != nil {
+		return err
+	}
+	switch kind {
+	case transferLocal:
+		return filesystem.Copy(sources, destDir)
+	case transferRemoteWithin:
+		if s.remote == nil {
+			return fmt.Errorf("remote not available")
 		}
 		return s.remote.CopyWithin(sources, destDir)
+	case transferDownload:
+		if s.remote == nil {
+			return fmt.Errorf("remote not available")
+		}
+		return s.remote.Download(sources, destDir)
+	case transferUpload:
+		if s.remote == nil {
+			return fmt.Errorf("remote not available")
+		}
+		return s.remote.Upload(sources, destDir)
+	default:
+		return fmt.Errorf("unsupported copy")
 	}
-	return filesystem.Copy(sources, destDir)
 }
 
 func (s *FileService) Move(sources []string, destDir string) error {
-	if anyRemote(sources) || remote.IsRemote(destDir) {
-		if !allRemote(sources) || !remote.IsRemote(destDir) {
-			return fmt.Errorf("move between local and remote is not supported yet")
+	kind, err := transferKind(sources, destDir)
+	if err != nil {
+		return err
+	}
+	switch kind {
+	case transferLocal:
+		return filesystem.Move(sources, destDir)
+	case transferRemoteWithin:
+		if s.remote == nil {
+			return fmt.Errorf("remote not available")
 		}
 		return s.remote.MoveWithin(sources, destDir)
+	case transferDownload:
+		if s.remote == nil {
+			return fmt.Errorf("remote not available")
+		}
+		if err := s.remote.Download(sources, destDir); err != nil {
+			return err
+		}
+		return s.remote.Delete(sources)
+	case transferUpload:
+		if s.remote == nil {
+			return fmt.Errorf("remote not available")
+		}
+		if err := s.remote.Upload(sources, destDir); err != nil {
+			return err
+		}
+		return filesystem.Delete(sources)
+	default:
+		return fmt.Errorf("unsupported move")
 	}
-	return filesystem.Move(sources, destDir)
+}
+
+type xferKind int
+
+const (
+	transferLocal xferKind = iota
+	transferRemoteWithin
+	transferDownload // remote → local
+	transferUpload   // local → remote
+)
+
+func transferKind(sources []string, destDir string) (xferKind, error) {
+	if len(sources) == 0 {
+		return 0, fmt.Errorf("no sources")
+	}
+	srcRemote := allRemote(sources)
+	srcAnyRemote := anyRemote(sources)
+	if srcAnyRemote && !srcRemote {
+		return 0, fmt.Errorf("mixed local/remote selection is not supported")
+	}
+	destRemote := remote.IsRemote(destDir)
+	switch {
+	case !srcRemote && !destRemote:
+		return transferLocal, nil
+	case srcRemote && destRemote:
+		return transferRemoteWithin, nil
+	case srcRemote && !destRemote:
+		return transferDownload, nil
+	case !srcRemote && destRemote:
+		return transferUpload, nil
+	default:
+		return 0, fmt.Errorf("unsupported transfer")
+	}
 }
 
 func (s *FileService) Delete(paths []string) error {

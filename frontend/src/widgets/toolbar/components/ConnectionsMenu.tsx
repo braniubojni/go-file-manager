@@ -2,6 +2,7 @@ import type { FC } from 'react'
 import AddIcon from '@mui/icons-material/Add'
 import CloudIcon from '@mui/icons-material/Cloud'
 import DeleteIcon from '@mui/icons-material/Delete'
+import FolderOpenIcon from '@mui/icons-material/FolderOpen'
 import LinkOffIcon from '@mui/icons-material/LinkOff'
 import Box from '@mui/material/Box'
 import Divider from '@mui/material/Divider'
@@ -26,6 +27,9 @@ export const ConnectionsMenu: FC = () => {
     onDisconnect,
     onRemove,
     submitDialog,
+    openSSHConfigMode,
+    loadSSHConfig,
+    connectFromConfig,
   } = useConnections()
 
   return (
@@ -114,6 +118,17 @@ export const ConnectionsMenu: FC = () => {
           <AddIcon fontSize="small" sx={{ mr: 1 }} />
           Add new…
         </MenuItem>
+        <MenuItem
+          data-testid="menu-conn-ssh-config"
+          dense
+          onClick={() => {
+            setAnchor(null)
+            void openSSHConfigMode()
+          }}
+        >
+          <FolderOpenIcon fontSize="small" sx={{ mr: 1 }} />
+          From SSH config…
+        </MenuItem>
 
         <Divider />
         <ListSubheader sx={{ lineHeight: '32px', bgcolor: 'background.paper' }}>FTP</ListSubheader>
@@ -130,7 +145,13 @@ export const ConnectionsMenu: FC = () => {
         </MenuItem>
       </Menu>
 
-      <ConnectionDialog dialog={dialog} dispatch={dispatch} onSubmit={() => void submitDialog()} />
+      <ConnectionDialog
+        dialog={dialog}
+        dispatch={dispatch}
+        onSubmit={() => void submitDialog()}
+        onLoadSSHConfig={(path) => void loadSSHConfig(path)}
+        onConnectFromConfig={(host) => void connectFromConfig(host)}
+      />
     </>
   )
 }

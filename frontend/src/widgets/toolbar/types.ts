@@ -6,7 +6,11 @@ import type {
   ExtractAction,
   ExtractState,
 } from '../../features/archive/types'
-import type { AddConnectionAction, AddConnectionState } from '../../features/connections/types'
+import type {
+  AddConnectionAction,
+  AddConnectionState,
+  SSHConfigHost,
+} from '../../features/connections/types'
 import type {
   DeleteDialogAction,
   DeleteDialogState,
@@ -88,6 +92,8 @@ export type ConnectionDialogProps = {
   dialog: AddConnectionState
   dispatch: Dispatch<AddConnectionAction>
   onSubmit: () => void
+  onLoadSSHConfig: (path: string) => void
+  onConnectFromConfig: (host: SSHConfigHost) => void
 }
 
 export type FileOpDialogsArgs = {

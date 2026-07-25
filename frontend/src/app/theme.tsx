@@ -49,6 +49,14 @@ export const AppThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
           fontSize: 13,
         },
         components: {
+          MuiTextField: {
+            defaultProps: {
+              spellCheck: false,
+              autoCorrect: 'off',
+              autoCapitalize: 'off',
+              autoComplete: 'off',
+            },
+          },
           MuiButton: { defaultProps: { size: 'small' } },
           MuiIconButton: { defaultProps: { size: 'small' } },
           MuiCssBaseline: {

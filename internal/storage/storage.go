@@ -95,6 +95,13 @@ CREATE TABLE IF NOT EXISTS kv (
   key   TEXT PRIMARY KEY,
   value BLOB NOT NULL
 );
+CREATE TABLE IF NOT EXISTS remote_recent (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_key TEXT NOT NULL,
+  path        TEXT NOT NULL UNIQUE,
+  label       TEXT NOT NULL,
+  visited_at  TEXT NOT NULL
+);
 `)
 	return err
 }
@@ -182,4 +189,56 @@ VALUES(?, ?, COALESCE((SELECT MAX(sort_order)+1 FROM bookmarks), 0), ?)
 func (db *DB) RemoveBookmark(id int64) error {
 	_, err := db.sql.Exec(`DELETE FROM bookmarks WHERE id = ?`, id)
 	return err
+}
+
+// AddRemoteRecent upserts a recently visited remote path.
+// Per session_key, only the 10 most recently visited paths are kept.
+func (db *DB) AddRemoteRecent(sessionKey, path, label string) error {
+	// Nanosecond precision with fixed-width format so SQLite string ordering is correct.
+	now := time.Now().UTC().Format("2006-01-02T15:04:05.000000000Z")
+	_, err := db.sql.Exec(`
+INSERT INTO remote_recent(session_key, path, label, visited_at)
+VALUES(?, ?, ?, ?)
+ON CONFLICT(path) DO UPDATE SET label = excluded.label, visited_at = excluded.visited_at
+`, sessionKey, path, label, now)
+	if err != nil {
+		return err
+	}
+	// Cap at 10 per session_key (delete oldest beyond the limit)
+	_, err = db.sql.Exec(`
+DELETE FROM remote_recent
+WHERE session_key = ? AND id NOT IN (
+    SELECT id FROM remote_recent
+    WHERE session_key = ?
+    ORDER BY visited_at DESC, id DESC
+    LIMIT 10
+)
+`, sessionKey, sessionKey)
+	return err
+}
+
+// GetRemoteRecent returns recently visited paths for a session_key, newest first.
+func (db *DB) GetRemoteRecent(sessionKey string) ([]domain.RemoteRecent, error) {
+	rows, err := db.sql.Query(`
+SELECT session_key, path, label, visited_at
+FROM remote_recent
+WHERE session_key = ?
+ORDER BY visited_at DESC, id DESC
+`, sessionKey)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var list []domain.RemoteRecent
+	for rows.Next() {
+		var r domain.RemoteRecent
+		if err := rows.Scan(&r.SessionKey, &r.Path, &r.Label, &r.LastVisited); err != nil {
+			return nil, err
+		}
+		list = append(list, r)
+	}
+	if list == nil {
+		list = []domain.RemoteRecent{}
+	}
+	return list, rows.Err()
 }

@@ -15,15 +15,30 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as domain$0 from "../domain/models.js";
 
 /**
- * AddProfile parses a connection string (e.g. "ssh user@host") and saves it.
+ * AddProfile parses a connection string (e.g. "ssh user@host" or config alias) and saves it.
  */
 export function AddProfile(spec: string): $CancellablePromise<domain$0.ConnectionProfile> {
     return $Call.ByID(2055959622, spec);
 }
 
 /**
+ * AddRecentPath records a remote virtual path as recently visited.
+ */
+export function AddRecentPath(vpath: string): $CancellablePromise<void> {
+    return $Call.ByID(2100475021, vpath);
+}
+
+/**
+ * ConnectFromConfig connects using a host entry parsed from an SSH config file.
+ * If save is true the host is also stored as a named connection profile (with IdentityFiles).
+ */
+export function ConnectFromConfig(host: domain$0.SSHConfigHost, password: string, save: boolean): $CancellablePromise<domain$0.ConnectResult> {
+    return $Call.ByID(183864338, host, password, save);
+}
+
+/**
  * ConnectProfile connects using a saved profile. password may be empty (keys/agent).
- * Returns start path for the active pane.
+ * password is also tried as a private-key passphrase.
  */
 export function ConnectProfile(id: string, password: string): $CancellablePromise<domain$0.ConnectResult> {
     return $Call.ByID(1614696825, id, password);
@@ -37,6 +52,13 @@ export function ConnectSpec(specStr: string, password: string, save: boolean): $
 }
 
 /**
+ * DefaultSSHConfigPaths returns the standard OpenSSH client config file paths.
+ */
+export function DefaultSSHConfigPaths(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(2870403019);
+}
+
+/**
  * Disconnect closes the session for key or virtual path.
  */
 export function Disconnect(keyOrPath: string): $CancellablePromise<void> {
@@ -44,10 +66,24 @@ export function Disconnect(keyOrPath: string): $CancellablePromise<void> {
 }
 
 /**
+ * GetRecentPaths returns recently visited remote paths for a session key.
+ */
+export function GetRecentPaths(sessionKey: string): $CancellablePromise<domain$0.RemoteRecent[] | null> {
+    return $Call.ByID(4024057771, sessionKey);
+}
+
+/**
  * ListProfiles returns saved connection profiles.
  */
 export function ListProfiles(): $CancellablePromise<domain$0.ConnectionProfile[] | null> {
     return $Call.ByID(3747268220);
+}
+
+/**
+ * ListSSHConfigHosts parses an SSH config file and returns its host entries.
+ */
+export function ListSSHConfigHosts(configPath: string): $CancellablePromise<domain$0.SSHConfigHost[] | null> {
+    return $Call.ByID(1388953377, configPath);
 }
 
 /**
@@ -69,4 +105,11 @@ export function ParseSpec(spec: string): $CancellablePromise<domain$0.Connection
  */
 export function RemoveProfile(id: string): $CancellablePromise<void> {
     return $Call.ByID(4184816407, id);
+}
+
+/**
+ * SetProfileDefaultWorkDir stores the preferred start path for a saved profile.
+ */
+export function SetProfileDefaultWorkDir(profileID: string, vpath: string): $CancellablePromise<void> {
+    return $Call.ByID(1284601464, profileID, vpath);
 }

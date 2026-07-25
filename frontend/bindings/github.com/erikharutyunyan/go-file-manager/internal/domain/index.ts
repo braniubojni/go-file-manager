@@ -8,6 +8,8 @@ export type {
     ConnectionProfile,
     FileEntry,
     PanePaths,
+    RemoteRecent,
+    SSHConfigHost,
     SearchHit,
     Settings,
     ShortcutDef,

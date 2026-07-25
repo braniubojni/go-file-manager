@@ -4,12 +4,12 @@ Parent: root `AGENTS.md`. Wails packaging assets + platform Taskfiles.
 
 ## Icon (single source)
 
-| File | Role |
-|------|------|
-| **`build/appicon.png`** | **Only** brand source (1024²) |
-| `windows/icon.ico` | Generated |
-| `darwin/icons.icns` | Generated |
-| `ios/icon.png` | Keep in sync with appicon when branding |
+| File                    | Role                                    |
+| ----------------------- | --------------------------------------- |
+| **`build/appicon.png`** | **Only** brand source (1024²)           |
+| `windows/icon.ico`      | Generated                               |
+| `darwin/icons.icns`     | Generated                               |
+| `ios/icon.png`          | Keep in sync with appicon when branding |
 
 ```bash
 # from build/
@@ -24,9 +24,9 @@ wails3 generate icons -input appicon.png \
 
 ## macOS package vs build
 
-| Command | Output |
-|---------|--------|
-| `wails3 build` / `darwin:build` | Bare Mach-O → Terminal icon if double-clicked |
+| Command                                  | Output                                           |
+| ---------------------------------------- | ------------------------------------------------ |
+| `wails3 build` / `darwin:build`          | Bare Mach-O → Terminal icon if double-clicked    |
 | `wails3 package` / `task package:darwin` | `bin/go-file-manager.app` (drag to Applications) |
 
 Brand metadata: `build/config.yml` + `darwin/Info.plist` (`Go File Manager`, `com.braniubojni.go-file-manager`).

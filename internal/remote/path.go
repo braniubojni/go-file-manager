@@ -19,9 +19,11 @@ var (
 
 // Spec is a parsed SSH connection target.
 type Spec struct {
-	User string
-	Host string
-	Port int
+	User          string
+	Host          string
+	Port          int
+	IdentityFiles []string // private key paths to try (e.g. from SSH config IdentityFile)
+	ConfigAlias   string   // optional ~/.ssh/config Host alias used for re-resolve
 }
 
 // SessionKey returns user@host:port.
@@ -50,7 +52,7 @@ func (s Spec) JoinPath(remotePath string) string {
 	return fmt.Sprintf("ssh://%s@%s:%d%s", s.User, s.Host, s.Port, p)
 }
 
-// ParseSpec parses "ssh user@host", "user@host:22", etc.
+// ParseSpec parses "ssh user@host", "user@host:22", an SSH config Host alias, etc.
 func ParseSpec(input string) (Spec, error) {
 	raw := strings.TrimSpace(input)
 	if raw == "" {
@@ -62,21 +64,27 @@ func ParseSpec(input string) (Spec, error) {
 		if err != nil {
 			return Spec{}, err
 		}
-		return loc.Spec, nil
+		return EnrichSpec(loc.Spec), nil
 	}
 	m := specRe.FindStringSubmatch(raw)
-	if m == nil {
-		return Spec{}, fmt.Errorf("invalid format; use: ssh username@host or username@host:port")
-	}
-	port := 22
-	if m[3] != "" {
-		p, err := strconv.Atoi(m[3])
-		if err != nil || p <= 0 || p > 65535 {
-			return Spec{}, fmt.Errorf("invalid port")
+	if m != nil {
+		port := 22
+		if m[3] != "" {
+			p, err := strconv.Atoi(m[3])
+			if err != nil || p <= 0 || p > 65535 {
+				return Spec{}, fmt.Errorf("invalid port")
+			}
+			port = p
 		}
-		port = p
+		return EnrichSpec(Spec{User: m[1], Host: m[2], Port: port}), nil
 	}
-	return Spec{User: m[1], Host: m[2], Port: port}, nil
+	// Bare token: treat as ~/.ssh/config Host alias (e.g. "pahestain")
+	if !strings.ContainsAny(raw, " @/") {
+		if h, ok := LookupSSHConfigHost(raw); ok {
+			return SpecFromSSHConfigHost(h), nil
+		}
+	}
+	return Spec{}, fmt.Errorf("invalid format; use: ssh user@host, user@host:port, or an SSH config Host alias")
 }
 
 // Location is a remote virtual path split into session + remote filesystem path.

@@ -372,7 +372,8 @@ export const FileTable: FC<FileTableProps> = ({
       const payload: DragPayload = { sourcePane: paneId, paths }
       de.dataTransfer?.setData(DND_MIME, JSON.stringify(payload))
       de.dataTransfer?.setData('text/plain', JSON.stringify(payload))
-      if (de.dataTransfer) de.dataTransfer.effectAllowed = 'move'
+      // Allow both; dropEffect chooses copy (default) vs move (Ctrl).
+      if (de.dataTransfer) de.dataTransfer.effectAllowed = 'copyMove'
     }
 
     const onDragEnd = () => {
@@ -469,7 +470,8 @@ export const FileTable: FC<FileTableProps> = ({
       onKeyDown={handleKeys}
       onDragOver={(e) => {
         e.preventDefault()
-        e.dataTransfer.dropEffect = 'move'
+        // Default: copy. Hold Control for move.
+        e.dataTransfer.dropEffect = e.ctrlKey ? 'move' : 'copy'
         setDropActive(true)
         updateDropTarget(e.target)
       }}
@@ -487,7 +489,8 @@ export const FileTable: FC<FileTableProps> = ({
         const payload = parseDrag(e.dataTransfer)
         if (!payload?.paths?.length) return
         const dest = resolveDropDest(e.target)
-        onDropPaths(payload.paths, dest, payload.sourcePane)
+        const mode = e.ctrlKey ? 'move' : 'copy'
+        onDropPaths(payload.paths, dest, payload.sourcePane, mode)
       }}
       sx={{
         flex: 1,

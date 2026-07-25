@@ -1,4 +1,4 @@
-version: '3'
+version: "3"
 
 includes:
   common: ../Taskfile.yml
@@ -32,7 +32,7 @@ tasks:
     cmds:
       - go run build/ios/scripts/deps/install_deps.go
     env:
-      TASK_FORCE_YES: '{{if .YES}}true{{else}}false{{end}}'
+      TASK_FORCE_YES: "{{if .YES}}true{{else}}false{{end}}"
     prompt: This will check and install iOS development dependencies. Continue?
 
   # Note: Bindings generation may show CGO warnings for iOS C imports.
@@ -55,8 +55,8 @@ tasks:
       - go build -buildmode=c-archive -overlay build/ios/xcode/overlay.json {{.BUILD_FLAGS}} -o {{.OUTPUT}}.a
     vars:
       BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,ios -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-tags ios,debug -buildvcs=false -gcflags=all="-l"{{end}}'
-      DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
-      OUTPUT: '{{ .OUTPUT | default .DEFAULT_OUTPUT }}'
+      DEFAULT_OUTPUT: "{{.BIN_DIR}}/{{.APP_NAME}}"
+      OUTPUT: "{{ .OUTPUT | default .DEFAULT_OUTPUT }}"
       SDK_PATH:
         sh: xcrun --sdk {{.IOS_SDK}} --show-sdk-path
     env:
@@ -64,8 +64,8 @@ tasks:
       CGO_ENABLED: 1
       GOARCH: '{{.ARCH | default "arm64"}}'
       PRODUCTION: '{{.PRODUCTION | default "false"}}'
-      CGO_CFLAGS: '-isysroot {{.SDK_PATH}} -target {{.IOS_TARGET}} {{.IOS_VERSION_MIN_FLAG}}'
-      CGO_LDFLAGS: '-isysroot {{.SDK_PATH}} -target {{.IOS_TARGET}}'
+      CGO_CFLAGS: "-isysroot {{.SDK_PATH}} -target {{.IOS_TARGET}} {{.IOS_VERSION_MIN_FLAG}}"
+      CGO_LDFLAGS: "-isysroot {{.SDK_PATH}} -target {{.IOS_TARGET}}"
 
   package:
     summary: Packages a production build of the application into a `.app` bundle
@@ -218,8 +218,8 @@ tasks:
       GOOS: ios
       CGO_ENABLED: 1
       GOARCH: '{{.ARCH | default "arm64"}}'
-      CGO_CFLAGS: '-isysroot {{.SDK_PATH}} -target {{.IOS_TARGET}} {{.IOS_VERSION_MIN_FLAG}}'
-      CGO_LDFLAGS: '-isysroot {{.SDK_PATH}} -target {{.IOS_TARGET}}'
+      CGO_CFLAGS: "-isysroot {{.SDK_PATH}} -target {{.IOS_TARGET}} {{.IOS_VERSION_MIN_FLAG}}"
+      CGO_LDFLAGS: "-isysroot {{.SDK_PATH}} -target {{.IOS_TARGET}}"
 
   ensure-simulator:
     internal: true

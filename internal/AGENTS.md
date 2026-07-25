@@ -4,15 +4,15 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 
 ## Packages
 
-| Package | Role |
-|---------|------|
-| `domain` | Shared models (settings, files, bookmarks, update info) |
+| Package      | Role                                                                          |
+| ------------ | ----------------------------------------------------------------------------- |
+| `domain`     | Shared models (settings, files, bookmarks, update info)                       |
 | `filesystem` | Local FS: list/copy/move/delete, archive/extract, search, text R/W, dir sizes |
-| `remote` | SSH location parse + sftp ops (`path.go`, `ssh.go`) |
-| `storage` | SQLite bookmarks + crypto helpers |
-| `config` | Config dir, open files in OS (`open_unix` / `open_windows`) |
-| `service` | Wails-bound services (thin orchestration over packages above) |
-| `version` | `Version` string; set via `-ldflags` / Task `VERSION` |
+| `remote`     | SSH location parse + sftp ops (`path.go`, `ssh.go`)                           |
+| `storage`    | SQLite bookmarks + crypto helpers                                             |
+| `config`     | Config dir, open files in OS (`open_unix` / `open_windows`)                   |
+| `service`    | Wails-bound services (thin orchestration over packages above)                 |
+| `version`    | `Version` string; set via `-ldflags` / Task `VERSION`                         |
 
 ## Services (Wails)
 

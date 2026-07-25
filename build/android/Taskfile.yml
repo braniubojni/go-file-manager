@@ -1,12 +1,12 @@
-version: '3'
+version: "3"
 
 includes:
   common: ../Taskfile.yml
 
 vars:
   APP_ID: '{{.APP_ID | default "com.wails.app"}}'
-  MIN_SDK: '21'
-  TARGET_SDK: '35'
+  MIN_SDK: "21"
+  TARGET_SDK: "35"
   # The emulator runs the host architecture; physical devices are arm64
   HOST_ARCH:
     sh: '[ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo "arm64"'
@@ -32,7 +32,7 @@ tasks:
     cmds:
       - go run build/android/scripts/deps/install_deps.go
     env:
-      TASK_FORCE_YES: '{{if .YES}}true{{else}}false{{end}}'
+      TASK_FORCE_YES: "{{if .YES}}true{{else}}false{{end}}"
     prompt: This will check and install Android development dependencies. Continue?
 
   build:
@@ -50,7 +50,7 @@ tasks:
       - echo "Building Android app {{.APP_NAME}}..."
       - task: compile:go:shared
         vars:
-          ARCH: '{{.ARCH | default .HOST_ARCH}}'
+          ARCH: "{{.ARCH | default .HOST_ARCH}}"
     vars:
       BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,android -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-tags android,debug -buildvcs=false -gcflags=all="-l"{{end}}'
     env:
@@ -128,7 +128,7 @@ tasks:
       - task: build
         vars:
           PRODUCTION: "true"
-          ARCH: '{{.ARCH | default .HOST_ARCH}}'
+          ARCH: "{{.ARCH | default .HOST_ARCH}}"
     cmds:
       - task: assemble:apk:release
 
@@ -152,7 +152,7 @@ tasks:
       - task: build
         vars:
           PRODUCTION: "true"
-          ARCH: '{{.ARCH | default .HOST_ARCH}}'
+          ARCH: "{{.ARCH | default .HOST_ARCH}}"
     cmds:
       - task: assemble:aab:release
 

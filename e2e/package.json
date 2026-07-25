@@ -1,7 +1,7 @@
 {
   "name": "go-file-manager-e2e",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",

@@ -77,12 +77,15 @@ type ShortcutDef struct {
 
 // ConnectionProfile is a saved remote connection (SSH now; FTP/SFTP later).
 type ConnectionProfile struct {
-	ID       string `json:"id"`
-	Protocol string `json:"protocol"` // "ssh", future: "ftp", "sftp"
-	User     string `json:"user"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Label    string `json:"label"` // display name; default user@host
+	ID             string   `json:"id"`
+	Protocol       string   `json:"protocol"` // "ssh", future: "ftp", "sftp"
+	User           string   `json:"user"`
+	Host           string   `json:"host"`
+	Port           int      `json:"port"`
+	Label          string   `json:"label"`                    // display name; default user@host
+	ConfigAlias    string   `json:"configAlias,omitempty"`    // ~/.ssh/config Host alias (re-resolved on connect)
+	IdentityFiles  []string `json:"identityFiles,omitempty"`  // private key paths (also re-merged from config)
+	DefaultWorkDir string   `json:"defaultWorkDir,omitempty"` // preferred ssh:// start path
 }
 
 // ActiveSession is a live remote connection for UI.
@@ -97,9 +100,28 @@ type ActiveSession struct {
 
 // ConnectResult is returned after a successful SSH dial.
 type ConnectResult struct {
-	RootPath string `json:"rootPath"`
-	HomePath string `json:"homePath"` // preferred start path (remote home or root)
-	Key      string `json:"key"`
+	RootPath       string `json:"rootPath"`
+	HomePath       string `json:"homePath"`                 // remote home or root
+	Key            string `json:"key"`                      // session key user@host:port
+	ProfileID      string `json:"profileId,omitempty"`      // saved profile id when known
+	DefaultWorkDir string `json:"defaultWorkDir,omitempty"` // profile default start path if set
+}
+
+// SSHConfigHost is a host entry from an OpenSSH client config file.
+type SSHConfigHost struct {
+	Alias         string   `json:"alias"`
+	HostName      string   `json:"hostName"`
+	User          string   `json:"user"`
+	Port          int      `json:"port"`
+	IdentityFiles []string `json:"identityFiles"`
+}
+
+// RemoteRecent is a recently visited remote directory path.
+type RemoteRecent struct {
+	SessionKey  string `json:"sessionKey"`
+	Path        string `json:"path"`        // ssh:// virtual path
+	Label       string `json:"label"`       // remote abs path for display
+	LastVisited string `json:"lastVisited"` // RFC3339
 }
 
 // AppName is used for config/data directories.

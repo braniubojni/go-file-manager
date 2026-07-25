@@ -1,14 +1,14 @@
-version: '3'
+version: "3"
 
 vars:
   APP_NAME: "go-file-manager"
   BIN_DIR: "bin"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
-  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+  VITE_PORT: "{{.WAILS_VITE_PORT | default 9245}}"
   # Target OS for build/package/run. Defaults to the host OS, and is overridden
   # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
   # tasks below dispatch to the matching platform Taskfile via this variable.
-  GOOS: '{{.GOOS | default OS}}'
+  GOOS: "{{.GOOS | default OS}}"
 
 includes:
   common: ./build/Taskfile.yml
@@ -24,23 +24,23 @@ tasks:
     cmds:
       - task: "{{.GOOS}}:build"
         vars:
-          ARCH: '{{.ARCH}}'
-          VERSION: '{{.VERSION}}'
-          DEV: '{{.DEV}}'
-          OUTPUT: '{{.OUTPUT}}'
-          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
-          OBFUSCATED: '{{.OBFUSCATED}}'
-          GARBLE_ARGS: '{{.GARBLE_ARGS}}'
-          CGO_ENABLED: '{{.CGO_ENABLED}}'
+          ARCH: "{{.ARCH}}"
+          VERSION: "{{.VERSION}}"
+          DEV: "{{.DEV}}"
+          OUTPUT: "{{.OUTPUT}}"
+          EXTRA_TAGS: "{{.EXTRA_TAGS}}"
+          OBFUSCATED: "{{.OBFUSCATED}}"
+          GARBLE_ARGS: "{{.GARBLE_ARGS}}"
+          CGO_ENABLED: "{{.CGO_ENABLED}}"
 
   package:
     summary: Packages a production build of the application
     cmds:
       - task: "{{.GOOS}}:package"
         vars:
-          ARCH: '{{.ARCH}}'
-          VERSION: '{{.VERSION}}'
-          DEV: '{{.DEV}}'
+          ARCH: "{{.ARCH}}"
+          VERSION: "{{.VERSION}}"
+          DEV: "{{.DEV}}"
 
   # Local cross-compile helpers (see https://v3.wails.io/guides/build/cross-platform/)
   # One-time for non-native targets: wails3 task setup:docker
@@ -50,7 +50,7 @@ tasks:
       - task: windows:build
         vars:
           ARCH: '{{.ARCH | default "amd64"}}'
-          VERSION: '{{.VERSION}}'
+          VERSION: "{{.VERSION}}"
           CGO_ENABLED: '{{.CGO_ENABLED | default "0"}}'
 
   build:linux:
@@ -63,8 +63,8 @@ tasks:
       - task: linux:build
         vars:
           ARCH: '{{.ARCH | default "amd64"}}'
-          VERSION: '{{.VERSION}}'
-          EXTRA_TAGS: '{{.EXTRA_TAGS}}'
+          VERSION: "{{.VERSION}}"
+          EXTRA_TAGS: "{{.EXTRA_TAGS}}"
 
   build:darwin:
     summary: Cross-build macOS binary only (Docker on Linux/Windows, native on macOS)
@@ -74,8 +74,8 @@ tasks:
     cmds:
       - task: darwin:build
         vars:
-          ARCH: '{{.ARCH | default ARCH}}'
-          VERSION: '{{.VERSION}}'
+          ARCH: "{{.ARCH | default ARCH}}"
+          VERSION: "{{.VERSION}}"
       - cmd: 'echo "Tip: for Applications / Dock icon, run: wails3 package (or task package:darwin)"'
         platforms: [darwin]
 
@@ -87,8 +87,8 @@ tasks:
     cmds:
       - task: darwin:package
         vars:
-          ARCH: '{{.ARCH | default ARCH}}'
-          VERSION: '{{.VERSION}}'
+          ARCH: "{{.ARCH | default ARCH}}"
+          VERSION: "{{.VERSION}}"
 
   # Local multi-platform release archives (mirrors .github/workflows/release.yml naming).
   # Requires Docker image for Linux: task setup:docker
@@ -106,23 +106,23 @@ tasks:
       DARWIN_ARCH: '{{.DARWIN_ARCH | default "arm64"}}'
       WINDOWS_ARCH: '{{.WINDOWS_ARCH | default "amd64"}}'
       # Host arch (Task ARCH) — arm64 on Apple Silicon, amd64 on Intel/x86_64 Linux.
-      LINUX_ARCH: '{{.LINUX_ARCH | default ARCH}}'
+      LINUX_ARCH: "{{.LINUX_ARCH | default ARCH}}"
     preconditions:
       - sh: test -n "{{.VERSION}}"
         msg: "VERSION is required, e.g. task dist VERSION=0.1.0"
     cmds:
       - task: dist:build
         vars:
-          VERSION: '{{.VERSION}}'
-          DARWIN_ARCH: '{{.DARWIN_ARCH}}'
-          WINDOWS_ARCH: '{{.WINDOWS_ARCH}}'
-          LINUX_ARCH: '{{.LINUX_ARCH}}'
+          VERSION: "{{.VERSION}}"
+          DARWIN_ARCH: "{{.DARWIN_ARCH}}"
+          WINDOWS_ARCH: "{{.WINDOWS_ARCH}}"
+          LINUX_ARCH: "{{.LINUX_ARCH}}"
       - task: dist:archive
         vars:
-          VERSION: '{{.VERSION}}'
-          DARWIN_ARCH: '{{.DARWIN_ARCH}}'
-          WINDOWS_ARCH: '{{.WINDOWS_ARCH}}'
-          LINUX_ARCH: '{{.LINUX_ARCH}}'
+          VERSION: "{{.VERSION}}"
+          DARWIN_ARCH: "{{.DARWIN_ARCH}}"
+          WINDOWS_ARCH: "{{.WINDOWS_ARCH}}"
+          LINUX_ARCH: "{{.LINUX_ARCH}}"
 
   dist:build:
     summary: Compile all platform artifacts for dist/
@@ -131,19 +131,19 @@ tasks:
       # Package .app first (embeds darwin binary under Contents/MacOS).
       - task: darwin:package
         vars:
-          VERSION: '{{.VERSION}}'
-          ARCH: '{{.DARWIN_ARCH}}'
+          VERSION: "{{.VERSION}}"
+          ARCH: "{{.DARWIN_ARCH}}"
       - task: windows:build
         vars:
-          VERSION: '{{.VERSION}}'
-          ARCH: '{{.WINDOWS_ARCH}}'
+          VERSION: "{{.VERSION}}"
+          ARCH: "{{.WINDOWS_ARCH}}"
           CGO_ENABLED: "0"
       # Separate OUTPUT so we do not clobber the darwin bare binary path mid-run.
       - task: linux:build
         vars:
-          VERSION: '{{.VERSION}}'
-          ARCH: '{{.LINUX_ARCH}}'
-          OUTPUT: 'bin/go-file-manager-linux-{{.LINUX_ARCH}}'
+          VERSION: "{{.VERSION}}"
+          ARCH: "{{.LINUX_ARCH}}"
+          OUTPUT: "bin/go-file-manager-linux-{{.LINUX_ARCH}}"
 
   dist:archive:
     summary: Zip/tar built artifacts into dist/ with updater-compatible names

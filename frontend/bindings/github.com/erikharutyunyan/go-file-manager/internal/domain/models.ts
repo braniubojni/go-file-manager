@@ -38,10 +38,24 @@ export interface ConnectResult {
     "rootPath": string;
 
     /**
-     * preferred start path (remote home or root)
+     * remote home or root
      */
     "homePath": string;
+
+    /**
+     * session key user@host:port
+     */
     "key": string;
+
+    /**
+     * saved profile id when known
+     */
+    "profileId"?: string;
+
+    /**
+     * profile default start path if set
+     */
+    "defaultWorkDir"?: string;
 }
 
 /**
@@ -62,6 +76,21 @@ export interface ConnectionProfile {
      * display name; default user@host
      */
     "label": string;
+
+    /**
+     * ~/.ssh/config Host alias (re-resolved on connect)
+     */
+    "configAlias"?: string;
+
+    /**
+     * private key paths (also re-merged from config)
+     */
+    "identityFiles"?: string[] | null;
+
+    /**
+     * preferred ssh:// start path
+     */
+    "defaultWorkDir"?: string;
 }
 
 /**
@@ -87,6 +116,39 @@ export interface FileEntry {
 export interface PanePaths {
     "left": string;
     "right": string;
+}
+
+/**
+ * RemoteRecent is a recently visited remote directory path.
+ */
+export interface RemoteRecent {
+    "sessionKey": string;
+
+    /**
+     * ssh:// virtual path
+     */
+    "path": string;
+
+    /**
+     * remote abs path for display
+     */
+    "label": string;
+
+    /**
+     * RFC3339
+     */
+    "lastVisited": string;
+}
+
+/**
+ * SSHConfigHost is a host entry from an OpenSSH client config file.
+ */
+export interface SSHConfigHost {
+    "alias": string;
+    "hostName": string;
+    "user": string;
+    "port": number;
+    "identityFiles": string[] | null;
 }
 
 /**

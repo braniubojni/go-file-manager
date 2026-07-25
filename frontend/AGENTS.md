@@ -19,14 +19,14 @@ public/          # usually empty; no brand icons here
 
 ## Patterns
 
-| Do | Don’t |
-|----|--------|
-| MUI path imports | `@mui/material` barrel |
-| `mutate` + onSuccess/onError | `mutateAsync` chains |
-| `FC` components | class components |
+| Do                                  | Don’t                  |
+| ----------------------------------- | ---------------------- |
+| MUI path imports                    | `@mui/material` barrel |
+| `mutate` + onSuccess/onError        | `mutateAsync` chains   |
+| `FC` components                     | class components       |
 | Colocate `styles.ts` / `helpers.ts` | Dump into global utils |
-| Keep files ~100–150 lines | Mega-components |
-| CodeMirror 6 editor | Monaco / workers |
+| Keep files ~100–150 lines           | Mega-components        |
+| CodeMirror 6 editor                 | Monaco / workers       |
 
 ## Data flow
 
@@ -52,7 +52,7 @@ cd frontend
 npm run typecheck
 npm run lint          # eslint src
 npm run knip          # knip.json ignores bindings/**
-npm run format        # prettier src
+npm run format        # oxfmt src
 npm run build
 ```
 

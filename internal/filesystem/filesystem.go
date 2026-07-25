@@ -376,7 +376,7 @@ func Copy(sources []string, destDir string) error {
 			}
 		}
 		base := filepath.Base(srcAbs)
-		target := uniquePath(filepath.Join(destAbs, base))
+		target := UniquePath(filepath.Join(destAbs, base))
 		if err := copyPath(srcAbs, target); err != nil {
 			return err
 		}
@@ -407,7 +407,7 @@ func Move(sources []string, destDir string) error {
 			return ErrSamePath
 		}
 		base := filepath.Base(srcAbs)
-		target := uniquePath(filepath.Join(destAbs, base))
+		target := UniquePath(filepath.Join(destAbs, base))
 		if err := os.Rename(srcAbs, target); err != nil {
 			// Cross-device: fall back to copy + delete.
 			if err := copyPath(srcAbs, target); err != nil {
@@ -426,7 +426,8 @@ func isDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func uniquePath(path string) string {
+// UniquePath returns path if free, else "name (n).ext" in the same directory.
+func UniquePath(path string) string {
 	if _, err := os.Lstat(path); os.IsNotExist(err) {
 		return path
 	}

@@ -47,7 +47,9 @@ func NewManager(keys HostKeyStore) *Manager {
 }
 
 // Connect dials SSH and opens SFTP. password may be empty (try keys/agent first).
+// When non-empty, password is tried as private-key passphrase and as server password.
 func (m *Manager) Connect(spec Spec, password string) error {
+	spec = EnrichSpec(spec)
 	if spec.Port <= 0 {
 		spec.Port = 22
 	}
@@ -62,9 +64,9 @@ func (m *Manager) Connect(spec Spec, password string) error {
 	}
 	m.mu.Unlock()
 
-	auth := buildAuthMethods(spec.User, password)
+	auth, info := buildAuthMethods(spec.User, password, spec.IdentityFiles)
 	if len(auth) == 0 {
-		return fmt.Errorf("no authentication methods available; provide a password")
+		return fmt.Errorf("no authentication methods available: %s; provide a password or key passphrase, or set IdentityFile in ~/.ssh/config", info.summary())
 	}
 
 	cfg := &ssh.ClientConfig{
@@ -76,9 +78,13 @@ func (m *Manager) Connect(spec Spec, password string) error {
 
 	conn, err := ssh.Dial("tcp", spec.DialAddr(), cfg)
 	if err != nil {
-		// Common password hint
-		if password == "" && strings.Contains(err.Error(), "unable to authenticate") {
-			return fmt.Errorf("authentication required: %w", err)
+		msg := err.Error()
+		if strings.Contains(msg, "unable to authenticate") {
+			hint := info.summary()
+			if password == "" {
+				return fmt.Errorf("authentication required: public key auth failed (%s). Provide a server password or key passphrase, or add IdentityFile in ~/.ssh/config: %w", hint, err)
+			}
+			return fmt.Errorf("authentication required: still unable to authenticate (%s): %w", hint, err)
 		}
 		return fmt.Errorf("ssh dial %s: %w", spec.DialAddr(), err)
 	}
@@ -450,30 +456,93 @@ func copyRemote(c *sftp.Client, src, dst string) error {
 	return out.Close()
 }
 
-func buildAuthMethods(user, password string) []ssh.AuthMethod {
+type authBuildInfo struct {
+	agentOK        bool
+	loadedKeys     int
+	passphraseNeed int
+	missingKeys    int
+	extraTried     int
+}
+
+func (a authBuildInfo) summary() string {
+	parts := []string{}
+	if a.agentOK {
+		parts = append(parts, "ssh-agent")
+	} else {
+		parts = append(parts, "no ssh-agent keys")
+	}
+	parts = append(parts, fmt.Sprintf("%d key file(s) loaded", a.loadedKeys))
+	if a.passphraseNeed > 0 {
+		parts = append(parts, fmt.Sprintf("%d encrypted key(s) need passphrase", a.passphraseNeed))
+	}
+	if a.missingKeys > 0 {
+		parts = append(parts, fmt.Sprintf("%d key path(s) missing", a.missingKeys))
+	}
+	if a.extraTried > 0 {
+		parts = append(parts, fmt.Sprintf("%d IdentityFile path(s)", a.extraTried))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func buildAuthMethods(user, password string, extraKeyPaths []string) ([]ssh.AuthMethod, authBuildInfo) {
 	var methods []ssh.AuthMethod
+	var info authBuildInfo
 
 	// SSH agent
 	if sock := os.Getenv("SSH_AUTH_SOCK"); sock != "" {
 		if ag, err := net.Dial("unix", sock); err == nil {
-			methods = append(methods, ssh.PublicKeysCallback(agent.NewClient(ag).Signers))
+			client := agent.NewClient(ag)
+			if signers, err := client.Signers(); err == nil && len(signers) > 0 {
+				info.agentOK = true
+				methods = append(methods, ssh.PublicKeys(signers...))
+			} else {
+				// Keep callback so late-loaded keys can still work
+				methods = append(methods, ssh.PublicKeysCallback(client.Signers))
+			}
 		}
+	}
+
+	seenKey := map[string]bool{}
+	tryKey := func(kp string) {
+		kp = strings.TrimSpace(kp)
+		if kp == "" {
+			return
+		}
+		if abs, err := filepath.Abs(kp); err == nil {
+			kp = abs
+		}
+		if seenKey[kp] {
+			return
+		}
+		seenKey[kp] = true
+		m, st := publicKeyFile(kp, password)
+		switch st {
+		case keyStatusOK:
+			info.loadedKeys++
+			methods = append(methods, m)
+		case keyStatusPassphrase:
+			info.passphraseNeed++
+		case keyStatusMissing:
+			info.missingKeys++
+		}
+	}
+
+	// Extra identity files (SSH config IdentityFile) first — preferred by IdentitiesOnly semantics
+	for _, kp := range extraKeyPaths {
+		info.extraTried++
+		tryKey(kp)
 	}
 
 	// Default private keys
 	home, _ := os.UserHomeDir()
 	if home != "" {
-		for _, name := range []string{"id_ed25519", "id_rsa", "id_ecdsa"} {
-			keyPath := filepath.Join(home, ".ssh", name)
-			if m := publicKeyFile(keyPath); m != nil {
-				methods = append(methods, m)
-			}
+		for _, name := range []string{"id_ed25519", "id_rsa", "id_ecdsa", "id_ed25519_sk", "id_ecdsa_sk"} {
+			tryKey(filepath.Join(home, ".ssh", name))
 		}
 	}
 
 	if password != "" {
 		methods = append(methods, ssh.Password(password))
-		// keyboard-interactive common for some servers
 		methods = append(methods, ssh.KeyboardInteractive(func(name, instruction string, questions []string, echos []bool) ([]string, error) {
 			answers := make([]string, len(questions))
 			for i := range questions {
@@ -484,20 +553,42 @@ func buildAuthMethods(user, password string) []ssh.AuthMethod {
 	}
 
 	_ = user
-	return methods
+	return methods, info
 }
 
-func publicKeyFile(path string) ssh.AuthMethod {
+type keyStatus int
+
+const (
+	keyStatusOK keyStatus = iota
+	keyStatusMissing
+	keyStatusPassphrase
+	keyStatusBad
+)
+
+func publicKeyFile(path, passphrase string) (ssh.AuthMethod, keyStatus) {
 	key, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		if os.IsNotExist(err) {
+			return nil, keyStatusMissing
+		}
+		return nil, keyStatusBad
 	}
 	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		// encrypted key without passphrase — skip
-		return nil
+	if err == nil {
+		return ssh.PublicKeys(signer), keyStatusOK
 	}
-	return ssh.PublicKeys(signer)
+	// Encrypted key
+	if _, ok := err.(*ssh.PassphraseMissingError); ok || strings.Contains(strings.ToLower(err.Error()), "passphrase") {
+		if passphrase == "" {
+			return nil, keyStatusPassphrase
+		}
+		signer, err = ssh.ParsePrivateKeyWithPassphrase(key, []byte(passphrase))
+		if err != nil {
+			return nil, keyStatusPassphrase
+		}
+		return ssh.PublicKeys(signer), keyStatusOK
+	}
+	return nil, keyStatusBad
 }
 
 func (m *Manager) hostKeyCallback(spec Spec) ssh.HostKeyCallback {

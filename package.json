@@ -6,13 +6,13 @@
     "prepare": "husky",
     "precommit": "lint-staged"
   },
-  "lint-staged": {
-    "*.go": "gofmt -w",
-    "frontend/src/**/*.{ts,tsx,css,json}": "prettier --write --config frontend/.prettierrc --ignore-path frontend/.prettierignore"
-  },
   "devDependencies": {
     "husky": "^9.1.7",
     "lint-staged": "^17.1.0",
-    "prettier": "^3.7.4"
+    "oxfmt": "^0.60.0"
+  },
+  "lint-staged": {
+    "*.go": "gofmt -w",
+    "frontend/src/**/*.{ts,tsx,css,json}": "oxfmt --write --config frontend/.oxfmt.json"
   }
 }

@@ -85,6 +85,7 @@ const GoToDialog: FC<Props> = ({ open, onClose }) => {
       data-testid="dialog-goto"
       slotProps={{ paper: { sx: paperSx } }}
       disableRestoreFocus
+      autoCorrect=""
     >
       <DialogContent sx={{ p: 0 }}>
         <TextField
@@ -97,6 +98,10 @@ const GoToDialog: FC<Props> = ({ open, onClose }) => {
           data-testid="input-goto"
           variant="outlined"
           size="small"
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          autoComplete="off"
           sx={{ px: 1.5, pt: 1.5, pb: 1 }}
         />
         <Box sx={listSx}>

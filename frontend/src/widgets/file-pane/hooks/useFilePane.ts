@@ -89,17 +89,25 @@ export const useFilePane = (id: PaneId) => {
     void FileService.Open(entry.path).catch((e) => show(errMessage(e), 'error'))
   }
 
-  const onDropPaths = (paths: string[], destDir: string, sourcePane: PaneId) => {
+  const onDropPaths = (
+    paths: string[],
+    destDir: string,
+    sourcePane: PaneId,
+    mode: 'copy' | 'move',
+  ) => {
     const dest = destDir || path
     if (!dest || !paths.length) return
     if (isNestedInSelf(paths, dest)) {
-      show('Cannot move a folder into itself', 'warning')
+      show(`Cannot ${mode} a folder into itself`, 'warning')
       return
     }
-    if (allSameParentAsDest(paths, dest) && sourcePane === id) return
-    void FileService.Move(paths, dest)
+    // Move into same folder is a no-op; copy may create "name (1)" duplicates.
+    if (mode === 'move' && allSameParentAsDest(paths, dest) && sourcePane === id) return
+    const op = mode === 'move' ? FileService.Move : FileService.Copy
+    const verb = mode === 'move' ? 'Moved' : 'Copied'
+    void op(paths, dest)
       .then(() => {
-        show(`Moved ${paths.length} item(s)`, 'success')
+        show(`${verb} ${paths.length} item(s)`, 'success')
         clearSelection()
         void qc.invalidateQueries({ queryKey: ['dir'] })
       })

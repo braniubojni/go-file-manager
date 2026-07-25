@@ -1,15 +1,15 @@
 // @ts-check
 
-import { defineConfig, globalIgnores } from 'eslint/config';
-import oxlint from 'eslint-plugin-oxlint';
-import pluginA11y from 'eslint-plugin-jsx-a11y';
-import pluginReact from 'eslint-plugin-react';
-import pluginReactHooks from 'eslint-plugin-react-hooks';
-import globals from 'globals';
-import pluginJs from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import reactRefresh from 'eslint-plugin-react-refresh';
-import pluginQuery from '@tanstack/eslint-plugin-query';
+import { defineConfig, globalIgnores } from 'eslint/config'
+import oxlint from 'eslint-plugin-oxlint'
+import pluginA11y from 'eslint-plugin-jsx-a11y'
+import pluginReact from 'eslint-plugin-react'
+import pluginReactHooks from 'eslint-plugin-react-hooks'
+import globals from 'globals'
+import pluginJs from '@eslint/js'
+import tseslint from 'typescript-eslint'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import pluginQuery from '@tanstack/eslint-plugin-query'
 
 export default defineConfig([
   reactRefresh.configs.vite,
@@ -99,4 +99,4 @@ export default defineConfig([
       // ],
     },
   },
-]);
+])

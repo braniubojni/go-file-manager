@@ -4,10 +4,10 @@ Parent: root `AGENTS.md`.
 
 ## Workflows
 
-| File | When | Purpose |
-|------|------|---------|
-| `workflows/ci.yml` | PR + `main` | Go quality + frontend quality |
-| `workflows/release.yml` | tags `v*` | Multi-OS build + GitHub Release assets |
+| File                    | When        | Purpose                                |
+| ----------------------- | ----------- | -------------------------------------- |
+| `workflows/ci.yml`      | PR + `main` | Go quality + frontend quality          |
+| `workflows/release.yml` | tags `v*`   | Multi-OS build + GitHub Release assets |
 
 ## Go job (`ci.yml`) — required order
 
@@ -18,7 +18,7 @@ Parent: root `AGENTS.md`.
    (Wails v3 CGO for main + terminal service).
 4. `go vet ./...`
 5. `go test ./internal/...`
-6. **golangci-lint-action@v9**, version **`v2.12.2`**, timeout 3m  
+6. **golangci-lint-action@v9**, version **`v2.12.2`**, timeout 3m
    - Must be built with Go ≥ **1.25** (go.mod). v2.1.x fails with go1.24 binary.
 
 ## Frontend job
