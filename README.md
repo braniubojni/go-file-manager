@@ -215,7 +215,7 @@ go vet ./...
 
 # Frontend
 cd frontend
-npm run lint                   # ESLint
+npm run lint                   # Oxlint
 npm run knip                   # Unused code detection
 npm run typecheck              # TypeScript
 ```
@@ -223,7 +223,7 @@ npm run typecheck              # TypeScript
 **Configured linters:**
 
 - Go: `errcheck`, `govet`, `staticcheck`, `ineffassign`, `unused`
-- Frontend: ESLint (React hooks, a11y), Knip (dead code)
+- Frontend: Oxlint, Knip (dead code)
 
 ### Architecture Principles
 
