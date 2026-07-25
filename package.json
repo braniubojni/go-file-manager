@@ -4,7 +4,8 @@
   "description": "Dual-pane desktop file manager (Wails v3 + Go + React)",
   "scripts": {
     "prepare": "husky",
-    "precommit": "lint-staged"
+    "precommit": "lint-staged",
+    "knip": "cd frontend && npm run knip"
   },
   "devDependencies": {
     "husky": "^9.1.7",

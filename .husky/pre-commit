@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 set -e
+# Check unused dependencies in frontend (Knip) before commit.
+npm run knip
 # Format staged Go (gofmt) and frontend (oxfmt) files before commit.
 # Prevents CI gofmt / format:check failures.
 npx lint-staged
