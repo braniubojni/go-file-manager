@@ -3,6 +3,7 @@ package remote
 import (
 	"fmt"
 	"io"
+	"sync"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -75,8 +76,11 @@ func (m *Manager) OpenShell(vpath string, cols, rows int) (*ShellSession, io.Rea
 	_, _ = fmt.Fprintf(stdin, "cd %q\n", rp)
 
 	pr, pw := io.Pipe()
-	go func() { _, _ = io.Copy(pw, stdout) }()
-	go func() { _, _ = io.Copy(pw, stderr) }()
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); _, _ = io.Copy(pw, stdout) }()
+	go func() { defer wg.Done(); _, _ = io.Copy(pw, stderr) }()
+	go func() { wg.Wait(); _ = pw.Close() }()
 
 	return &ShellSession{session: sess, stdin: stdin}, pr, nil
 }

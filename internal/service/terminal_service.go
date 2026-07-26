@@ -52,14 +52,14 @@ func (t *TerminalService) emit(name string, data any) {
 // SSH shell when cwd is an ssh:// virtual path.
 func (t *TerminalService) Start(paneID, cwd string) error {
 	t.mu.Lock()
-	if h, ok := t.sessions[paneID]; ok {
-		t.mu.Unlock()
-		if cwd != "" {
-			_ = h.Write(fmt.Sprintf("cd %q\n", cwd))
-		}
-		return nil
-	}
+	_, running := t.sessions[paneID]
 	t.mu.Unlock()
+	if running {
+		if cwd == "" {
+			return nil
+		}
+		return t.SetCwd(paneID, cwd)
+	}
 
 	var (
 		handle ptyHandle
@@ -163,5 +163,13 @@ func (t *TerminalService) SetCwd(paneID, cwd string) error {
 	if !ok {
 		return nil
 	}
-	return h.Write(fmt.Sprintf("cd %q\n", cwd))
+	shellPath := cwd
+	if remote.IsRemote(cwd) {
+		loc, err := remote.ParseLocation(cwd)
+		if err != nil {
+			return err
+		}
+		shellPath = loc.RemotePath
+	}
+	return h.Write(fmt.Sprintf("cd %q\n", shellPath))
 }
