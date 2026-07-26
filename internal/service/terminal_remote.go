@@ -37,8 +37,8 @@ func (r *remoteShell) Close() error {
 	return r.sess.Close()
 }
 
-// ExitCode is not tracked for remote shells (ponytail: best-effort;
-// wire up ssh.Session.Wait() if a real exit code is ever needed).
+// ExitCode is not tracked for remote shells (best-effort).
+// Wire up ssh.Session.Wait() if a real exit code is ever needed.
 func (r *remoteShell) ExitCode() int {
 	return 0
 }
