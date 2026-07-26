@@ -744,10 +744,7 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 
 ## Later ideas
 
-- Remote file editor implementation (CodeMirror 6)
-- Folder size calculation for remote dirs
 - Check all missing remote actions and implement them
-- Autocomplete for remote paths + inside of `Choose working directory` dialog when user wishes to change the working directory
 
 - Fancy .dmg creation for macOS (drag to /Applications)
 - setup autoupdate, wails3 updater instead of what we have now
