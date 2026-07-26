@@ -80,8 +80,10 @@ func (s *FileService) ListDir(path string, showHidden bool) ([]domain.FileEntry,
 
 func (s *FileService) ListPathCompletions(partial string) ([]string, error) {
 	if remote.IsRemote(partial) {
-		// Minimal: no remote completions yet
-		return []string{}, nil
+		if s.remote == nil {
+			return nil, fmt.Errorf("remote not available")
+		}
+		return s.remote.ListPathCompletions(partial)
 	}
 	return filesystem.ListPathCompletions(partial)
 }
@@ -227,18 +229,24 @@ func (s *FileService) CreateFile(parent, name string) (string, error) {
 	return filesystem.CreateFile(parent, name)
 }
 
-// ReadTextFile reads a local text file for the built-in editor.
+// ReadTextFile reads a text file for the built-in editor (local or remote).
 func (s *FileService) ReadTextFile(path string) (string, error) {
 	if remote.IsRemote(path) {
-		return "", fmt.Errorf("built-in editor is not available on remote connections yet")
+		if s.remote == nil {
+			return "", fmt.Errorf("remote not available")
+		}
+		return s.remote.ReadTextFile(path)
 	}
 	return filesystem.ReadTextFile(path)
 }
 
-// WriteTextFile writes a local text file from the built-in editor.
+// WriteTextFile writes a text file from the built-in editor (local or remote).
 func (s *FileService) WriteTextFile(path, content string) error {
 	if remote.IsRemote(path) {
-		return fmt.Errorf("built-in editor is not available on remote connections yet")
+		if s.remote == nil {
+			return fmt.Errorf("remote not available")
+		}
+		return s.remote.WriteTextFile(path, content)
 	}
 	return filesystem.WriteTextFile(path, content)
 }
@@ -264,7 +272,10 @@ func (s *FileService) Open(path string) error {
 func (s *FileService) DirChildSizes(jobID string, dir string) (map[string]int64, error) {
 	defer func() { _ = s.FinishJob(jobID) }()
 	if remote.IsRemote(dir) {
-		return nil, fmt.Errorf("folder sizes not available on remote connections yet")
+		if s.remote == nil {
+			return nil, fmt.Errorf("remote not available")
+		}
+		return s.remote.DirChildSizesCtx(s.jobCtx(jobID), dir)
 	}
 	return filesystem.DirChildSizesCtx(s.jobCtx(jobID), dir)
 }

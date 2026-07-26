@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -8,15 +9,21 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
+
+// MaxTextFileBytes is the largest remote file the built-in editor will open.
+// Mirrors filesystem.MaxTextFileBytes.
+const MaxTextFileBytes = 5 << 20 // 5 MiB
 
 // HostKeyStore loads/saves TOFU host key fingerprints (base64 SHA256).
 type HostKeyStore interface {
@@ -277,6 +284,241 @@ func (m *Manager) Exists(vpath string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+// ReadTextFile reads a remote text file for the built-in editor.
+func (m *Manager) ReadTextFile(vpath string) (string, error) {
+	loc, err := ParseLocation(vpath)
+	if err != nil {
+		return "", err
+	}
+	s, err := m.get(loc)
+	if err != nil {
+		return "", err
+	}
+	info, err := s.sftp.Stat(loc.RemotePath)
+	if err != nil {
+		return "", fmt.Errorf("stat %s: %w", loc.RemotePath, err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("not a file: %s", loc.RemotePath)
+	}
+	if info.Size() > MaxTextFileBytes {
+		return "", fmt.Errorf("file too large for built-in editor (max %d bytes)", MaxTextFileBytes)
+	}
+	f, err := s.sftp.Open(loc.RemotePath)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	if !utf8.Valid(data) {
+		return "", fmt.Errorf("binary or unsupported encoding: %s", loc.RemotePath)
+	}
+	return string(data), nil
+}
+
+// WriteTextFile writes remote text content atomically (temp + rename over sftp).
+func (m *Manager) WriteTextFile(vpath, content string) error {
+	loc, err := ParseLocation(vpath)
+	if err != nil {
+		return err
+	}
+	s, err := m.get(loc)
+	if err != nil {
+		return err
+	}
+	if info, err := s.sftp.Stat(loc.RemotePath); err == nil && info.IsDir() {
+		return fmt.Errorf("not a file: %s", loc.RemotePath)
+	}
+	dir := path.Dir(loc.RemotePath)
+	tmp := path.Join(dir, fmt.Sprintf(".gfm-edit-%d", time.Now().UnixNano()))
+	f, err := s.sftp.Create(tmp)
+	if err != nil {
+		return err
+	}
+	ok := false
+	defer func() {
+		if !ok {
+			_ = s.sftp.Remove(tmp)
+		}
+	}()
+	if _, err := f.Write([]byte(content)); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := s.sftp.Rename(tmp, loc.RemotePath); err != nil {
+		// sftp Rename fails if dest exists on some servers; fall back to remove+rename.
+		if rmErr := s.sftp.Remove(loc.RemotePath); rmErr != nil {
+			return err
+		}
+		if err := s.sftp.Rename(tmp, loc.RemotePath); err != nil {
+			return err
+		}
+	}
+	ok = true
+	return nil
+}
+
+// DirChildSizesCtx returns recursive byte sizes for each immediate child directory
+// of a remote dir. Keys are ssh:// virtual paths. Symlinks are not followed.
+func (m *Manager) DirChildSizesCtx(ctx context.Context, vpath string) (map[string]int64, error) {
+	loc, err := ParseLocation(vpath)
+	if err != nil {
+		return nil, err
+	}
+	s, err := m.get(loc)
+	if err != nil {
+		return nil, err
+	}
+	rp := loc.RemotePath
+	if rp == "" {
+		rp = "/"
+	}
+	info, err := s.sftp.Stat(rp)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("not a directory: %s", rp)
+	}
+	entries, err := s.sftp.ReadDir(rp)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]int64)
+	for _, e := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if !e.IsDir() || e.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		child := path.Join(rp, e.Name())
+		size, err := remoteDirSizeCtx(ctx, s.sftp, child)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			continue
+		}
+		out[loc.JoinPath(child)] = size
+	}
+	return out, nil
+}
+
+func remoteDirSizeCtx(ctx context.Context, c *sftp.Client, root string) (int64, error) {
+	var total int64
+	entries, err := c.ReadDir(root)
+	if err != nil {
+		return 0, err
+	}
+	for _, e := range entries {
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		if e.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		child := path.Join(root, e.Name())
+		if e.IsDir() {
+			sub, err := remoteDirSizeCtx(ctx, c, child)
+			if err != nil {
+				return 0, err
+			}
+			total += sub
+			continue
+		}
+		total += e.Size()
+	}
+	return total, nil
+}
+
+// ListPathCompletions returns ssh:// path suggestions for a partial remote path (max 50).
+func (m *Manager) ListPathCompletions(partial string) ([]string, error) {
+	partial = strings.TrimSpace(partial)
+	loc, err := ParseLocation(partial)
+	if err != nil {
+		return nil, err
+	}
+	s, err := m.get(loc)
+	if err != nil {
+		return nil, err
+	}
+
+	rp := loc.RemotePath
+	var dir, query string
+	if strings.HasSuffix(rp, "/") {
+		dir, query = rp, ""
+	} else {
+		dir, query = path.Dir(rp), path.Base(rp)
+		if dir == "." {
+			dir = "/"
+		}
+	}
+
+	entries, err := s.sftp.ReadDir(dir)
+	if err != nil {
+		return []string{}, nil
+	}
+
+	type item struct {
+		full       string
+		name       string
+		isDir      bool
+		startsWith bool
+		isDot      bool
+	}
+	queryLower := strings.ToLower(query)
+	items := make([]item, 0, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		nameLower := strings.ToLower(name)
+		if query != "" && !strings.Contains(nameLower, queryLower) {
+			continue
+		}
+		isDir := e.IsDir()
+		fullPath := path.Join(dir, name)
+		if isDir {
+			fullPath += "/"
+		}
+		items = append(items, item{
+			full:       loc.JoinPath(fullPath),
+			name:       name,
+			isDir:      isDir,
+			startsWith: query == "" || strings.HasPrefix(nameLower, queryLower),
+			isDot:      strings.HasPrefix(name, "."),
+		})
+	}
+
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := items[i], items[j]
+		if a.isDot != b.isDot {
+			return !a.isDot
+		}
+		if a.startsWith != b.startsWith {
+			return a.startsWith
+		}
+		if a.isDir != b.isDir {
+			return a.isDir
+		}
+		return strings.ToLower(a.name) < strings.ToLower(b.name)
+	})
+
+	if len(items) > 50 {
+		items = items[:50]
+	}
+	out := make([]string, len(items))
+	for i, it := range items {
+		out[i] = it.full
+	}
+	return out, nil
 }
 
 // Mkdir creates a directory under parent virtual path.
