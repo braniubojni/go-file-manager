@@ -129,7 +129,8 @@ jobs:
                 ls -la bin/ || true
                 exit 1
               fi
-              (cd bin && zip -9 "../dist/${NAME}.zip" go-file-manager.exe)
+              # zip is not available on Windows runners; use 7-Zip (pre-installed).
+              7z a -tzip "dist/${NAME}.zip" "$EXE"
               echo "asset=dist/${NAME}.zip" >> "$GITHUB_OUTPUT"
               ;;
             linux)
