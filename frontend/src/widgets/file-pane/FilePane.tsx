@@ -17,7 +17,6 @@ export const FilePane: FC<FilePaneProps> = ({ id }) => {
       <PaneHeader
         id={id}
         active={p.active}
-        path={p.path}
         job={p.job}
         terminalOpen={p.terminalOpen}
         onActivate={p.activatePane}

@@ -86,6 +86,7 @@ wails3 task package:darwin VERSION=0.1.0 ARCH=arm64  # .app for macOS
 From macOS (Windows = native Go cross-compile; Linux = Docker):
 
 ```bash
+# MAIN COMMAND: builds all 3 platforms + packages macOS .app
 wails3 task setup:docker          # once, ~800MB (host arch)
 wails3 task dist VERSION=0.1.0
 # → dist/go-file-manager_0.1.0_darwin_arm64.zip   (.app inside)
@@ -743,6 +744,10 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 
 ## Later ideas
 
+- Check all missing remote actions and implement them
+
+- Fancy .dmg creation for macOS (drag to /Applications)
+- setup autoupdate, wails3 updater instead of what we have now
 - Tabs
 - Implement git diff highlight feature
 - search
@@ -751,4 +756,4 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 - compare dirs
 - viewer/editor
 - progress for large trees.
-- setup autoupdate, wails3 updater instead of what we have now
+- work on CI for all OS getting failed builds

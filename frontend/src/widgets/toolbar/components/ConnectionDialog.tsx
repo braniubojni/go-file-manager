@@ -1,4 +1,5 @@
 import type { FC } from 'react'
+import Autocomplete from '@mui/material/Autocomplete'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
@@ -14,6 +15,8 @@ import Radio from '@mui/material/Radio'
 import RadioGroup from '@mui/material/RadioGroup'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
+import { usePathCompletions } from '../../../entities/file/queries'
+import { resolveRemoteWorkdirInput } from '../../../features/connections/helpers'
 import type { ConnectionDialogProps } from '../types'
 
 const DIALOG_TITLES: Record<string, string> = {
@@ -30,6 +33,11 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
   onLoadSSHConfig,
   onConnectFromConfig,
 }) => {
+  const workdirCustomOpen = dialog.mode === 'workdir' && Boolean(dialog.workdirCustom)
+  const workdirPartial = resolveRemoteWorkdirInput(dialog.workdirHome, dialog.workdirCustom) ?? ''
+  const workdirCompletions = usePathCompletions(workdirPartial, workdirCustomOpen)
+  const workdirOptions = workdirCompletions.data ?? []
+
   return (
     <Dialog
       data-testid="dialog-connection"
@@ -197,19 +205,33 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
               />
             </RadioGroup>
             {(dialog.workdirChosen === '__custom__' || dialog.workdirCustom) && (
-              <TextField
-                autoFocus
-                label="Remote path"
-                placeholder="/home/user/project"
-                helperText="Absolute path on the remote, or ssh://…"
-                value={dialog.workdirCustom}
-                onChange={(e) => dispatch({ type: 'set_workdir_custom', path: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') onSubmit()
-                }}
+              <Autocomplete
+                freeSolo
                 fullWidth
                 size="small"
-                data-testid="input-workdir-custom"
+                options={workdirOptions}
+                inputValue={dialog.workdirCustom}
+                filterOptions={(x) => x}
+                onInputChange={(_, v, reason) => {
+                  if (reason === 'reset') return
+                  dispatch({ type: 'set_workdir_custom', path: v })
+                }}
+                onChange={(_, v) => {
+                  if (typeof v === 'string' && v) dispatch({ type: 'set_workdir_custom', path: v })
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    autoFocus
+                    label="Remote path"
+                    placeholder="/home/user/project"
+                    helperText="Absolute path on the remote, or ssh://…"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') onSubmit()
+                    }}
+                    data-testid="input-workdir-custom"
+                  />
+                )}
               />
             )}
             {dialog.workdirProfileId && (

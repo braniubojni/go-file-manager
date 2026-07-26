@@ -125,10 +125,6 @@ export const useFilePane = (id: PaneId) => {
 
   const onCalcSizes = () => {
     if (!path) return
-    if (path.startsWith('ssh://')) {
-      show('Folder sizes not available on remote connections yet', 'warning')
-      return
-    }
     setActivePane(id)
     const gen = beginSizes(id)
     const uiJobId = newJobId('sizes')

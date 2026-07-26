@@ -97,7 +97,7 @@ export const useToolbarActions = () => {
     }
     const path = realSelection[0]
     if (path.startsWith('ssh://')) {
-      show('Built-in editor is not available on remote connections yet', 'warning')
+      openWorkspace(parentDirOf(path), path)
       return
     }
     if (settings?.useBuiltInEditor === false) {

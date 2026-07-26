@@ -26,7 +26,6 @@ import {
 type Props = {
   id: PaneId
   active: boolean
-  path: string
   job: PaneJob | null | undefined
   terminalOpen: boolean
   onActivate: () => void
@@ -38,7 +37,6 @@ type Props = {
 export const PaneHeader: FC<Props> = ({
   id,
   active,
-  path,
   job,
   terminalOpen,
   onActivate,
@@ -105,17 +103,12 @@ export const PaneHeader: FC<Props> = ({
         <StorageIcon fontSize="small" />
       </IconButton>
     </Tooltip>
-    <Tooltip
-      title={
-        path.startsWith('ssh://') ? 'Terminal unavailable on remote' : 'Toggle terminal (Ctrl+`)'
-      }
-    >
+    <Tooltip title="Toggle terminal (Ctrl+`)">
       <span>
         <IconButton
           data-testid={`btn-terminal-toggle-${id}`}
           size="small"
           color={terminalOpen ? 'primary' : 'default'}
-          disabled={path.startsWith('ssh://')}
           onClick={(e) => {
             e.stopPropagation()
             onToggleTerminal()

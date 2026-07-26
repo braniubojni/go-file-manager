@@ -29,7 +29,7 @@ func main() {
 	fileSvc := service.NewFileService(remoteMgr)
 	settingsSvc := service.NewSettingsService(db, cfgStore)
 	bookmarkSvc := service.NewBookmarkService(db)
-	termSvc := service.NewTerminalService()
+	termSvc := service.NewTerminalService(remoteMgr)
 	connSvc := service.NewConnectionService(db, remoteMgr)
 	updateSvc := service.NewUpdateService()
 
