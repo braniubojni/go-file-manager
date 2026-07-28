@@ -134,13 +134,13 @@ Pass `VERSION=x.y.z` into Task builds; production ldflags inject:
 
 ## Updates (GitHub Releases)
 
+Uses **Wails v3 `app.Updater`** with the GitHub Releases provider.
+
 - **Repo:** `braniubojni/go-file-manager`
 - Settings → **Updates**: show version, check now, auto-check every **10 days** (default on)
-- Flow: check → confirm → download platform asset (if present) → open package → quit to finish install
-- If no matching asset: **Open releases page**
-- Asset names must include `_{os}_{arch}` (see Releasing below)
-
-Custom in-app updater (not the Wails `app.Updater` yet): download + open is intentional for ad-hoc-signed mac builds. Wails’ built-in updater is a possible later migration; asset naming already matches its GitHub provider defaults.
+- Flow: check → builtin update window → download → verify `SHA256SUMS` → **Restart & Apply** (in-place swap + relaunch)
+- Asset names must include `os` + `arch` substrings (see Releasing below)
+- Each release must include a sibling **`SHA256SUMS`** asset (`sha256sum` / `shasum -a 256` format)
 
 ### Releasing
 
@@ -159,17 +159,20 @@ git push origin v0.1.0
 | `ubuntu-latest`  | `go-file-manager_{ver}_linux_amd64.tar.gz`                |
 | `macos-latest`   | `go-file-manager_{ver}_darwin_arm64.zip` (`.app` inside)  |
 | `windows-latest` | `go-file-manager_{ver}_windows_amd64.zip` (`.exe` inside) |
+| publish job      | `SHA256SUMS` (digests of the platform archives)           |
+
+Archives must have a **single top-level entry** (Wails extract rule): `.app` / one binary / one `.exe`.
 
 Or build locally and attach assets yourself:
 
 ```bash
 wails3 task dist VERSION=0.1.0
-# create a release in the GitHub UI and upload dist/*
+# create a release in the GitHub UI and upload dist/* (includes SHA256SUMS)
 ```
 
-The in-app updater matches `_{os}_{arch}` in asset names (`darwin`/`windows`/`linux`, `arm64`/`amd64`).
+The updater’s default asset matcher picks by `GOOS` + `GOARCH` substrings (`darwin`/`windows`/`linux`, `arm64`/`amd64`).
 
-**Note:** macOS artifacts from CI are ad-hoc signed only (not Developer ID). Users may need right-click → Open the first time.
+**Note:** macOS artifacts from CI are ad-hoc signed only (not Developer ID). Gatekeeper may still require right-click → Open; the updater does not re-sign binaries.
 
 ## Quality / CI
 
@@ -507,12 +510,11 @@ wails3 task build:darwin VERSION=0.1.0
 # Adds: -ldflags "-X .../internal/version.Version=0.1.0"
 ```
 
-**In-app updater:**
+**In-app updater (Wails `app.Updater`):**
 
-- Checks GitHub Releases API every 10 days (configurable)
-- Matches `_{os}_{arch}` in asset names
-- User confirms before download + install
-- Download → open package → quit (manual finish)
+- Checks GitHub Releases every 10 days (configurable) or on demand
+- Matches os/arch substrings in asset names; verifies `SHA256SUMS`
+- Builtin window: notes, progress, Restart & Apply (helper swap + relaunch)
 
 ---
 
@@ -754,8 +756,7 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 
 - Check all missing remote actions and implement them
 
-- setup autoupdate, wails3 updater instead of what we have now
-- Implement git diff highlight feature
+- Redo option with 10 second in case of delete tooltip `Delete completed`
 - search
 - archives
 - FTP

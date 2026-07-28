@@ -11,7 +11,9 @@ export const terminalRootSx = (height: number, bg: string): SxProps<Theme> => ({
   flexDirection: 'column',
   position: 'relative',
   '& .xterm': { height: '100%' },
-  '& .xterm-viewport': { overflowY: 'auto !important' },
+  // Always reserve scrollbar gutter so FitAddon cols don't thrash on overflow
+  // (WINCH spam breaks multiline zsh / powerlevel10k prompts).
+  '& .xterm-viewport': { overflowY: 'scroll !important' },
 });
 
 export const resizeHandleSx: SxProps<Theme> = {

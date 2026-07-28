@@ -259,6 +259,29 @@ tasks:
             tar -C "$STAGE" -czf "dist/go-file-manager_${VER}_linux_${L_ARCH}.tar.gz" go-file-manager
             rm -rf "$STAGE"
 
+            # Checksums for Wails app.Updater (ChecksumAsset: SHA256SUMS).
+            # Include only installable archives (not DMG — updater does not install .dmg).
+            (
+              cd dist
+              rm -f SHA256SUMS
+              found=0
+              for f in *.zip *.tar.gz; do
+                [ -f "$f" ] || continue
+                found=1
+                if command -v sha256sum >/dev/null 2>&1; then
+                  sha256sum "$f"
+                else
+                  shasum -a 256 "$f"
+                fi
+              done | sort -k2 > SHA256SUMS
+              if [ "$found" -eq 0 ]; then
+                echo "No dist archives for SHA256SUMS" >&2
+                exit 1
+              fi
+              echo "=== SHA256SUMS ==="
+              cat SHA256SUMS
+            )
+
             echo "=== dist/ ready ==="
             ls -lh dist/
 

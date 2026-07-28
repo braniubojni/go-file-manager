@@ -48,6 +48,50 @@ export const editorPaneSx: SxProps<Theme> = {
   flexDirection: 'column',
 };
 
+export const mergeColsHeaderSx: SxProps<Theme> = {
+  display: 'flex',
+  borderBottom: '1px solid',
+  borderColor: 'divider',
+  bgcolor: 'action.hover',
+  flexShrink: 0,
+};
+
+export const mergeColLabelSx: SxProps<Theme> = {
+  flex: 1,
+  px: 1.5,
+  py: 0.5,
+  fontWeight: 700,
+  color: 'text.secondary',
+  borderRight: '1px solid',
+  borderColor: 'divider',
+  '&:last-of-type': { borderRight: 'none' },
+};
+
+export const mergeHostSx: SxProps<Theme> = {
+  flex: 1,
+  minHeight: 0,
+  overflow: 'hidden',
+  display: 'flex',
+  flexDirection: 'column',
+  // MergeView defaults to height:auto; pin it so both panes fill the workspace.
+  '& .cm-mergeView': {
+    flex: 1,
+    minHeight: 0,
+    height: '100% !important',
+    overflow: 'auto',
+  },
+  '& .cm-mergeViewEditors': {
+    display: 'flex',
+    alignItems: 'stretch',
+    minHeight: '100%',
+  },
+  '& .cm-mergeViewEditor': {
+    flex: '1 1 0',
+    minWidth: 0,
+    overflow: 'hidden',
+  },
+};
+
 export const treeRowSx = (selected: boolean, depth: number): SxProps<Theme> => ({
   display: 'flex',
   alignItems: 'center',

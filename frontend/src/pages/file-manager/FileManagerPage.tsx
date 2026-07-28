@@ -51,6 +51,7 @@ export const FileManagerPage: FC = () => {
           onNewFolder={() => trigger('mkdir')}
           onNewFile={() => trigger('mkfile')}
           onEditFile={() => trigger('editFile')}
+          onGitDiff={() => trigger('gitDiff')}
           onRename={() => trigger('rename')}
           onDelete={() => trigger('delete')}
         />

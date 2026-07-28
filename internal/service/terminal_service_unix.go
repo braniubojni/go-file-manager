@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 
 	"github.com/creack/pty"
@@ -18,7 +19,8 @@ type localPTY struct {
 }
 
 // spawnLocalPTY starts a login shell in a PTY at cwd (cwd may be empty).
-func spawnLocalPTY(cwd string) (ptyHandle, error) {
+// cols/rows should match the frontend xterm size; zeros fall back to 80×24.
+func spawnLocalPTY(cwd string, cols, rows int) (ptyHandle, error) {
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		if _, err := os.Stat("/bin/zsh"); err == nil {
@@ -28,17 +30,49 @@ func spawnLocalPTY(cwd string) (ptyHandle, error) {
 		}
 	}
 
+	if cols < 2 {
+		cols = 80
+	}
+	if rows < 1 {
+		rows = 24
+	}
+
 	cmd := exec.Command(shell, "-l")
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
-	cmd.Env = os.Environ()
+	// Strip COLUMNS/LINES so zsh/p10k use the PTY ioctl size, not a stale host value.
+	// Force a modern terminal type for color / cursor protocols.
+	cmd.Env = cleanShellEnv(os.Environ())
 
-	ptmx, err := pty.Start(cmd)
+	ws := &pty.Winsize{Rows: uint16(rows), Cols: uint16(cols)}
+	ptmx, err := pty.StartWithSize(cmd, ws)
 	if err != nil {
 		return nil, fmt.Errorf("start pty: %w", err)
 	}
 	return &localPTY{cmd: cmd, ptmx: ptmx}, nil
+}
+
+func cleanShellEnv(env []string) []string {
+	out := make([]string, 0, len(env)+2)
+	hasTerm := false
+	for _, e := range env {
+		switch {
+		case strings.HasPrefix(e, "COLUMNS="), strings.HasPrefix(e, "LINES="):
+			continue
+		case strings.HasPrefix(e, "TERM="):
+			hasTerm = true
+			out = append(out, "TERM=xterm-256color")
+		default:
+			out = append(out, e)
+		}
+	}
+	if !hasTerm {
+		out = append(out, "TERM=xterm-256color")
+	}
+	// Helps truecolor themes; harmless if unused.
+	out = append(out, "COLORTERM=truecolor")
+	return out
 }
 
 func (l *localPTY) Read(p []byte) (int, error) {
@@ -51,7 +85,7 @@ func (l *localPTY) Write(data string) error {
 }
 
 func (l *localPTY) Resize(cols, rows int) error {
-	if cols < 1 {
+	if cols < 2 {
 		cols = 80
 	}
 	if rows < 1 {

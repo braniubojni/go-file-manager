@@ -24,6 +24,7 @@ export const Toolbar: FC = () => {
         onMkdir={a.onMkdir}
         onMkfile={a.onMkfile}
         onEditFile={a.onEditFile}
+        onGitDiff={a.onGitDiff}
         onRename={a.onRename}
         onDelete={a.onDelete}
         onArchive={() => void a.openArchiveDialog()}

@@ -6,31 +6,66 @@ import type { PaneId } from '../../../entities/file/types';
 import { TerminalService } from '../../../shared/api/bindings';
 import type { TermPayload } from '../types';
 
+/** Fit host → xterm cells; only push PTY resize when cols/rows actually change. */
+const fitAndMaybeResize = (
+  host: HTMLElement,
+  term: Terminal,
+  fit: FitAddon,
+  paneId: PaneId,
+  started: boolean,
+  last: { cols: number; rows: number },
+): void => {
+  if (host.clientWidth < 4 || host.clientHeight < 4) return;
+  try {
+    fit.fit();
+  } catch {
+    return;
+  }
+  const cols = term.cols;
+  const rows = term.rows;
+  if (cols < 2 || rows < 1) return;
+  if (cols === last.cols && rows === last.rows) return;
+  last.cols = cols;
+  last.rows = rows;
+  if (started) {
+    void TerminalService.Resize(paneId, cols, rows);
+  }
+};
+
 export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme: ITheme) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const startedRef = useRef(false);
+  const lastSizeRef = useRef({ cols: 0, rows: 0 });
   const cwdRef = useRef(cwd);
   cwdRef.current = cwd;
 
   useEffect(() => {
     if (!hostRef.current) return;
+    const host = hostRef.current;
+    const lastSize = { cols: 0, rows: 0 };
+    lastSizeRef.current = lastSize;
 
     const term = new Terminal({
       cursorBlink: true,
       fontSize: 12,
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       theme: xtermTheme,
+      // Avoid convertEol issues; PTY already sends CR/LF as the shell intends.
+      allowProposedApi: false,
+      scrollback: 5000,
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
-    term.open(hostRef.current);
+    term.open(host);
     try {
       fit.fit();
     } catch {
       /* ignore */
     }
+    // Focus so typing works immediately after toggle (no click required).
+    term.focus();
 
     termRef.current = term;
     fitRef.current = fit;
@@ -54,35 +89,45 @@ export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme
       }
     });
 
+    // Fit before start so the first Resize after spawn matches the real host size
+    // (zsh/p10k need a correct WINCH early; avoid 0×0 default from openpty).
+    fitAndMaybeResize(host, term, fit, paneId, false, lastSize);
+
     void TerminalService.Start(paneId, cwdRef.current)
       .then(async () => {
         startedRef.current = true;
+        // Force one PTY resize even if lastSize was set only on the xterm side.
         try {
           fit.fit();
-          const dims = fit.proposeDimensions();
-          if (dims) await TerminalService.Resize(paneId, dims.cols, dims.rows);
+          const cols = term.cols;
+          const rows = term.rows;
+          if (cols >= 2 && rows >= 1) {
+            lastSize.cols = cols;
+            lastSize.rows = rows;
+            await TerminalService.Resize(paneId, cols, rows);
+          }
         } catch {
           /* ignore */
         }
+        // Re-focus after layout/start; fit/async start can steal focus.
+        term.focus();
       })
       .catch((e) => {
         term.writeln(`\r\nFailed to start terminal: ${String(e)}`);
       });
 
+    // Debounce RO → rAF so scrollbar show/hide can’t WINCH-spam zsh.
+    let raf = 0;
     const ro = new ResizeObserver(() => {
-      try {
-        fit.fit();
-        const dims = fit.proposeDimensions();
-        if (dims && startedRef.current) {
-          void TerminalService.Resize(paneId, dims.cols, dims.rows);
-        }
-      } catch {
-        /* ignore */
-      }
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        fitAndMaybeResize(host, term, fit, paneId, startedRef.current, lastSize);
+      });
     });
-    ro.observe(hostRef.current);
+    ro.observe(host);
 
     return () => {
+      cancelAnimationFrame(raf);
       onData.dispose();
       if (typeof unsubData === 'function') unsubData();
       if (typeof unsubExit === 'function') unsubExit();
@@ -108,15 +153,11 @@ export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme
   }, [cwd, paneId]);
 
   useEffect(() => {
-    try {
-      fitRef.current?.fit();
-      const dims = fitRef.current?.proposeDimensions();
-      if (dims && startedRef.current) {
-        void TerminalService.Resize(paneId, dims.cols, dims.rows);
-      }
-    } catch {
-      /* ignore */
-    }
+    const host = hostRef.current;
+    const term = termRef.current;
+    const fit = fitRef.current;
+    if (!host || !term || !fit) return;
+    fitAndMaybeResize(host, term, fit, paneId, startedRef.current, lastSizeRef.current);
   }, [height, paneId]);
 
   return { hostRef };

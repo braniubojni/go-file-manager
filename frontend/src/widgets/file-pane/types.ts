@@ -32,6 +32,8 @@ export type FileTableProps = {
   focused: string;
   active: boolean;
   showExtensions: boolean;
+  /** Basename → git status code (M/A/D/U/?). Empty when disabled or not a repo. */
+  gitByName?: Map<string, string>;
   folderSizes?: Record<string, number>;
   /** @deprecated overlay removed — sizes use pane header job spinner */
   sizesLoading?: boolean;

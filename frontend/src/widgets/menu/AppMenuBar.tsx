@@ -21,6 +21,7 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
   onNewFolder,
   onNewFile,
   onEditFile,
+  onGitDiff,
   onRename,
   onDelete,
 }) => {
@@ -45,6 +46,7 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['dir'] });
+    void qc.invalidateQueries({ queryKey: ['gitStatus'] });
     closeAll();
   };
 
@@ -85,6 +87,15 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
             }}
           >
             Edit
+          </MenuItem>
+          <MenuItem
+            data-testid="menu-file-git-diff"
+            onClick={() => {
+              closeAll();
+              onGitDiff();
+            }}
+          >
+            Git diff
           </MenuItem>
           <MenuItem
             data-testid="menu-file-rename"

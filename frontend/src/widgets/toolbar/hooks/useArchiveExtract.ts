@@ -28,6 +28,7 @@ export const useArchiveExtract = ({
     show(msg, 'success');
     clearSelection();
     void qc.invalidateQueries({ queryKey: ['dir'] });
+    void qc.invalidateQueries({ queryKey: ['gitStatus'] });
   };
 
   const openArchiveDialog = async () => {

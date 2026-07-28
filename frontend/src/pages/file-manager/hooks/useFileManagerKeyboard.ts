@@ -175,6 +175,9 @@ export const useFileManagerKeyboard = () => {
         case 'editFile':
           trigger('editFile');
           break;
+        case 'gitDiff':
+          trigger('gitDiff');
+          break;
         case 'goTo':
           openGoTo();
           break;
