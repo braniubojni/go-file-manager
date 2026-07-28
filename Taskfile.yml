@@ -31,8 +31,14 @@ tasks:
 
         # 1. Check if Docker daemon is running; start Docker Desktop if not
         if ! docker info >/dev/null 2>&1; then
-          echo "=== Docker is not running. Launching Docker Desktop... ==="
-          open -a Docker
+          echo "=== Docker is not running. ==="
+          if [ "$(uname -s)" = "Darwin" ]; then
+            echo "Launching Docker Desktop..."
+            open -a Docker
+          else
+            echo "Please start the Docker daemon, then re-run this task." >&2
+            exit 1
+          fi
           echo "Waiting for Docker daemon to initialize..."
           until docker info >/dev/null 2>&1; do
             sleep 2
