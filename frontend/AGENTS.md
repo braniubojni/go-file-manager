@@ -43,7 +43,7 @@ public/          # usually empty; no brand icons here
 ## Updates UI
 
 - `features/updates/*` + Settings `UpdatesSection`.
-- Hooks: auto-check interval, download/open actions → Go `UpdateService`.
+- Check / auto-check → `UpdateService.CheckAndInstall` (Wails builtin update window).
 
 ## Tooling
 

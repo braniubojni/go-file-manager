@@ -43,9 +43,10 @@ task ci:go
 - Matrix: linux/amd64, darwin/arm64, windows/amd64 (native runners).
 - Linux deps: **GTK4** packages (same as CI), not gtk3.
 - Inject version from tag into ldflags + `build/config.yml`.
-- Asset naming for updater: include `_{os}_{arch}` (see `UpdateService` / README).
+- Asset naming for Wails updater: include os/arch substrings; single top-level entry per archive.
+- Publish job generates **`SHA256SUMS`** for platform zips/tarballs.
 - macOS CI: `darwin:package` → zip of `.app`; ad-hoc sign only (users may need right-click Open).
-- Local mirror of asset layout: root task **`dist`** (`task dist VERSION=x.y.z`).
+- Local mirror of asset layout: root task **`dist`** (`task dist VERSION=x.y.z` → includes `SHA256SUMS`).
 
 ## Actions versions (current)
 

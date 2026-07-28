@@ -11,6 +11,32 @@ type FileEntry struct {
 	IsSymlink bool   `json:"isSymlink"`
 }
 
+// GitStatusEntry is one child name with a compact git working-tree status.
+// Status is one of: M (modified), A (added), D (deleted), U (unmerged), ? (untracked).
+type GitStatusEntry struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+// GitDirStatus is git status for immediate children of one listed directory.
+type GitDirStatus struct {
+	RepoRoot string           `json:"repoRoot"` // empty if not in a repo
+	Entries  []GitStatusEntry `json:"entries"`
+}
+
+// GitFileDiff is HEAD vs working-tree content for one local file (read-only viewer).
+type GitFileDiff struct {
+	Path      string `json:"path"`
+	RepoRoot  string `json:"repoRoot"`
+	RelPath   string `json:"relPath"`
+	Status    string `json:"status"` // M|A|D|U|? or empty
+	OldText   string `json:"oldText"`
+	NewText   string `json:"newText"`
+	Binary    bool   `json:"binary"`
+	Truncated bool   `json:"truncated"`
+	Message   string `json:"message"` // soft-fail reason when no usable content
+}
+
 // Bookmark is a saved directory shortcut.
 type Bookmark struct {
 	ID        int64  `json:"id"`
@@ -51,6 +77,7 @@ type Settings struct {
 	Theme                   string `json:"theme"`
 	ShowHidden              bool   `json:"showHidden"`
 	ShowExtensions          bool   `json:"showExtensions"`
+	ShowGitStatus           bool   `json:"showGitStatus"`
 	UseBuiltInEditor        bool   `json:"useBuiltInEditor"`
 	AutoCheckUpdates        bool   `json:"autoCheckUpdates"`
 	UpdateCheckIntervalDays int    `json:"updateCheckIntervalDays"`
@@ -58,18 +85,6 @@ type Settings struct {
 	SkippedUpdateVersion    string `json:"skippedUpdateVersion"` // remote version user skipped
 	LeftPath                string `json:"leftPath"`
 	RightPath               string `json:"rightPath"`
-}
-
-// UpdateInfo is the result of checking GitHub Releases for a newer version.
-type UpdateInfo struct {
-	CurrentVersion string `json:"currentVersion"`
-	LatestVersion  string `json:"latestVersion"`
-	Notes          string `json:"notes"`
-	HTMLURL        string `json:"htmlUrl"`
-	AssetName      string `json:"assetName"`
-	AssetURL       string `json:"assetUrl"`
-	AssetSize      int64  `json:"assetSize"`
-	Available      bool   `json:"available"`
 }
 
 // SearchHit is one result from nested file/folder search (Go-to).

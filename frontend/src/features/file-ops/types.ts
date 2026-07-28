@@ -30,6 +30,7 @@ export type FileOpsRequest =
   | 'mkdir'
   | 'mkfile'
   | 'editFile'
+  | 'gitDiff'
   | 'goTo'
   | 'refresh'
   | 'goParent'

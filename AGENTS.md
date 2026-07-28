@@ -87,8 +87,8 @@ task test:e2e
 ## Version & updates
 
 - `internal/version.Version` injected via ldflags / Task `VERSION`.
-- In-app updater: GitHub Releases; assets match `_{os}_{arch}`; install = **download + open**, not silent replace.
-- Auto-check interval ~**10 days** (`updateCheckIntervalDays`).
+- In-app updater: Wails `app.Updater` + GitHub provider (`braniubojni/go-file-manager`); assets match os/arch substrings; release must include `SHA256SUMS`; install = verify + helper swap + relaunch.
+- Auto-check interval ~**10 days** (`updateCheckIntervalDays`); Settings calls `UpdateService.CheckAndInstall`.
 
 ## Deferred / partial
 

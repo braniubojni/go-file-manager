@@ -9,6 +9,7 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
+import DifferenceIcon from '@mui/icons-material/Difference';
 import EditIcon from '@mui/icons-material/Edit';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import LightModeIcon from '@mui/icons-material/LightMode';
@@ -81,6 +82,11 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
         <Button data-testid="btn-edit" startIcon={<EditIcon />} onClick={p.onEditFile}>
           Edit
         </Button>
+        <Tooltip title="Git diff (HEAD vs working tree)">
+          <Button data-testid="btn-git-diff" startIcon={<DifferenceIcon />} onClick={p.onGitDiff}>
+            Diff
+          </Button>
+        </Tooltip>
         <Button
           data-testid="btn-rename"
           startIcon={<DriveFileRenameOutlineIcon />}

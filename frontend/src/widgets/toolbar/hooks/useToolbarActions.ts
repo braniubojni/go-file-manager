@@ -35,6 +35,7 @@ export const useToolbarActions = () => {
   const otherPane = usePaneStore((s) => s.otherPane);
   const openSettings = useDialogStore((s) => s.openSettings);
   const openWorkspace = useEditorStore((s) => s.openWorkspace);
+  const openDiff = useEditorStore((s) => s.openDiff);
   const openGoTo = useGoToStore((s) => s.openGoTo);
   const editorOpen = useEditorStore((s) => s.open);
 
@@ -61,7 +62,10 @@ export const useToolbarActions = () => {
       onError: (e) => show(errMessage(e), 'error'),
     });
   };
-  const refreshAll = () => void qc.invalidateQueries({ queryKey: ['dir'] });
+  const refreshAll = () => {
+    void qc.invalidateQueries({ queryKey: ['dir'] });
+    void qc.invalidateQueries({ queryKey: ['gitStatus'] });
+  };
 
   const fileOps = useFileOpDialogs({ activePath, realSelection, destPath, clearSelection });
   const archiveOps = useArchiveExtract({ activePane, activePath, realSelection, clearSelection });
@@ -106,6 +110,19 @@ export const useToolbarActions = () => {
     openWorkspace(parentDirOf(path), path);
   };
 
+  const onGitDiff = () => {
+    if (realSelection.length !== 1) {
+      show('Select exactly one file to diff', 'warning');
+      return;
+    }
+    const path = realSelection[0];
+    if (path.startsWith('ssh://')) {
+      show('Git diff is not available on remote connections', 'warning');
+      return;
+    }
+    openDiff(parentDirOf(path), path);
+  };
+
   const onGoTo = () => {
     if (editorOpen) return;
     if (activePath.startsWith('ssh://')) {
@@ -124,6 +141,7 @@ export const useToolbarActions = () => {
       mkdir: fileOps.onMkdir,
       mkfile: fileOps.onMkfile,
       editFile: onEditFile,
+      gitDiff: onGitDiff,
       goTo: onGoTo,
       refresh: refreshAll,
       goParent: () => void goParent(),
@@ -150,6 +168,7 @@ export const useToolbarActions = () => {
     cycleTheme,
     refreshAll,
     onEditFile,
+    onGitDiff,
     onGoTo,
     ...fileOps,
     ...archiveOps,

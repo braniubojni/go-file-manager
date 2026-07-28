@@ -63,6 +63,7 @@ export const useEditorFile = () => {
         show('Saved', 'success');
         const parent = filePath.replace(/\/+$/, '').split(/[/\\]/).slice(0, -1).join('/') || '/';
         void qc.invalidateQueries({ queryKey: ['dir', parent] });
+        void qc.invalidateQueries({ queryKey: ['gitStatus', parent] });
       })
       .catch((e) => show(errMessage(e), 'error'));
   }, [filePath, dirty, content, setDirty, show, qc]);

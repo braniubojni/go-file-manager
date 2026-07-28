@@ -6,8 +6,9 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 
 | Package      | Role                                                                          |
 | ------------ | ----------------------------------------------------------------------------- |
-| `domain`     | Shared models (settings, files, bookmarks, update info)                       |
+| `domain`     | Shared models (settings, files, bookmarks)                       |
 | `filesystem` | Local FS: list/copy/move/delete, archive/extract, search, text R/W, dir sizes |
+| `gitstatus`  | Upward-only repo root + one scoped `git status` (no disk-wide `.git` walk)   |
 | `remote`     | SSH location parse + sftp ops (`path.go`, `ssh.go`)                           |
 | `storage`    | SQLite bookmarks + crypto helpers                                             |
 | `config`     | Config dir, open files in OS (`open_unix` / `open_windows`)                   |
@@ -23,7 +24,8 @@ Registered in `main.go`:
 - `BookmarkService` — SQLite
 - `ConnectionService` — SSH profiles/sessions
 - `TerminalService` — PTY per pane (`_unix` / `_windows`); holds `*application.App` for events
-- `UpdateService` — GitHub Releases check/download/open
+- `UpdateService` — thin façade over `app.Updater` (CheckAndInstall / GetVersion / OpenReleases)
+- `GitService` — `StatusForDir` (cached root + porcelain; local only)
 
 ## Remote paths
 

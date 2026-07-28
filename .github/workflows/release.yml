@@ -4,8 +4,9 @@
 # On tag v1.2.3:
 #   - builds linux/darwin/windows packages
 #   - injects version into internal/version.Version
-#   - uploads assets named for the in-app updater:
+#   - uploads assets named for the Wails updater:
 #       go-file-manager_{version}_{os}_{arch}.{ext}
+#       SHA256SUMS
 
 name: Release
 
@@ -129,8 +130,8 @@ jobs:
                 ls -la bin/ || true
                 exit 1
               fi
-              # zip is not available on Windows runners; use 7-Zip (pre-installed).
-              7z a -tzip "dist/${NAME}.zip" "$EXE"
+              # Single top-level entry (Wails updater). 7-Zip is pre-installed on Windows runners.
+              (cd bin && 7z a -tzip "../dist/${NAME}.zip" "go-file-manager.exe")
               echo "asset=dist/${NAME}.zip" >> "$GITHUB_OUTPUT"
               ;;
             linux)
@@ -178,6 +179,20 @@ jobs:
 
       - name: List assets
         run: find release-assets -type f | sort
+
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd release-assets
+          # Platform packages only (exclude VERSION if present).
+          shopt -s nullglob
+          files=( *.zip *.tar.gz )
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release archives found for checksums" >&2
+            exit 1
+          fi
+          sha256sum "${files[@]}" | sort -k2 > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

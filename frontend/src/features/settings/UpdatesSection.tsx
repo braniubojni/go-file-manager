@@ -7,9 +7,7 @@ import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import { useEffect, useState, type FC } from 'react';
 import type { AppSettings } from '../../entities/file/types';
-import { formatBytes } from '../updates/helpers';
 import { useUpdateActions } from '../updates/hooks/useUpdateActions';
-import { useUpdateStore } from '../updates/updateStore';
 import { UpdateService } from '../../shared/api/bindings';
 
 type Props = {
@@ -19,18 +17,13 @@ type Props = {
 
 export const UpdatesSection: FC<Props> = ({ draft, onChange }) => {
   const [version, setVersion] = useState('…');
-  const phase = useUpdateStore((s) => s.phase);
-  const info = useUpdateStore((s) => s.info);
-  const error = useUpdateStore((s) => s.error);
-  const { check, downloadAndApply, skip, openReleases } = useUpdateActions();
+  const { check, openReleases, busy } = useUpdateActions();
 
   useEffect(() => {
     void UpdateService.GetVersion()
       .then(setVersion)
       .catch(() => setVersion('unknown'));
   }, []);
-
-  const busy = phase === 'checking' || phase === 'downloading';
 
   return (
     <Stack spacing={1.5} data-testid="settings-updates">
@@ -57,7 +50,7 @@ export const UpdatesSection: FC<Props> = ({ draft, onChange }) => {
           data-testid="btn-check-updates"
           disabled={busy}
           onClick={() => void check()}
-          startIcon={phase === 'checking' ? <CircularProgress size={14} /> : undefined}
+          startIcon={busy ? <CircularProgress size={14} /> : undefined}
         >
           Check for updates
         </Button>
@@ -66,70 +59,9 @@ export const UpdatesSection: FC<Props> = ({ draft, onChange }) => {
         </Button>
       </Box>
 
-      {phase === 'upToDate' && (
-        <Typography variant="body2" color="success.main" data-testid="update-status-ok">
-          You’re on the latest version (v{info?.currentVersion ?? version}).
-        </Typography>
-      )}
-      {phase === 'error' && (
-        <Typography variant="body2" color="error" data-testid="update-status-error">
-          {error || 'Update check failed'}
-        </Typography>
-      )}
-      {phase === 'downloading' && (
-        <Typography variant="body2" data-testid="update-status-download">
-          Downloading… <CircularProgress size={14} sx={{ ml: 1 }} />
-        </Typography>
-      )}
-      {phase === 'available' && info && (
-        <Box
-          sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}
-          data-testid="update-available"
-        >
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>
-            v{info.latestVersion} available
-          </Typography>
-          {info.assetName ? (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              {info.assetName}
-              {info.assetSize ? ` · ${formatBytes(info.assetSize)}` : ''}
-            </Typography>
-          ) : (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              No package for this platform in the release — open the releases page to download.
-            </Typography>
-          )}
-          {info.notes ? (
-            <Typography
-              variant="caption"
-              component="pre"
-              sx={{
-                mt: 1,
-                maxHeight: 120,
-                overflow: 'auto',
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'inherit',
-              }}
-            >
-              {info.notes}
-            </Typography>
-          ) : null}
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1.5 }}>
-            <Button
-              size="small"
-              variant="contained"
-              data-testid="btn-update-now"
-              disabled={busy}
-              onClick={() => void downloadAndApply()}
-            >
-              {info.assetUrl ? 'Update now' : 'Open release'}
-            </Button>
-            <Button size="small" onClick={skip}>
-              Skip this version
-            </Button>
-          </Box>
-        </Box>
-      )}
+      <Typography variant="caption" color="text.secondary">
+        Checks open the built-in update window (download, verify, restart to apply).
+      </Typography>
     </Stack>
   );
 };

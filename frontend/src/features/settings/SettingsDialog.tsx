@@ -109,6 +109,19 @@ const SettingsDialog: FC<Props> = ({ open, onClose }) => {
             />
           </Tooltip>
 
+          <Tooltip title="Color file names by git status when the folder is inside a local repository. Uses one cheap git call per directory (no disk-wide .git search).">
+            <FormControlLabel
+              control={
+                <Switch
+                  data-testid="settings-show-git-status"
+                  checked={draft.showGitStatus}
+                  onChange={(_, v) => setDraft({ ...draft, showGitStatus: v })}
+                />
+              }
+              label="Show git status colors"
+            />
+          </Tooltip>
+
           <Tooltip title="Open text files in the built-in editor instead of the system app.">
             <FormControlLabel
               control={

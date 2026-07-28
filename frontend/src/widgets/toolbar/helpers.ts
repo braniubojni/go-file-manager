@@ -111,6 +111,7 @@ export const createToolbarRequestHandlers = (
     'mkdir',
     'mkfile',
     'editFile',
+    'gitDiff',
     'goTo',
     'refresh',
     'goParent',

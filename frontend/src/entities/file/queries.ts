@@ -1,10 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookmarkService, FileService, SettingsService } from '../../shared/api/bindings';
-import type { AppSettings, PaneTabsState, ThemePreference } from './types';
+import {
+  BookmarkService,
+  FileService,
+  GitService,
+  SettingsService,
+} from '../../shared/api/bindings';
+import type { AppSettings, GitDirStatus, PaneTabsState, ThemePreference } from './types';
 import { defaultSettings } from './types';
 
 const queryKeys = {
   dir: (path: string, showHidden: boolean) => ['dir', path, showHidden] as const,
+  gitStatus: (path: string) => ['gitStatus', path] as const,
   home: ['home'] as const,
   settings: ['settings'] as const,
   shortcuts: ['shortcuts'] as const,
@@ -40,6 +46,7 @@ const normalizeSettings = (
         theme?: string;
         showHidden?: boolean;
         showExtensions?: boolean;
+        showGitStatus?: boolean;
         useBuiltInEditor?: boolean;
         autoCheckUpdates?: boolean;
         updateCheckIntervalDays?: number;
@@ -58,6 +65,7 @@ const normalizeSettings = (
       theme === 'dark' || theme === 'light' || theme === 'system' ? theme : defaultSettings.theme,
     showHidden: Boolean(s?.showHidden),
     showExtensions: s?.showExtensions !== false,
+    showGitStatus: s?.showGitStatus !== false,
     useBuiltInEditor: s?.useBuiltInEditor !== false,
     autoCheckUpdates: s?.autoCheckUpdates !== false,
     updateCheckIntervalDays:
@@ -75,6 +83,7 @@ const settingsPayload = (settings: AppSettings) => ({
   theme: settings.theme,
   showHidden: settings.showHidden,
   showExtensions: settings.showExtensions,
+  showGitStatus: settings.showGitStatus,
   useBuiltInEditor: settings.useBuiltInEditor,
   autoCheckUpdates: settings.autoCheckUpdates,
   updateCheckIntervalDays: settings.updateCheckIntervalDays,
@@ -136,6 +145,26 @@ export const useDirListing = (path: string | undefined, showHidden: boolean) => 
       return rows ?? [];
     },
     enabled: Boolean(path),
+  });
+};
+
+/** Git working-tree status for one local directory (parallel to ListDir). */
+export const useGitDirStatus = (path: string | undefined, enabled: boolean) => {
+  const remote = Boolean(path?.startsWith('ssh://'));
+  return useQuery({
+    queryKey: queryKeys.gitStatus(path ?? ''),
+    queryFn: async (): Promise<GitDirStatus> => {
+      const st = await GitService.StatusForDir(path!);
+      return {
+        repoRoot: st?.repoRoot ?? '',
+        entries: (st?.entries ?? []).map((e) => ({
+          name: e.name,
+          status: e.status,
+        })),
+      };
+    },
+    enabled: Boolean(enabled && path && !remote),
+    staleTime: 8_000,
   });
 };
 
@@ -228,7 +257,10 @@ const useInvalidateDirs = () => {
   const qc = useQueryClient();
   return (...paths: string[]) => {
     for (const p of paths) {
-      if (p) void qc.invalidateQueries({ queryKey: ['dir', p] });
+      if (p) {
+        void qc.invalidateQueries({ queryKey: ['dir', p] });
+        void qc.invalidateQueries({ queryKey: ['gitStatus', p] });
+      }
     }
   };
 };

@@ -49,6 +49,11 @@ export const AppThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
           fontSize: 13,
         },
         components: {
+          MuiTooltip: {
+            defaultProps: {
+              arrow: true,
+            },
+          },
           MuiTextField: {
             defaultProps: {
               spellCheck: false,

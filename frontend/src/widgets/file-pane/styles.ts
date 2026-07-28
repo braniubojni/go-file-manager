@@ -178,4 +178,27 @@ export const dataGridSx: SxProps<Theme> = {
   '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': {
     outline: 'none',
   },
+  // Git status: subtle name color + left inset (selection/focus still win).
+  '& .MuiDataGrid-row.git-M .MuiDataGrid-cell[data-field="displayName"]': {
+    color: 'warning.main',
+    boxShadow: (t) => `inset 3px 0 0 ${t.palette.warning.main}`,
+  },
+  '& .MuiDataGrid-row.git-A .MuiDataGrid-cell[data-field="displayName"]': {
+    color: 'info.main',
+    boxShadow: (t) => `inset 3px 0 0 ${t.palette.info.main}`,
+  },
+  '& .MuiDataGrid-row.git-untracked .MuiDataGrid-cell[data-field="displayName"]': {
+    color: 'success.main',
+    boxShadow: (t) => `inset 3px 0 0 ${t.palette.success.main}`,
+  },
+  '& .MuiDataGrid-row.git-D .MuiDataGrid-cell[data-field="displayName"]': {
+    color: 'error.main',
+    boxShadow: (t) => `inset 3px 0 0 ${t.palette.error.main}`,
+    textDecoration: 'line-through',
+  },
+  '& .MuiDataGrid-row.git-U .MuiDataGrid-cell[data-field="displayName"]': {
+    color: 'error.main',
+    fontWeight: 700,
+    boxShadow: (t) => `inset 3px 0 0 ${t.palette.error.dark}`,
+  },
 };

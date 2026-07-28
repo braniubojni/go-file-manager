@@ -54,6 +54,7 @@ export const useConnections = () => {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['connections'] });
     void qc.invalidateQueries({ queryKey: ['dir'] });
+    void qc.invalidateQueries({ queryKey: ['gitStatus'] });
   };
 
   /** Always offer workdir picker after connect (home + recents + saved default). */

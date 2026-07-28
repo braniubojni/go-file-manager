@@ -8,7 +8,10 @@ import (
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 	"github.com/erikharutyunyan/go-file-manager/internal/service"
 	"github.com/erikharutyunyan/go-file-manager/internal/storage"
+	"github.com/erikharutyunyan/go-file-manager/internal/version"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/updater"
+	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 )
 
 //go:embed all:frontend/dist
@@ -32,6 +35,7 @@ func main() {
 	termSvc := service.NewTerminalService(remoteMgr)
 	connSvc := service.NewConnectionService(db, remoteMgr)
 	updateSvc := service.NewUpdateService()
+	gitSvc := service.NewGitService()
 
 	app := application.New(application.Options{
 		Name:        "Go File Manager",
@@ -43,6 +47,7 @@ func main() {
 			application.NewService(termSvc),
 			application.NewService(connSvc),
 			application.NewService(updateSvc),
+			application.NewService(gitSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -57,7 +62,22 @@ func main() {
 		},
 	})
 
+	gh, err := github.New(github.Config{
+		Repository:    "braniubojni/go-file-manager",
+		ChecksumAsset: "SHA256SUMS",
+	})
+	if err != nil {
+		log.Fatalf("github updater provider: %v", err)
+	}
+	if err := app.Updater.Init(updater.Config{
+		CurrentVersion: service.CurrentVersionForUpdater(version.Version),
+		Providers:      []updater.Provider{gh},
+	}); err != nil {
+		log.Fatalf("Updater.Init: %v", err)
+	}
+
 	termSvc.SetApp(app)
+	service.AttachUpdateApp(updateSvc, app)
 
 	app.OnShutdown(func() {
 		_ = termSvc.Stop("left")

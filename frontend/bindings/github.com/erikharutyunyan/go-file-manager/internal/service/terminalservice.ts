@@ -46,6 +46,7 @@ export function SetCwd(paneID: string, cwd: string): $CancellablePromise<void> {
 /**
  * Start spawns a shell at cwd for the given pane: a local login shell, or an
  * SSH shell when cwd is an ssh:// virtual path.
+ * The PTY starts at 80×24; the frontend should Resize to the fitted xterm size ASAP.
  */
 export function Start(paneID: string, cwd: string): $CancellablePromise<void> {
     return $Call.ByID(2443104662, paneID, cwd);

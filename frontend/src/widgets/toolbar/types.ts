@@ -39,6 +39,7 @@ export type ToolbarBarProps = {
   onMkdir: () => void;
   onMkfile: () => void;
   onEditFile: () => void;
+  onGitDiff: () => void;
   onRename: () => void;
   onDelete: () => void;
   onArchive: () => void;

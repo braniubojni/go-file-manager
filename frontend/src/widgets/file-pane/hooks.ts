@@ -16,7 +16,12 @@ import {
   type MouseEvent,
 } from 'react';
 import { useDrop } from 'react-dnd';
-import { useDirListing, useHomeDir, useSettings } from '../../entities/file/queries';
+import {
+  useDirListing,
+  useGitDirStatus,
+  useHomeDir,
+  useSettings,
+} from '../../entities/file/queries';
 import type { FileEntry, PaneId } from '../../entities/file/types';
 import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
 import { useFolderSizeStore } from '../../features/folder-size/folderSizeStore';
@@ -71,7 +76,16 @@ export const useFilePane = (id: PaneId) => {
   const { data: settings } = useSettings();
   const showHidden = settings?.showHidden ?? false;
   const showExtensions = settings?.showExtensions ?? true;
+  const showGitStatus = settings?.showGitStatus !== false;
   const listing = useDirListing(path || undefined, showHidden);
+  const gitStatus = useGitDirStatus(path || undefined, showGitStatus);
+  const gitByName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of gitStatus.data?.entries ?? []) {
+      if (e.name) m.set(e.name, e.status);
+    }
+    return m;
+  }, [gitStatus.data]);
   const show = useSnack((s) => s.show);
   const qc = useQueryClient();
 
@@ -172,6 +186,7 @@ export const useFilePane = (id: PaneId) => {
         show(`${verb} ${paths.length} item(s)`, 'success');
         clearSelection();
         void qc.invalidateQueries({ queryKey: ['dir'] });
+        void qc.invalidateQueries({ queryKey: ['gitStatus'] });
       })
       .catch((e) => show(errMessage(e), 'error'));
   };
@@ -232,6 +247,7 @@ export const useFilePane = (id: PaneId) => {
     focused,
     active,
     showExtensions,
+    gitByName,
     listing,
     terminalOpen,
     terminalHeight,
@@ -265,6 +281,7 @@ export const useFileTable = ({
   focused,
   active,
   showExtensions,
+  gitByName,
   folderSizes,
   onSelect,
   onFocus,
@@ -435,9 +452,16 @@ export const useFileTable = ({
       const classes: string[] = [];
       if (params.id === focused) classes.push('row-focused');
       if (selected.includes(String(params.id))) classes.push('row-selected');
+      const name = (params.row as { name?: string }).name;
+      const st = name && gitByName?.get(name);
+      if (st === 'M') classes.push('git-M');
+      else if (st === 'A') classes.push('git-A');
+      else if (st === 'D') classes.push('git-D');
+      else if (st === 'U') classes.push('git-U');
+      else if (st === '?') classes.push('git-untracked');
       return classes.join(' ');
     },
-    [focused, selected],
+    [focused, selected, gitByName],
   );
 
   const onColumnWidthChange = useCallback(

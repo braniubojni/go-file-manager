@@ -56,6 +56,7 @@ export const FilePane: FC<FilePaneProps> = ({ id }) => {
           focused={p.focused}
           active={p.active}
           showExtensions={p.showExtensions}
+          gitByName={p.gitByName}
           folderSizes={p.folderSizes}
           onSelect={(paths) => p.setSelection(id, paths)}
           onFocus={(path, opts) => p.setFocus(id, path, opts)}

@@ -50,6 +50,7 @@ func (t *TerminalService) emit(name string, data any) {
 
 // Start spawns a shell at cwd for the given pane: a local login shell, or an
 // SSH shell when cwd is an ssh:// virtual path.
+// The PTY starts at 80×24; the frontend should Resize to the fitted xterm size ASAP.
 func (t *TerminalService) Start(paneID, cwd string) error {
 	t.mu.Lock()
 	_, running := t.sessions[paneID]
@@ -61,6 +62,8 @@ func (t *TerminalService) Start(paneID, cwd string) error {
 		return t.SetCwd(paneID, cwd)
 	}
 
+	const defaultCols, defaultRows = 80, 24
+
 	var (
 		handle ptyHandle
 		err    error
@@ -69,9 +72,9 @@ func (t *TerminalService) Start(paneID, cwd string) error {
 		if t.remote == nil {
 			return fmt.Errorf("remote not available")
 		}
-		handle, err = spawnRemotePTY(t.remote, cwd, 80, 24)
+		handle, err = spawnRemotePTY(t.remote, cwd, defaultCols, defaultRows)
 	} else {
-		handle, err = spawnLocalPTY(cwd)
+		handle, err = spawnLocalPTY(cwd, defaultCols, defaultRows)
 	}
 	if err != nil {
 		return err

@@ -27,6 +27,7 @@ export interface AppSettings {
   theme: ThemePreference;
   showHidden: boolean;
   showExtensions: boolean;
+  showGitStatus: boolean;
   useBuiltInEditor: boolean;
   autoCheckUpdates: boolean;
   updateCheckIntervalDays: number;
@@ -36,6 +37,11 @@ export interface AppSettings {
   rightPath: string;
 }
 
+export interface GitDirStatus {
+  repoRoot: string;
+  entries: { name: string; status: string }[];
+}
+
 export interface SearchHit {
   name: string;
   path: string;
@@ -43,21 +49,11 @@ export interface SearchHit {
   relPath: string;
 }
 
-export interface UpdateInfo {
-  currentVersion: string;
-  latestVersion: string;
-  notes: string;
-  htmlUrl: string;
-  assetName: string;
-  assetUrl: string;
-  assetSize: number;
-  available: boolean;
-}
-
 export const defaultSettings: AppSettings = {
   theme: 'system',
   showHidden: false,
   showExtensions: true,
+  showGitStatus: true,
   useBuiltInEditor: true,
   autoCheckUpdates: true,
   updateCheckIntervalDays: 10,

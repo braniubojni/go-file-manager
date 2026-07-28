@@ -111,6 +111,49 @@ export interface FileEntry {
 }
 
 /**
+ * GitDirStatus is git status for immediate children of one listed directory.
+ */
+export interface GitDirStatus {
+    /**
+     * empty if not in a repo
+     */
+    "repoRoot": string;
+    "entries": GitStatusEntry[] | null;
+}
+
+/**
+ * GitFileDiff is HEAD vs working-tree content for one local file (read-only viewer).
+ */
+export interface GitFileDiff {
+    "path": string;
+    "repoRoot": string;
+    "relPath": string;
+
+    /**
+     * M|A|D|U|? or empty
+     */
+    "status": string;
+    "oldText": string;
+    "newText": string;
+    "binary": boolean;
+    "truncated": boolean;
+
+    /**
+     * soft-fail reason when no usable content
+     */
+    "message": string;
+}
+
+/**
+ * GitStatusEntry is one child name with a compact git working-tree status.
+ * Status is one of: M (modified), A (added), D (deleted), U (unmerged), ? (untracked).
+ */
+export interface GitStatusEntry {
+    "name": string;
+    "status": string;
+}
+
+/**
  * PaneTabs holds each pane's open tabs and which one is active.
  */
 export interface PaneTabs {
@@ -170,6 +213,7 @@ export interface Settings {
     "theme": string;
     "showHidden": boolean;
     "showExtensions": boolean;
+    "showGitStatus": boolean;
     "useBuiltInEditor": boolean;
     "autoCheckUpdates": boolean;
     "updateCheckIntervalDays": number;
@@ -202,18 +246,4 @@ export interface ShortcutDef {
  */
 export interface TabState {
     "path": string;
-}
-
-/**
- * UpdateInfo is the result of checking GitHub Releases for a newer version.
- */
-export interface UpdateInfo {
-    "currentVersion": string;
-    "latestVersion": string;
-    "notes": string;
-    "htmlUrl": string;
-    "assetName": string;
-    "assetUrl": string;
-    "assetSize": number;
-    "available": boolean;
 }

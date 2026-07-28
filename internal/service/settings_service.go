@@ -253,6 +253,9 @@ func parseSettingsJSON(data []byte) domain.Settings {
 	if v, ok := m["showExtensions"].(bool); ok {
 		out.ShowExtensions = v
 	}
+	if v, ok := m["showGitStatus"].(bool); ok {
+		out.ShowGitStatus = v
+	}
 	if v, ok := m["useBuiltInEditor"].(bool); ok {
 		out.UseBuiltInEditor = v
 	}
