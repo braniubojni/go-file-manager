@@ -19,8 +19,14 @@ export function GetConfigDir(): $CancellablePromise<string> {
     return $Call.ByID(780043014);
 }
 
-export function GetPanePaths(): $CancellablePromise<domain$0.PanePaths> {
-    return $Call.ByID(4161505117);
+/**
+ * GetPaneTabs returns each pane's saved tab list. If no tabs blob was ever
+ * saved, or a pane's list ended up empty, it falls back to a single tab
+ * derived from the legacy Settings.LeftPath/RightPath so existing installs
+ * (and e2e's settings.json seed) keep working.
+ */
+export function GetPaneTabs(): $CancellablePromise<domain$0.PaneTabs> {
+    return $Call.ByID(1411864435);
 }
 
 export function GetSettings(): $CancellablePromise<domain$0.Settings> {
@@ -51,8 +57,12 @@ export function RevealInOS(path: string): $CancellablePromise<void> {
     return $Call.ByID(1818025483, path);
 }
 
-export function SavePanePaths(left: string, right: string): $CancellablePromise<void> {
-    return $Call.ByID(2575467756, left, right);
+/**
+ * SavePaneTabs persists each pane's tab list and mirrors the active tab's
+ * path into Settings.LeftPath/RightPath, which stays the boot fallback.
+ */
+export function SavePaneTabs(tabs: domain$0.PaneTabs): $CancellablePromise<void> {
+    return $Call.ByID(4028892756, tabs);
 }
 
 export function SaveSettings(settings: domain$0.Settings): $CancellablePromise<void> {

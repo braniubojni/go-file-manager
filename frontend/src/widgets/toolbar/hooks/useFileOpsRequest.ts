@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
-import { useFileOpsStore } from '../../../features/file-ops/fileOpsStore'
-import { runToolbarRequest } from '../helpers'
-import type { ToolbarRequestHandlers } from '../types'
+import { useEffect, useRef } from 'react';
+import { useFileOpsStore } from '../../../features/file-ops/fileOpsStore';
+import { runToolbarRequest } from '../helpers';
+import type { ToolbarRequestHandlers } from '../types';
 
 /**
  * When the file-ops store fires a request (keyboard shortcut / menu),
@@ -11,14 +11,14 @@ import type { ToolbarRequestHandlers } from '../types'
  * read via ref so the effect only re-runs on `nonce`.
  */
 export const useFileOpsRequest = (handlers: ToolbarRequestHandlers): void => {
-  const nonce = useFileOpsStore((s) => s.nonce)
-  const handlersRef = useRef(handlers)
-  handlersRef.current = handlers
+  const nonce = useFileOpsStore((s) => s.nonce);
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
 
   useEffect(() => {
-    const { request, consume } = useFileOpsStore.getState()
-    if (!request) return
-    runToolbarRequest(request, handlersRef.current)
-    consume()
-  }, [nonce])
-}
+    const { request, consume } = useFileOpsStore.getState();
+    if (!request) return;
+    runToolbarRequest(request, handlersRef.current);
+    consume();
+  }, [nonce]);
+};

@@ -1,11 +1,11 @@
-import type { NameDialogAction, NameDialogState } from './types'
+import type { NameDialogAction, NameDialogState } from './types';
 
-export type { NameDialogAction, NameDialogState } from './types'
+export type { NameDialogAction, NameDialogState } from './types';
 
 export const initialNameDialogState: NameDialogState = {
   open: false,
   name: '',
-}
+};
 
 export const nameDialogReducer = (
   state: NameDialogState,
@@ -13,12 +13,12 @@ export const nameDialogReducer = (
 ): NameDialogState => {
   switch (action.type) {
     case 'open':
-      return { open: true, name: action.name }
+      return { open: true, name: action.name };
     case 'close':
-      return { open: false, name: '' }
+      return { open: false, name: '' };
     case 'set_name':
-      return { ...state, name: action.name }
+      return { ...state, name: action.name };
     default:
-      return state
+      return state;
   }
-}
+};

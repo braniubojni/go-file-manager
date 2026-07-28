@@ -1,9 +1,9 @@
-import { create } from 'zustand'
+import { create } from 'zustand';
 
 /** Shared DataGrid column widths for both panes. */
 interface ColumnState {
-  widths: Record<string, number>
-  setWidth: (field: string, width: number) => void
+  widths: Record<string, number>;
+  setWidth: (field: string, width: number) => void;
 }
 
 const defaults: Record<string, number> = {
@@ -12,7 +12,7 @@ const defaults: Record<string, number> = {
   size: 100,
   modTime: 160,
   ext: 80,
-}
+};
 
 export const useColumnStore = create<ColumnState>((set) => ({
   widths: { ...defaults },
@@ -20,4 +20,4 @@ export const useColumnStore = create<ColumnState>((set) => ({
     set((s) => ({
       widths: { ...s.widths, [field]: Math.max(40, Math.round(width)) },
     })),
-}))
+}));

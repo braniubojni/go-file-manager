@@ -1,7 +1,7 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App'
-import { Providers } from './app/providers'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import { Providers } from './app/providers';
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
@@ -9,4 +9,4 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
       <App />
     </Providers>
   </React.StrictMode>,
-)
+);

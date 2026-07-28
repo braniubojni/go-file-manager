@@ -1,39 +1,39 @@
-import ExpandLessIcon from '@mui/icons-material/ExpandLess'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import FolderIcon from '@mui/icons-material/Folder'
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
-import Box from '@mui/material/Box'
-import Typography from '@mui/material/Typography'
-import type { FC } from 'react'
-import type { FileEntry } from '../../entities/file/types'
-import type { TreeChildren } from './hooks/useFolderTree'
-import { treePaneSx, treeRowSx } from './styles'
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FolderIcon from '@mui/icons-material/Folder';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import type { FC } from 'react';
+import type { FileEntry } from '../../entities/file/types';
+import type { TreeChildren } from './hooks/useFolderTree';
+import { treePaneSx, treeRowSx } from './styles';
 
 type Props = {
-  rootPath: string
-  selectedPath: string | null
-  childrenMap: TreeChildren
-  expanded: Record<string, boolean>
-  onToggle: (dir: string) => void
-  onOpenFile: (path: string) => void
-}
+  rootPath: string;
+  selectedPath: string | null;
+  childrenMap: TreeChildren;
+  expanded: Record<string, boolean>;
+  onToggle: (dir: string) => void;
+  onOpenFile: (path: string) => void;
+};
 
 const NodeList: FC<{
-  dir: string
-  depth: number
-  selectedPath: string | null
-  childrenMap: TreeChildren
-  expanded: Record<string, boolean>
-  onToggle: (dir: string) => void
-  onOpenFile: (path: string) => void
+  dir: string;
+  depth: number;
+  selectedPath: string | null;
+  childrenMap: TreeChildren;
+  expanded: Record<string, boolean>;
+  onToggle: (dir: string) => void;
+  onOpenFile: (path: string) => void;
 }> = ({ dir, depth, selectedPath, childrenMap, expanded, onToggle, onOpenFile }) => {
-  const entries = childrenMap[dir]
+  const entries = childrenMap[dir];
   if (!entries) {
     return (
       <Typography variant="caption" color="text.secondary" sx={{ pl: 2 + depth * 1.5 }}>
         Loading…
       </Typography>
-    )
+    );
   }
   return (
     <>
@@ -79,8 +79,8 @@ const NodeList: FC<{
         ),
       )}
     </>
-  )
-}
+  );
+};
 
 export const FolderTree: FC<Props> = ({
   rootPath,
@@ -104,4 +104,4 @@ export const FolderTree: FC<Props> = ({
       onOpenFile={onOpenFile}
     />
   </Box>
-)
+);

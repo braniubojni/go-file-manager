@@ -5,4 +5,4 @@ export {
   TerminalService,
   ConnectionService,
   UpdateService,
-} from '../../../bindings/github.com/erikharutyunyan/go-file-manager/internal/service'
+} from '../../../bindings/github.com/erikharutyunyan/go-file-manager/internal/service';

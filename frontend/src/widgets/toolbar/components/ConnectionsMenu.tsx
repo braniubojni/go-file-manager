@@ -1,19 +1,19 @@
-import type { FC } from 'react'
-import AddIcon from '@mui/icons-material/Add'
-import CloudIcon from '@mui/icons-material/Cloud'
-import DeleteIcon from '@mui/icons-material/Delete'
-import FolderOpenIcon from '@mui/icons-material/FolderOpen'
-import LinkOffIcon from '@mui/icons-material/LinkOff'
-import Box from '@mui/material/Box'
-import Divider from '@mui/material/Divider'
-import IconButton from '@mui/material/IconButton'
-import ListSubheader from '@mui/material/ListSubheader'
-import Menu from '@mui/material/Menu'
-import MenuItem from '@mui/material/MenuItem'
-import Tooltip from '@mui/material/Tooltip'
-import Typography from '@mui/material/Typography'
-import { useConnections } from '../hooks/useConnections'
-import { ConnectionDialog } from './ConnectionDialog'
+import type { FC } from 'react';
+import AddIcon from '@mui/icons-material/Add';
+import CloudIcon from '@mui/icons-material/Cloud';
+import DeleteIcon from '@mui/icons-material/Delete';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import LinkOffIcon from '@mui/icons-material/LinkOff';
+import Box from '@mui/material/Box';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
+import ListSubheader from '@mui/material/ListSubheader';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import { useConnections } from '../hooks/useConnections';
+import { ConnectionDialog } from './ConnectionDialog';
 
 export const ConnectionsMenu: FC = () => {
   const {
@@ -30,7 +30,7 @@ export const ConnectionsMenu: FC = () => {
     openSSHConfigMode,
     loadSSHConfig,
     connectFromConfig,
-  } = useConnections()
+  } = useConnections();
 
   return (
     <>
@@ -60,8 +60,8 @@ export const ConnectionsMenu: FC = () => {
           </MenuItem>
         )}
         {sshProfiles.map((p) => {
-          const key = `${p.user}@${p.host}:${p.port || 22}`
-          const live = sessionKeys.has(key)
+          const key = `${p.user}@${p.host}:${p.port || 22}`;
+          const live = sessionKeys.has(key);
           return (
             <MenuItem
               key={p.id}
@@ -86,8 +86,8 @@ export const ConnectionsMenu: FC = () => {
                   aria-label="Disconnect"
                   data-testid={`btn-disconnect-${p.id}`}
                   onClick={(e) => {
-                    e.stopPropagation()
-                    void onDisconnect(key)
+                    e.stopPropagation();
+                    void onDisconnect(key);
                   }}
                 >
                   <LinkOffIcon fontSize="small" />
@@ -98,21 +98,21 @@ export const ConnectionsMenu: FC = () => {
                 aria-label="Remove"
                 data-testid={`btn-remove-conn-${p.id}`}
                 onClick={(e) => {
-                  e.stopPropagation()
-                  void onRemove(p.id)
+                  e.stopPropagation();
+                  void onRemove(p.id);
                 }}
               >
                 <DeleteIcon fontSize="small" />
               </IconButton>
             </MenuItem>
-          )
+          );
         })}
         <MenuItem
           data-testid="menu-conn-add"
           dense
           onClick={() => {
-            setAnchor(null)
-            dispatch({ type: 'open_add' })
+            setAnchor(null);
+            dispatch({ type: 'open_add' });
           }}
         >
           <AddIcon fontSize="small" sx={{ mr: 1 }} />
@@ -122,8 +122,8 @@ export const ConnectionsMenu: FC = () => {
           data-testid="menu-conn-ssh-config"
           dense
           onClick={() => {
-            setAnchor(null)
-            void openSSHConfigMode()
+            setAnchor(null);
+            void openSSHConfigMode();
           }}
         >
           <FolderOpenIcon fontSize="small" sx={{ mr: 1 }} />
@@ -153,5 +153,5 @@ export const ConnectionsMenu: FC = () => {
         onConnectFromConfig={(host) => void connectFromConfig(host)}
       />
     </>
-  )
-}
+  );
+};

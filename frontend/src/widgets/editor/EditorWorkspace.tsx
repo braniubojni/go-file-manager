@@ -1,59 +1,59 @@
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogContentText from '@mui/material/DialogContentText'
-import DialogTitle from '@mui/material/DialogTitle'
-import { useState, type FC } from 'react'
-import { useEditorStore } from '../../features/editor/editorStore'
-import { EditorHeader } from './EditorHeader'
-import { FolderTree } from './FolderTree'
-import { CodeMirrorPane } from './CodeMirrorPane'
-import { useEditorFile } from './hooks/useEditorFile'
-import { useFolderTree } from './hooks/useFolderTree'
-import { bodySx, workspaceRootSx } from './styles'
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import { useState, type FC } from 'react';
+import { useEditorStore } from '../../features/editor/editorStore';
+import { EditorHeader } from './EditorHeader';
+import { FolderTree } from './FolderTree';
+import { CodeMirrorPane } from './CodeMirrorPane';
+import { useEditorFile } from './hooks/useEditorFile';
+import { useFolderTree } from './hooks/useFolderTree';
+import { bodySx, workspaceRootSx } from './styles';
 
 export const EditorWorkspace: FC = () => {
-  const rootPath = useEditorStore((s) => s.rootPath)
-  const filePath = useEditorStore((s) => s.filePath)
-  const dirty = useEditorStore((s) => s.dirty)
-  const setFilePath = useEditorStore((s) => s.setFilePath)
-  const closeWorkspace = useEditorStore((s) => s.closeWorkspace)
-  const { content, loading, loadError, onChange, save } = useEditorFile()
-  const { children, expanded, toggle } = useFolderTree(rootPath)
-  const [confirmClose, setConfirmClose] = useState(false)
-  const [pendingPath, setPendingPath] = useState<string | null>(null)
+  const rootPath = useEditorStore((s) => s.rootPath);
+  const filePath = useEditorStore((s) => s.filePath);
+  const dirty = useEditorStore((s) => s.dirty);
+  const setFilePath = useEditorStore((s) => s.setFilePath);
+  const closeWorkspace = useEditorStore((s) => s.closeWorkspace);
+  const { content, loading, loadError, onChange, save } = useEditorFile();
+  const { children, expanded, toggle } = useFolderTree(rootPath);
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
 
   const requestClose = () => {
-    if (dirty) setConfirmClose(true)
-    else closeWorkspace()
-  }
+    if (dirty) setConfirmClose(true);
+    else closeWorkspace();
+  };
 
   const openFile = (path: string) => {
-    if (path === filePath) return
+    if (path === filePath) return;
     if (dirty) {
-      setPendingPath(path)
-      setConfirmClose(true)
-      return
+      setPendingPath(path);
+      setConfirmClose(true);
+      return;
     }
-    setFilePath(path)
-  }
+    setFilePath(path);
+  };
 
   const discardAndContinue = () => {
-    setConfirmClose(false)
+    setConfirmClose(false);
     if (pendingPath) {
-      setFilePath(pendingPath)
-      setPendingPath(null)
+      setFilePath(pendingPath);
+      setPendingPath(null);
     } else {
-      closeWorkspace()
+      closeWorkspace();
     }
-  }
+  };
 
   const cancelConfirm = () => {
-    setConfirmClose(false)
-    setPendingPath(null)
-  }
+    setConfirmClose(false);
+    setPendingPath(null);
+  };
 
   return (
     <Box sx={workspaceRootSx} data-testid="editor-workspace">
@@ -92,5 +92,5 @@ export const EditorWorkspace: FC = () => {
         </DialogActions>
       </Dialog>
     </Box>
-  )
-}
+  );
+};

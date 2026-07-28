@@ -1,26 +1,26 @@
 export type NameDialogState = {
-  open: boolean
-  name: string
-}
+  open: boolean;
+  name: string;
+};
 
 export type NameDialogAction =
   | { type: 'open'; name: string }
   | { type: 'close' }
-  | { type: 'set_name'; name: string }
+  | { type: 'set_name'; name: string };
 
 export type DeleteDialogState = {
-  confirmOpen: boolean
-  permissionOpen: boolean
-  permissionMessage: string
-  paths: string[]
-}
+  confirmOpen: boolean;
+  permissionOpen: boolean;
+  permissionMessage: string;
+  paths: string[];
+};
 
 export type DeleteDialogAction =
   | { type: 'open_confirm'; paths: string[] }
   | { type: 'close_confirm' }
   | { type: 'open_permission'; message: string }
   | { type: 'close_permission' }
-  | { type: 'reset' }
+  | { type: 'reset' };
 
 export type FileOpsRequest =
   | 'copy'
@@ -39,13 +39,13 @@ export type FileOpsRequest =
   | 'calcSizes'
   | 'archive'
   | 'extract'
-  | null
+  | null;
 
-export type FileOpsAction = Exclude<FileOpsRequest, null>
+export type FileOpsAction = Exclude<FileOpsRequest, null>;
 
 export type FileOpsState = {
-  request: FileOpsRequest
-  nonce: number
-  trigger: (request: FileOpsAction) => void
-  consume: () => void
-}
+  request: FileOpsRequest;
+  nonce: number;
+  trigger: (request: FileOpsAction) => void;
+  consume: () => void;
+};

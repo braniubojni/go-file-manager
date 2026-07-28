@@ -3,7 +3,6 @@ package filesystem
 import (
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -46,64 +45,85 @@ func SearchTree(root, query string, showHidden bool, limit int) ([]domain.Search
 		starts bool
 		isDot  bool
 	}
+	type pendingDir struct {
+		path  string
+		rel   string
+		depth int
+	}
 	var hits []hit
 	visits := 0
 
-	err = filepath.WalkDir(abs, func(path string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			if d != nil && d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
+	queue := []pendingDir{{path: abs, rel: "", depth: -1}}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		entries, readErr := os.ReadDir(current.path)
+		if readErr != nil {
+			err = readErr
+			break
 		}
-		if path == abs {
-			return nil
-		}
-		visits++
-		if visits > maxSearchVisits || len(hits) >= limit*3 {
-			return errSearchStop
-		}
-		rel, relErr := filepath.Rel(abs, path)
-		if relErr != nil {
-			return nil
-		}
-		depth := strings.Count(rel, string(os.PathSeparator))
-		if depth > maxSearchDepth {
-			if d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		name := d.Name()
-		if !showHidden && strings.HasPrefix(name, ".") {
-			if d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		// Empty query: only immediate children (depth 0).
-		if q == "" {
-			if depth > 0 {
-				if d.IsDir() {
-					return fs.SkipDir
-				}
-				return nil
-			}
-		} else if !strings.Contains(strings.ToLower(name), q) {
-			return nil
-		}
-		hits = append(hits, hit{
-			SearchHit: domain.SearchHit{
-				Name:    name,
-				Path:    path,
-				IsDir:   d.IsDir(),
-				RelPath: filepath.ToSlash(rel),
-			},
-			starts: q != "" && strings.HasPrefix(strings.ToLower(name), q),
-			isDot:  strings.HasPrefix(name, "."),
+		sort.SliceStable(entries, func(i, j int) bool {
+			return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
 		})
-		return nil
-	})
+
+		for _, entry := range entries {
+			visits++
+			if visits > maxSearchVisits || len(hits) >= limit*3 {
+				err = errSearchStop
+				break
+			}
+
+			name := entry.Name()
+			if !showHidden && strings.HasPrefix(name, ".") {
+				continue
+			}
+
+			depth := current.depth + 1
+			if depth > maxSearchDepth {
+				continue
+			}
+
+			rel := name
+			if current.rel != "" {
+				rel = filepath.Join(current.rel, name)
+			}
+			path := filepath.Join(current.path, name)
+
+			if q == "" {
+				if depth == 0 {
+					hits = append(hits, hit{
+						SearchHit: domain.SearchHit{
+							Name:    name,
+							Path:    path,
+							IsDir:   entry.IsDir(),
+							RelPath: filepath.ToSlash(rel),
+						},
+						starts: false,
+						isDot:  strings.HasPrefix(name, "."),
+					})
+				}
+			} else if strings.Contains(strings.ToLower(name), q) {
+				hits = append(hits, hit{
+					SearchHit: domain.SearchHit{
+						Name:    name,
+						Path:    path,
+						IsDir:   entry.IsDir(),
+						RelPath: filepath.ToSlash(rel),
+					},
+					starts: strings.HasPrefix(strings.ToLower(name), q),
+					isDot:  strings.HasPrefix(name, "."),
+				})
+			}
+
+			if entry.IsDir() && depth < maxSearchDepth {
+				queue = append(queue, pendingDir{path: path, rel: rel, depth: depth})
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
 	if err != nil && !errors.Is(err, errSearchStop) {
 		return nil, err
 	}

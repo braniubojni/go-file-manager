@@ -1,16 +1,17 @@
-import Box from '@mui/material/Box'
-import type { FC } from 'react'
-import { errMessage } from '../../shared/lib/format'
-import { PaneTerminal } from '../terminal/PaneTerminal'
-import { FileTable } from './FileTable'
-import { PaneHeader } from './PaneHeader'
-import { PathBar } from './PathBar'
-import { useFilePane } from './hooks/useFilePane'
-import { paneBodySx, paneRootSx } from './styles'
-import type { FilePaneProps } from './types'
+import Box from '@mui/material/Box';
+import type { FC } from 'react';
+import { errMessage } from '../../shared/lib/format';
+import { PaneTerminal } from '../terminal/PaneTerminal';
+import { FileTable } from './FileTable';
+import { useFilePane } from './hooks';
+import { PaneHeader } from './PaneHeader';
+import { PaneTabs } from './PaneTabs';
+import { PathBar } from './PathBar';
+import { paneBodySx, paneRootSx } from './styles';
+import type { FilePaneProps } from './types';
 
 export const FilePane: FC<FilePaneProps> = ({ id }) => {
-  const p = useFilePane(id)
+  const p = useFilePane(id);
 
   return (
     <Box data-testid={`pane-${id}`} sx={paneRootSx(p.active)}>
@@ -23,9 +24,17 @@ export const FilePane: FC<FilePaneProps> = ({ id }) => {
         onCancelJob={p.cancelJob}
         onCalcSizes={p.onCalcSizes}
         onToggleTerminal={() => {
-          p.setActivePane(id)
-          p.toggleTerminal(id)
+          p.setActivePane(id);
+          p.toggleTerminal(id);
         }}
+      />
+      <PaneTabs
+        id={id}
+        tabs={p.tabs}
+        activeTabId={p.activeTabId}
+        onSelectTab={p.onSelectTab}
+        onCloseTab={p.onCloseTab}
+        onAddTab={p.onAddTab}
       />
       <PathBar
         paneId={id}
@@ -59,5 +68,5 @@ export const FilePane: FC<FilePaneProps> = ({ id }) => {
       </Box>
       {p.terminalOpen && <PaneTerminal paneId={id} cwd={p.path} height={p.terminalHeight} />}
     </Box>
-  )
-}
+  );
+};

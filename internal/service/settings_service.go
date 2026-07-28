@@ -13,6 +13,7 @@ import (
 const (
 	kvSettings  = "settings"
 	kvShortcuts = "shortcuts"
+	kvTabs      = "tabs"
 )
 
 // SettingsService persists app settings and shortcuts in encrypted SQLite (app.db).
@@ -53,22 +54,88 @@ func (s *SettingsService) SaveSettings(settings domain.Settings) error {
 	return s.db.SetKV(kvSettings, data)
 }
 
-func (s *SettingsService) GetPanePaths() (domain.PanePaths, error) {
+// GetPaneTabs returns each pane's saved tab list. If no tabs blob was ever
+// saved, or a pane's list ended up empty, it falls back to a single tab
+// derived from the legacy Settings.LeftPath/RightPath so existing installs
+// (and e2e's settings.json seed) keep working.
+func (s *SettingsService) GetPaneTabs() (domain.PaneTabs, error) {
 	st, err := s.GetSettings()
 	if err != nil {
-		return domain.PanePaths{}, err
+		return domain.PaneTabs{}, err
 	}
-	return domain.PanePaths{Left: st.LeftPath, Right: st.RightPath}, nil
+	raw, err := s.db.GetKV(kvTabs)
+	if err != nil {
+		return domain.PaneTabs{}, err
+	}
+	var tabs domain.PaneTabs
+	if raw != nil {
+		if err := json.Unmarshal(raw, &tabs); err != nil {
+			tabs = domain.PaneTabs{}
+		}
+	}
+	if len(tabs.Left) == 0 {
+		tabs.Left = []domain.TabState{{Path: st.LeftPath}}
+		tabs.LeftActive = 0
+	}
+	if len(tabs.Right) == 0 {
+		tabs.Right = []domain.TabState{{Path: st.RightPath}}
+		tabs.RightActive = 0
+	}
+	tabs.LeftActive = clampIndex(tabs.LeftActive, len(tabs.Left))
+	tabs.RightActive = clampIndex(tabs.RightActive, len(tabs.Right))
+	return tabs, nil
 }
 
-func (s *SettingsService) SavePanePaths(left, right string) error {
+// SavePaneTabs persists each pane's tab list and mirrors the active tab's
+// path into Settings.LeftPath/RightPath, which stays the boot fallback.
+func (s *SettingsService) SavePaneTabs(tabs domain.PaneTabs) error {
+	tabs.Left = dropEmptyTabs(tabs.Left)
+	tabs.Right = dropEmptyTabs(tabs.Right)
+	tabs.LeftActive = clampIndex(tabs.LeftActive, len(tabs.Left))
+	tabs.RightActive = clampIndex(tabs.RightActive, len(tabs.Right))
+
+	data, err := json.Marshal(tabs)
+	if err != nil {
+		return err
+	}
+	if err := s.db.SetKV(kvTabs, data); err != nil {
+		return err
+	}
+
 	st, err := s.GetSettings()
 	if err != nil {
 		return err
 	}
-	st.LeftPath = left
-	st.RightPath = right
+	if len(tabs.Left) > 0 {
+		st.LeftPath = tabs.Left[tabs.LeftActive].Path
+	}
+	if len(tabs.Right) > 0 {
+		st.RightPath = tabs.Right[tabs.RightActive].Path
+	}
 	return s.SaveSettings(st)
+}
+
+func clampIndex(idx, length int) int {
+	if length == 0 {
+		return 0
+	}
+	if idx < 0 {
+		return 0
+	}
+	if idx >= length {
+		return length - 1
+	}
+	return idx
+}
+
+func dropEmptyTabs(tabs []domain.TabState) []domain.TabState {
+	out := make([]domain.TabState, 0, len(tabs))
+	for _, t := range tabs {
+		if t.Path != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func (s *SettingsService) GetShortcuts() (map[string]string, error) {

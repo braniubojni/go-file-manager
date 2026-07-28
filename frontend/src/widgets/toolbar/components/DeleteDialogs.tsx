@@ -1,14 +1,13 @@
-import type { FC } from 'react'
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogContentText from '@mui/material/DialogContentText'
-import DialogTitle from '@mui/material/DialogTitle'
-import Typography from '@mui/material/Typography'
-import type { RefObject } from 'react'
-import type { DeleteDialogsProps } from '../types'
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import Typography from '@mui/material/Typography';
+import type { FC, RefObject } from 'react';
+import type { DeleteDialogsProps } from '../types';
 
 export const DeleteDialogs: FC<DeleteDialogsProps> = ({
   del,
@@ -17,7 +16,7 @@ export const DeleteDialogs: FC<DeleteDialogsProps> = ({
   deleteBtnRef,
   onConfirm,
 }) => {
-  const listed = del.paths.length ? del.paths : paths
+  const listed = del.paths.length ? del.paths : paths;
 
   return (
     <>
@@ -27,8 +26,8 @@ export const DeleteDialogs: FC<DeleteDialogsProps> = ({
         onClose={() => dispatch({ type: 'close_confirm' })}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
-            e.preventDefault()
-            onConfirm()
+            e.preventDefault();
+            onConfirm();
           }
         }}
       >
@@ -87,5 +86,5 @@ export const DeleteDialogs: FC<DeleteDialogsProps> = ({
         </DialogActions>
       </Dialog>
     </>
-  )
-}
+  );
+};

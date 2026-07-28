@@ -1,6 +1,6 @@
-import type { AddConnectionAction, AddConnectionState } from './types'
+import type { AddConnectionAction, AddConnectionState } from './types';
 
-export type { AddConnectionAction, AddConnectionState } from './types'
+export type { AddConnectionAction, AddConnectionState } from './types';
 
 export const initialAddConnectionState: AddConnectionState = {
   open: false,
@@ -23,7 +23,7 @@ export const initialAddConnectionState: AddConnectionState = {
   workdirCustom: '',
   workdirRemember: true,
   workdirProfileId: '',
-}
+};
 
 export const addConnectionReducer = (
   state: AddConnectionState,
@@ -36,7 +36,7 @@ export const addConnectionReducer = (
         open: true,
         mode: 'add',
         save: true,
-      }
+      };
     case 'open_password':
       return {
         ...initialAddConnectionState,
@@ -45,7 +45,7 @@ export const addConnectionReducer = (
         askPassword: true,
         profileId: action.profileId,
         spec: action.label ?? '',
-      }
+      };
     case 'open_ssh_config':
       return {
         ...initialAddConnectionState,
@@ -54,9 +54,9 @@ export const addConnectionReducer = (
         save: true,
         // sshConfigPath is set via set_ssh_config_path after DefaultSSHConfigPaths() resolves
         sshConfigPath: '',
-      }
+      };
     case 'open_workdir': {
-      const chosen = action.chosen || action.home
+      const chosen = action.chosen || action.home;
       return {
         ...state,
         open: true,
@@ -70,37 +70,37 @@ export const addConnectionReducer = (
         workdirCustom: '',
         workdirRemember: Boolean(action.profileId),
         workdirProfileId: action.profileId ?? '',
-      }
+      };
     }
     case 'close':
-      return { ...initialAddConnectionState }
+      return { ...initialAddConnectionState };
     case 'set_spec':
-      return { ...state, spec: action.spec, error: '' }
+      return { ...state, spec: action.spec, error: '' };
     case 'set_password':
-      return { ...state, password: action.password, error: '' }
+      return { ...state, password: action.password, error: '' };
     case 'set_save':
-      return { ...state, save: action.save }
+      return { ...state, save: action.save };
     case 'set_busy':
-      return { ...state, busy: action.busy }
+      return { ...state, busy: action.busy };
     case 'set_error':
-      return { ...state, error: action.error, busy: false }
+      return { ...state, error: action.error, busy: false };
     case 'need_password':
-      return { ...state, askPassword: true, busy: false, password: '' }
+      return { ...state, askPassword: true, busy: false, password: '' };
     case 'set_ssh_config_path':
-      return { ...state, sshConfigPath: action.path, sshConfigHosts: [], error: '' }
+      return { ...state, sshConfigPath: action.path, sshConfigHosts: [], error: '' };
     case 'set_ssh_config_hosts':
-      return { ...state, sshConfigHosts: action.hosts, sshConfigLoading: false, error: '' }
+      return { ...state, sshConfigHosts: action.hosts, sshConfigLoading: false, error: '' };
     case 'set_ssh_config_loading':
-      return { ...state, sshConfigLoading: action.loading }
+      return { ...state, sshConfigLoading: action.loading };
     case 'select_config_host':
-      return { ...state, selectedConfigHost: action.host }
+      return { ...state, selectedConfigHost: action.host };
     case 'set_workdir_chosen':
-      return { ...state, workdirChosen: action.path, workdirCustom: '' }
+      return { ...state, workdirChosen: action.path, workdirCustom: '' };
     case 'set_workdir_custom':
-      return { ...state, workdirCustom: action.path, workdirChosen: '__custom__' }
+      return { ...state, workdirCustom: action.path, workdirChosen: '__custom__' };
     case 'set_workdir_remember':
-      return { ...state, workdirRemember: action.remember }
+      return { ...state, workdirRemember: action.remember };
     default:
-      return state
+      return state;
   }
-}
+};

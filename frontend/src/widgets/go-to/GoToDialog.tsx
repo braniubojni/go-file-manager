@@ -1,80 +1,81 @@
-import FolderIcon from '@mui/icons-material/Folder'
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'
-import Box from '@mui/material/Box'
-import Dialog from '@mui/material/Dialog'
-import DialogContent from '@mui/material/DialogContent'
-import TextField from '@mui/material/TextField'
-import Typography from '@mui/material/Typography'
-import { useEffect, useMemo, useState, type FC, type KeyboardEvent } from 'react'
-import { useSearchTree, useSettings } from '../../entities/file/queries'
-import type { SearchHit } from '../../entities/file/types'
-import { parentDirOf, useEditorStore } from '../../features/editor/editorStore'
-import { useGoToStore } from '../../features/go-to/goToStore'
-import { usePaneStore } from '../../features/pane/paneStore'
-import { FileService } from '../../shared/api/bindings'
-import { errMessage } from '../../shared/lib/format'
-import { useSnack } from '../../shared/ui/SnackbarHost'
-import { listSx, paperSx, rowSx } from './styles'
+import FolderIcon from '@mui/icons-material/Folder';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import Box from '@mui/material/Box';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { useEffect, useMemo, useState, type FC, type KeyboardEvent } from 'react';
+import { useSearchTree, useSettings } from '../../entities/file/queries';
+import type { SearchHit } from '../../entities/file/types';
+import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
+import { usePaneStore } from '../../features/pane/paneStore';
+import { FileService } from '../../shared/api/bindings';
+import { errMessage } from '../../shared/lib/format';
+import { useSnack } from '../../shared/ui/SnackbarHost';
+import { enterPaneTab } from '../file-pane/helpers';
+import { listSx, paperSx, rowSx } from './styles';
 
 type Props = {
-  open: boolean
-  onClose: () => void
-}
+  open: boolean;
+  onClose: () => void;
+};
 
-const GoToDialog: FC<Props> = ({ open, onClose }) => {
-  const activePane = usePaneStore((s) => s.activePane)
-  const path = usePaneStore((s) => (s.activePane === 'left' ? s.leftPath : s.rightPath))
-  const navigate = usePaneStore((s) => s.navigate)
-  const { data: settings } = useSettings()
-  const show = useSnack((s) => s.show)
-  const openWorkspace = useEditorStore((s) => s.openWorkspace)
-  const [query, setQuery] = useState('')
-  const [debounced, setDebounced] = useState('')
-  const [index, setIndex] = useState(0)
+export const GoToDialog: FC<Props> = ({ open, onClose }) => {
+  const activePane = usePaneStore((s) => s.activePane);
+  const path = usePaneStore((s) => s.getPath(s.activePane));
+  const navigate = usePaneStore((s) => s.navigate);
+  const { data: settings } = useSettings();
+  const show = useSnack((s) => s.show);
+  const openWorkspace = useEditorStore((s) => s.openWorkspace);
+  const [query, setQuery] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [index, setIndex] = useState(0);
 
-  useEffect(() => {
-    if (!open) {
-      setQuery('')
-      setDebounced('')
-      setIndex(0)
-      return
-    }
-    const t = window.setTimeout(() => setDebounced(query), 180)
-    return () => window.clearTimeout(t)
-  }, [query, open])
-
-  const search = useSearchTree(path || undefined, debounced, settings?.showHidden ?? false, open)
-  const hits = useMemo(() => search.data ?? [], [search.data])
-
-  useEffect(() => {
-    setIndex(0)
-  }, [debounced, hits.length])
+  const search = useSearchTree(path || undefined, debounced, settings?.showHidden ?? false, open);
+  const hits = useMemo(() => search.data ?? [], [search.data]);
 
   const select = (hit: SearchHit) => {
-    onClose()
+    onClose();
     if (hit.isDir) {
-      navigate(activePane, hit.path)
-      return
+      enterPaneTab(activePane, hit.path);
+      navigate(activePane, hit.path);
+      return;
     }
     if (settings?.useBuiltInEditor !== false) {
-      openWorkspace(parentDirOf(hit.path), hit.path)
-      return
+      openWorkspace(parentDirOf(hit.path), hit.path);
+      return;
     }
-    void FileService.Open(hit.path).catch((e) => show(errMessage(e), 'error'))
-  }
+    void FileService.Open(hit.path).catch((e) => show(errMessage(e), 'error'));
+  };
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setIndex((i) => Math.min(hits.length - 1, i + 1))
+      e.preventDefault();
+      setIndex((i) => Math.min(hits.length - 1, i + 1));
     } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setIndex((i) => Math.max(0, i - 1))
+      e.preventDefault();
+      setIndex((i) => Math.max(0, i - 1));
     } else if (e.key === 'Enter' && hits[index]) {
-      e.preventDefault()
-      select(hits[index])
+      e.preventDefault();
+      select(hits[index]);
     }
-  }
+  };
+
+  useEffect(() => {
+    if (!open) {
+      setQuery('');
+      setDebounced('');
+      setIndex(0);
+      return;
+    }
+    const t = window.setTimeout(() => setDebounced(query), 180);
+    return () => window.clearTimeout(t);
+  }, [query, open]);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [debounced, hits.length]);
 
   return (
     <Dialog
@@ -141,11 +142,5 @@ const GoToDialog: FC<Props> = ({ open, onClose }) => {
         </Box>
       </DialogContent>
     </Dialog>
-  )
-}
-
-export const GoToHost: FC = () => {
-  const open = useGoToStore((s) => s.open)
-  const closeGoTo = useGoToStore((s) => s.closeGoTo)
-  return <GoToDialog open={open} onClose={closeGoTo} />
-}
+  );
+};

@@ -19,6 +19,37 @@ includes:
   android: ./build/android/Taskfile.yml
 
 tasks:
+  docker:ensure:
+    summary: Ensures Docker Desktop is running and wails-cross image exists
+    internal: true
+    vars:
+      # Wails expects 'wails-cross' for amd64, and 'wails-cross-arm64' for arm64.
+      IMAGE_NAME: 'wails-cross{{if ne .LINUX_ARCH "amd64"}}-{{.LINUX_ARCH}}{{end}}'
+    cmds:
+      - |
+        set -euo pipefail
+
+        # 1. Check if Docker daemon is running; start Docker Desktop if not
+        if ! docker info >/dev/null 2>&1; then
+          echo "=== Docker is not running. Launching Docker Desktop... ==="
+          open -a Docker
+          echo "Waiting for Docker daemon to initialize..."
+          until docker info >/dev/null 2>&1; do
+            sleep 2
+          done
+          echo "=== Docker daemon is up! ==="
+          sleep 2 # Extra buffer for socket readiness
+        fi
+
+        # 2. Check if the specific architecture image exists
+        IMG="{{.IMAGE_NAME}}"
+        if ! docker image inspect "$IMG" >/dev/null 2>&1; then
+          echo "=== Docker image '$IMG' not found. Building it now... ==="
+          wails3 task setup:docker ARCH="{{.LINUX_ARCH}}"
+        else
+          echo "=== Docker image '$IMG' found! ==="
+        fi
+
   build:
     summary: Builds the application
     cmds:
@@ -111,6 +142,9 @@ tasks:
       - sh: test -n "{{.VERSION}}"
         msg: "VERSION is required, e.g. task dist VERSION=0.1.0"
     cmds:
+      - task: docker:ensure
+        vars:
+          LINUX_ARCH: "{{.LINUX_ARCH}}"
       - task: dist:build
         vars:
           VERSION: "{{.VERSION}}"
@@ -158,36 +192,69 @@ tasks:
         LINUX_BIN="bin/go-file-manager-linux-${L_ARCH}"
         mkdir -p dist
         rm -f "dist/go-file-manager_${VER}_darwin_${D_ARCH}.zip" \
+              "dist/go-file-manager_${VER}_darwin_${D_ARCH}.dmg" \
               "dist/go-file-manager_${VER}_windows_${W_ARCH}.zip" \
               "dist/go-file-manager_${VER}_linux_${L_ARCH}.tar.gz"
 
-        if [ ! -d "bin/go-file-manager.app" ]; then
-          echo "Expected bin/go-file-manager.app (darwin package failed?)" >&2
-          ls -la bin/ || true
-          exit 1
-        fi
-        (cd bin && zip -ry "../dist/go-file-manager_${VER}_darwin_${D_ARCH}.zip" go-file-manager.app)
+            # 1. Darwin (macOS)
+            if [ ! -d "bin/go-file-manager.app" ]; then
+              echo "Expected bin/go-file-manager.app (darwin package failed?)" >&2
+              ls -la bin/ || true
+              exit 1
+            fi
+            
+            # Create standard zip
+            (cd bin && zip -ry "../dist/go-file-manager_${VER}_darwin_${D_ARCH}.zip" go-file-manager.app)
 
-        if [ ! -f "bin/go-file-manager.exe" ]; then
-          echo "Expected bin/go-file-manager.exe" >&2
-          ls -la bin/ || true
-          exit 1
-        fi
-        (cd bin && zip -9 "../dist/go-file-manager_${VER}_windows_${W_ARCH}.zip" go-file-manager.exe)
+            # Create DMG if on macOS and create-dmg is installed
+            if [ "$(uname -s)" = "Darwin" ]; then
+              if command -v create-dmg >/dev/null 2>&1; then
+                echo "=== Generating macOS DMG ==="
+                # 1. Clean up any previous DMG in bin/
+                rm -f "bin/go-file-manager.dmg"
 
-        if [ ! -f "$LINUX_BIN" ]; then
-          echo "Expected $LINUX_BIN" >&2
-          ls -la bin/ || true
-          exit 1
-        fi
-        # Archive member name must be go-file-manager (matches CI + updater docs).
-        STAGE=$(mktemp -d)
-        cp "$LINUX_BIN" "$STAGE/go-file-manager"
-        tar -C "$STAGE" -czf "dist/go-file-manager_${VER}_linux_${L_ARCH}.tar.gz" go-file-manager
-        rm -rf "$STAGE"
+                # 2. Output the DMG directly to the bin/ folder
+                create-dmg \
+                  --volname "go-file-manager" \
+                  --window-pos 200 120 \
+                  --window-size 600 400 \
+                  --icon-size 100 \
+                  --icon "go-file-manager.app" 150 190 \
+                  --app-drop-link 450 190 \
+                  "bin/go-file-manager.dmg" \
+                  "bin/go-file-manager.app"
 
-        echo "=== dist/ ready ==="
-        ls -lh dist/
+                # 3. Copy the cleanly named bin file into dist/ with the version tags
+                cp "bin/go-file-manager.dmg" "dist/go-file-manager_${VER}_darwin_${D_ARCH}.dmg"
+              else
+                echo "Notice: 'create-dmg' is not installed. Skipping .dmg creation."
+                echo "To enable, run: brew install create-dmg"
+              fi
+            fi
+
+            # 2. Windows
+            if [ ! -f "bin/go-file-manager.exe" ]; then
+              echo "Expected bin/go-file-manager.exe" >&2
+              ls -la bin/ || true
+              exit 1
+            fi
+            (cd bin && zip -9 "../dist/go-file-manager_${VER}_windows_${W_ARCH}.zip" go-file-manager.exe)
+
+            # 3. Linux
+            if [ ! -f "$LINUX_BIN" ]; then
+              echo "Expected $LINUX_BIN" >&2
+              ls -la bin/ || true
+              exit 1
+            fi
+            
+            # Archive member name must be go-file-manager (matches CI + updater docs).
+            STAGE=$(mktemp -d)
+            cp "$LINUX_BIN" "$STAGE/go-file-manager"
+            tar -C "$STAGE" -czf "dist/go-file-manager_${VER}_linux_${L_ARCH}.tar.gz" go-file-manager
+            rm -rf "$STAGE"
+
+            echo "=== dist/ ready ==="
+            ls -lh dist/
 
   run:
     summary: Runs the application

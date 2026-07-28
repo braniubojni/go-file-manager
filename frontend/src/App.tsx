@@ -1,8 +1,8 @@
-import type { FC } from 'react'
-import { FileManagerPage } from './pages/file-manager/FileManagerPage'
+import type { FC } from 'react';
+import { FileManagerPage } from './pages/file-manager/FileManagerPage';
 
 const App: FC = () => {
-  return <FileManagerPage />
-}
+  return <FileManagerPage />;
+};
 
-export default App
+export default App;

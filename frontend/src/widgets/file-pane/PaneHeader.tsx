@@ -1,16 +1,16 @@
-import CancelIcon from '@mui/icons-material/Cancel'
-import StorageIcon from '@mui/icons-material/Storage'
-import TerminalIcon from '@mui/icons-material/Terminal'
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import CircularProgress from '@mui/material/CircularProgress'
-import IconButton from '@mui/material/IconButton'
-import Tooltip from '@mui/material/Tooltip'
-import Typography from '@mui/material/Typography'
-import type { FC } from 'react'
-import type { PaneId } from '../../entities/file/types'
-import type { PaneJob } from '../../features/jobs/types'
-import { jobKindIcon } from './helpers'
+import CancelIcon from '@mui/icons-material/Cancel';
+import StorageIcon from '@mui/icons-material/Storage';
+import TerminalIcon from '@mui/icons-material/Terminal';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import type { FC } from 'react';
+import type { PaneId } from '../../entities/file/types';
+import type { PaneJob } from '../../features/jobs/types';
+import { jobKindIcon } from './helpers';
 import {
   headerSpacerSx,
   jobCancelBtnSx,
@@ -21,18 +21,18 @@ import {
   jobTooltipSlotSx,
   paneHeaderSx,
   paneHeaderTitleSx,
-} from './styles'
+} from './styles';
 
 type Props = {
-  id: PaneId
-  active: boolean
-  job: PaneJob | null | undefined
-  terminalOpen: boolean
-  onActivate: () => void
-  onCancelJob: () => void
-  onCalcSizes: () => void
-  onToggleTerminal: () => void
-}
+  id: PaneId;
+  active: boolean;
+  job: PaneJob | null | undefined;
+  terminalOpen: boolean;
+  onActivate: () => void;
+  onCancelJob: () => void;
+  onCalcSizes: () => void;
+  onToggleTerminal: () => void;
+};
 
 export const PaneHeader: FC<Props> = ({
   id,
@@ -69,8 +69,8 @@ export const PaneHeader: FC<Props> = ({
                 startIcon={<CancelIcon fontSize="small" />}
                 data-testid={`btn-cancel-job-${id}`}
                 onClick={(e) => {
-                  e.stopPropagation()
-                  onCancelJob()
+                  e.stopPropagation();
+                  onCancelJob();
                 }}
                 sx={jobCancelBtnSx}
               >
@@ -96,8 +96,8 @@ export const PaneHeader: FC<Props> = ({
         data-testid={`btn-folder-sizes-${id}`}
         size="small"
         onClick={(e) => {
-          e.stopPropagation()
-          onCalcSizes()
+          e.stopPropagation();
+          onCalcSizes();
         }}
       >
         <StorageIcon fontSize="small" />
@@ -110,8 +110,8 @@ export const PaneHeader: FC<Props> = ({
           size="small"
           color={terminalOpen ? 'primary' : 'default'}
           onClick={(e) => {
-            e.stopPropagation()
-            onToggleTerminal()
+            e.stopPropagation();
+            onToggleTerminal();
           }}
         >
           <TerminalIcon fontSize="small" />
@@ -119,4 +119,4 @@ export const PaneHeader: FC<Props> = ({
       </span>
     </Tooltip>
   </Box>
-)
+);

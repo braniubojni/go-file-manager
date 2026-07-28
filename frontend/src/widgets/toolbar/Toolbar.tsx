@@ -1,13 +1,13 @@
-import type { FC } from 'react'
-import { ArchiveDialog } from './components/ArchiveDialog'
-import { DeleteDialogs } from './components/DeleteDialogs'
-import { ExtractDialog } from './components/ExtractDialog'
-import { NameDialog } from './components/NameDialog'
-import { ToolbarBar } from './components/ToolbarBar'
-import { useToolbarActions } from './hooks/useToolbarActions'
+import type { FC } from 'react';
+import { ArchiveDialog } from './components/ArchiveDialog';
+import { DeleteDialogs } from './components/DeleteDialogs';
+import { ExtractDialog } from './components/ExtractDialog';
+import { NameDialog } from './components/NameDialog';
+import { ToolbarBar } from './components/ToolbarBar';
+import { useToolbarActions } from './hooks/useToolbarActions';
 
 export const Toolbar: FC = () => {
-  const a = useToolbarActions()
+  const a = useToolbarActions();
 
   return (
     <>
@@ -17,8 +17,8 @@ export const Toolbar: FC = () => {
         canForward={a.canForward}
         theme={a.theme}
         otherPaneLabel={a.otherPane(a.activePane)}
-        onBack={() => a.goBack(a.activePane)}
-        onForward={() => a.goForward(a.activePane)}
+        onBack={a.goBack}
+        onForward={a.goForward}
         onCopy={a.onCopy}
         onMove={a.onMove}
         onMkdir={a.onMkdir}
@@ -93,5 +93,5 @@ export const Toolbar: FC = () => {
         onConfirm={() => void a.confirmExtract()}
       />
     </>
-  )
-}
+  );
+};
