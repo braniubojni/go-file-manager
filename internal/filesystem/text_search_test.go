@@ -80,8 +80,9 @@ func TestSearchTreeFindsLaterSiblingAfterLargeEarlierSubtree(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < maxSearchVisits+50; i++ {
-		name := filepath.Join(root, "aaa", "deep", strings.Repeat("x", i%3)+strings.TrimSpace(strings.Repeat("0", 1)))
-		if err := os.WriteFile(name+strings.Repeat("a", i%5)+filepath.Ext(".txt"), []byte("x"), 0o644); err != nil {
+		// Use quotient+remainder to ensure filenames are unique without extra imports.
+		name := filepath.Join(root, "aaa", "deep", "f"+strings.Repeat("a", i%200)+strings.Repeat("b", i/200)+".txt")
+		if err := os.WriteFile(name, []byte("x"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
