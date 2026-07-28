@@ -261,9 +261,12 @@ tasks:
 
             # Checksums for Wails app.Updater (ChecksumAsset: SHA256SUMS).
             # Include only installable archives (not DMG — updater does not install .dmg).
+            # Generate into a temp file first (do not pipe the loop — that runs it in a
+            # subshell, so a found=1 flag would be lost), then sort.
             (
               cd dist
               rm -f SHA256SUMS
+              sums=$(mktemp)
               found=0
               for f in *.zip *.tar.gz; do
                 [ -f "$f" ] || continue
@@ -273,11 +276,14 @@ tasks:
                 else
                   shasum -a 256 "$f"
                 fi
-              done | sort -k2 > SHA256SUMS
+              done > "$sums"
               if [ "$found" -eq 0 ]; then
+                rm -f "$sums"
                 echo "No dist archives for SHA256SUMS" >&2
                 exit 1
               fi
+              sort -k2 "$sums" > SHA256SUMS
+              rm -f "$sums"
               echo "=== SHA256SUMS ==="
               cat SHA256SUMS
             )

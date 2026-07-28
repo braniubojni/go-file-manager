@@ -10,14 +10,10 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
-
 /**
  * CheckAndInstall opens the Wails update window, checks GitHub Releases, and
  * if a newer version is found, downloads/verifies/stages it for Restart & Apply.
- * Non-blocking: work runs in a background goroutine so the UI thread stays free.
+ * Errors propagate to the frontend so the caller can show failures.
  */
 export function CheckAndInstall(): $CancellablePromise<void> {
     return $Call.ByID(3005346729);
@@ -42,11 +38,4 @@ export function OpenReleasesPage(): $CancellablePromise<void> {
  */
 export function ReleasesURL(): $CancellablePromise<string> {
     return $Call.ByID(1370296590);
-}
-
-/**
- * SetApp injects the application after application.New (and Updater.Init).
- */
-export function SetApp(app: application$0.App | null): $CancellablePromise<void> {
-    return $Call.ByID(846302940, app);
 }

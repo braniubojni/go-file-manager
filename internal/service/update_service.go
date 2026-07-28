@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/erikharutyunyan/go-file-manager/internal/config"
@@ -25,8 +24,9 @@ func NewUpdateService() *UpdateService {
 	return &UpdateService{}
 }
 
-// SetApp injects the application after application.New (and Updater.Init).
-func (s *UpdateService) SetApp(app *application.App) {
+// AttachUpdateApp injects the application after application.New (and Updater.Init).
+// Package-level (not a service method) so it is not exposed in Wails frontend bindings.
+func AttachUpdateApp(s *UpdateService, app *application.App) {
 	s.app = app
 }
 
@@ -42,17 +42,12 @@ func (s *UpdateService) ReleasesURL() string {
 
 // CheckAndInstall opens the Wails update window, checks GitHub Releases, and
 // if a newer version is found, downloads/verifies/stages it for Restart & Apply.
-// Non-blocking: work runs in a background goroutine so the UI thread stays free.
+// Errors propagate to the frontend so the caller can show failures.
 func (s *UpdateService) CheckAndInstall() error {
 	if s.app == nil {
 		return fmt.Errorf("updater not ready")
 	}
-	go func() {
-		if err := s.app.Updater.CheckAndInstall(context.Background()); err != nil {
-			log.Printf("update: %v", err)
-		}
-	}()
-	return nil
+	return s.app.Updater.CheckAndInstall(context.Background())
 }
 
 // OpenReleasesPage opens the GitHub releases page in the browser.

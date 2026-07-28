@@ -77,7 +77,7 @@ func main() {
 	}
 
 	termSvc.SetApp(app)
-	updateSvc.SetApp(app)
+	service.AttachUpdateApp(updateSvc, app)
 
 	app.OnShutdown(func() {
 		_ = termSvc.Stop("left")
