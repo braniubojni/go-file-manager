@@ -60,8 +60,8 @@ func SearchTree(root, query string, showHidden bool, limit int) ([]domain.Search
 
 		entries, readErr := os.ReadDir(current.path)
 		if readErr != nil {
-			err = readErr
-			break
+			// Skip unreadable subtrees (permissions, transient IO errors) and keep searching.
+			continue
 		}
 		sort.SliceStable(entries, func(i, j int) bool {
 			return strings.ToLower(entries[i].Name()) < strings.ToLower(entries[j].Name())
