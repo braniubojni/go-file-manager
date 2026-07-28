@@ -1,6 +1,6 @@
-import type { ArchiveAction, ArchiveState } from './types'
+import type { ArchiveAction, ArchiveState } from './types';
 
-export type { ArchiveAction, ArchiveState } from './types'
+export type { ArchiveAction, ArchiveState } from './types';
 
 export const initialArchiveState: ArchiveState = {
   open: false,
@@ -11,7 +11,7 @@ export const initialArchiveState: ArchiveState = {
   password: '',
   busy: false,
   error: null,
-}
+};
 
 export const archiveDialogReducer = (state: ArchiveState, action: ArchiveAction): ArchiveState => {
   switch (action.type) {
@@ -22,18 +22,18 @@ export const archiveDialogReducer = (state: ArchiveState, action: ArchiveAction)
         name: action.defaultName || 'archive',
         formats: action.formats?.length ? action.formats : state.formats,
         format: 'zip',
-      }
+      };
     case 'close':
-      return { ...state, open: false, busy: false, error: null, password: '', encrypt: false }
+      return { ...state, open: false, busy: false, error: null, password: '', encrypt: false };
     case 'set':
-      return { ...state, ...action.patch, error: null }
+      return { ...state, ...action.patch, error: null };
     case 'submit_start':
-      return { ...state, busy: true, error: null }
+      return { ...state, busy: true, error: null };
     case 'submit_ok':
-      return { ...initialArchiveState, formats: state.formats }
+      return { ...initialArchiveState, formats: state.formats };
     case 'submit_fail':
-      return { ...state, busy: false, error: action.error }
+      return { ...state, busy: false, error: action.error };
     default:
-      return state
+      return state;
   }
-}
+};

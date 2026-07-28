@@ -1,5 +1,5 @@
-import type { SxProps, Theme } from '@mui/material/styles'
-import { TERMINAL_MIN_HEIGHT } from '../../features/terminal/terminalStore'
+import type { SxProps, Theme } from '@mui/material/styles';
+import { TERMINAL_MIN_HEIGHT } from '../../features/terminal/terminalStore';
 
 export const terminalRootSx = (height: number, bg: string): SxProps<Theme> => ({
   height,
@@ -12,7 +12,7 @@ export const terminalRootSx = (height: number, bg: string): SxProps<Theme> => ({
   position: 'relative',
   '& .xterm': { height: '100%' },
   '& .xterm-viewport': { overflowY: 'auto !important' },
-})
+});
 
 export const resizeHandleSx: SxProps<Theme> = {
   height: 6,
@@ -33,10 +33,10 @@ export const resizeHandleSx: SxProps<Theme> = {
     bgcolor: 'primary.main',
     borderColor: 'primary.main',
   },
-}
+};
 
 export const hostSx: SxProps<Theme> = {
   flex: 1,
   minHeight: 0,
   width: '100%',
-}
+};

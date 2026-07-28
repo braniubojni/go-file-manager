@@ -1,65 +1,65 @@
-import FolderOpenIcon from '@mui/icons-material/FolderOpen'
-import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import Button from '@mui/material/Button'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogTitle from '@mui/material/DialogTitle'
-import FormControl from '@mui/material/FormControl'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import InputLabel from '@mui/material/InputLabel'
-import MenuItem from '@mui/material/MenuItem'
-import Select from '@mui/material/Select'
-import Stack from '@mui/material/Stack'
-import Switch from '@mui/material/Switch'
-import Tooltip from '@mui/material/Tooltip'
-import Typography from '@mui/material/Typography'
-import { useEffect, useState, type FC } from 'react'
-import { useSaveSettings, useSettings } from '../../entities/file/queries'
-import type { AppSettings, ThemePreference } from '../../entities/file/types'
-import { SettingsService } from '../../shared/api/bindings'
-import { errMessage } from '../../shared/lib/format'
-import { useSnack } from '../../shared/ui/SnackbarHost'
-import { UpdatesSection } from './UpdatesSection'
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import FormControl from '@mui/material/FormControl';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import { useEffect, useState, type FC } from 'react';
+import { useSaveSettings, useSettings } from '../../entities/file/queries';
+import type { AppSettings } from '../../entities/file/types';
+import { SettingsService } from '../../shared/api/bindings';
+import { errMessage } from '../../shared/lib/format';
+import { useSnack } from '../../shared/ui/SnackbarHost';
+import { UpdatesSection } from './UpdatesSection';
 
 interface Props {
-  open: boolean
-  onClose: () => void
+  open: boolean;
+  onClose: () => void;
 }
 
 const SettingsDialog: FC<Props> = ({ open, onClose }) => {
-  const { data } = useSettings()
-  const save = useSaveSettings()
-  const show = useSnack((s) => s.show)
-  const [draft, setDraft] = useState<AppSettings | null>(null)
+  const { data } = useSettings();
+  const save = useSaveSettings();
+  const show = useSnack((s) => s.show);
+  const [draft, setDraft] = useState<AppSettings | null>(null);
 
   useEffect(() => {
-    if (open && data) setDraft({ ...data })
-  }, [open, data])
+    if (open && data) setDraft({ ...data });
+  }, [open, data]);
 
-  if (!draft) return null
+  if (!draft) return null;
 
   const onSave = () => {
     save.mutate(draft, {
       onSuccess: () => {
-        show('Settings saved', 'success')
-        onClose()
+        show('Settings saved', 'success');
+        onClose();
       },
       onError: (e) => show(errMessage(e), 'error'),
-    })
-  }
+    });
+  };
 
   const reveal = () => {
     void SettingsService.GetSettingsPath()
       .then((p) => SettingsService.RevealInOS(p))
-      .catch((e) => show(errMessage(e), 'error'))
-  }
+      .catch((e) => show(errMessage(e), 'error'));
+  };
 
   const openFile = () => {
     void SettingsService.GetSettingsPath()
       .then((p) => SettingsService.OpenInOS(p))
-      .catch((e) => show(errMessage(e), 'error'))
-  }
+      .catch((e) => show(errMessage(e), 'error'));
+  };
 
   return (
     <Dialog data-testid="dialog-settings" open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -74,7 +74,7 @@ const SettingsDialog: FC<Props> = ({ open, onClose }) => {
                 labelId="theme-label"
                 label="Theme"
                 value={draft.theme}
-                onChange={(e) => setDraft({ ...draft, theme: e.target.value as ThemePreference })}
+                onChange={(e) => setDraft({ ...draft, theme: e.target.value })}
               >
                 <MenuItem value="system">System</MenuItem>
                 <MenuItem value="dark">Dark</MenuItem>
@@ -148,7 +148,7 @@ const SettingsDialog: FC<Props> = ({ open, onClose }) => {
         </Button>
       </DialogActions>
     </Dialog>
-  )
-}
+  );
+};
 
-export default SettingsDialog
+export default SettingsDialog;

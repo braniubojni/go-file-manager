@@ -1,37 +1,37 @@
-import CssBaseline from '@mui/material/CssBaseline'
-import { ThemeProvider, createTheme } from '@mui/material/styles'
-import { useEffect, useMemo, useState, type FC, type ReactNode } from 'react'
-import { useSettings } from '../entities/file/queries'
-import type { ThemePreference } from '../entities/file/types'
+import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
+import { useSettings } from '../entities/file/queries';
+import type { ThemePreference } from '../entities/file/types';
 
 const useSystemDark = (): boolean => {
   const [dark, setDark] = useState(() =>
     typeof window !== 'undefined'
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
       : true,
-  )
+  );
 
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => setDark(mq.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
-  return dark
-}
+  return dark;
+};
 
 const resolveMode = (pref: ThemePreference, systemDark: boolean): 'light' | 'dark' => {
-  if (pref === 'light') return 'light'
-  if (pref === 'dark') return 'dark'
-  return systemDark ? 'dark' : 'light'
-}
+  if (pref === 'light') return 'light';
+  if (pref === 'dark') return 'dark';
+  return systemDark ? 'dark' : 'light';
+};
 
 export const AppThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const { data: settings } = useSettings()
-  const pref: ThemePreference = settings?.theme ?? 'system'
-  const systemDark = useSystemDark()
-  const mode = resolveMode(pref, systemDark)
+  const { data: settings } = useSettings();
+  const pref: ThemePreference = settings?.theme ?? 'system';
+  const systemDark = useSystemDark();
+  const mode = resolveMode(pref, systemDark);
 
   const theme = useMemo(
     () =>
@@ -73,12 +73,12 @@ export const AppThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
         },
       }),
     [mode],
-  )
+  );
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       {children}
     </ThemeProvider>
-  )
-}
+  );
+};

@@ -89,6 +89,11 @@ From macOS (Windows = native Go cross-compile; Linux = Docker):
 # MAIN COMMAND: builds all 3 platforms + packages macOS .app
 wails3 task setup:docker          # once, ~800MB (host arch)
 wails3 task dist VERSION=0.1.0
+# Fancy macOS dmg creation (optional) — requires create-dmg on macOS:
+create-dmg --volname "go-file-manager" --window-pos 200 120 --window-size 600 400 --icon-size 100 --icon "go-file-manager.app" 150 190 --app-drop-link 450 190 bin/go-file-manager.dmg bin/go-file-manager.app
+# Mac dmg creation (optional) — requires hdiutil on macOS:
+hdiutil create -volname "go-file-manager" -srcfolder bin/go-file-manager.app -ov -format UDZO -o "$(pwd)/bin/go-file-manager.dmg"
+
 # → dist/go-file-manager_0.1.0_darwin_arm64.zip   (.app inside)
 # → dist/go-file-manager_0.1.0_windows_amd64.zip
 # → dist/go-file-manager_0.1.0_linux_<host-arch>.tar.gz  (arm64 on Apple Silicon)
@@ -725,20 +730,23 @@ wails3 task test:all
 
 ## Keyboard (defaults; editable in UI / shortcuts.json)
 
-| Binding         | Action                               |
-| --------------- | ------------------------------------ |
-| Tab             | Switch active pane                   |
-| ↑ / ↓           | Move row selection (file list)       |
-| Enter           | Open folder or open file with OS app |
-| F5              | Refresh                              |
-| F2              | Rename                               |
-| Delete          | Delete                               |
-| Mod+Shift+C / X | Copy / Move                          |
-| Alt+ArrowUp     | Parent folder                        |
-| Mod+, / Mod+/   | Settings / Shortcuts                 |
-| Ctrl+`          | Toggle terminal under active pane    |
-| Double-click    | Enter directory / open file          |
-| Ctrl/Cmd+click  | Multi-select                         |
+| Binding                   | Action                               |
+| ------------------------- | ------------------------------------ |
+| Tab                       | Switch active pane                   |
+| ↑ / ↓                     | Move row selection (file list)       |
+| Enter                     | Open folder or open file with OS app |
+| F5                        | Refresh                              |
+| F2                        | Rename                               |
+| Delete                    | Delete                               |
+| Mod+Shift+C / X           | Copy / Move                          |
+| Alt+ArrowUp               | Parent folder                        |
+| Mod+, / Mod+/             | Settings / Shortcuts                 |
+| Ctrl+`                    | Toggle terminal under active pane    |
+| Mod+T                     | New tab (active pane)                |
+| Mod+W                     | Close tab (active pane)              |
+| Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab                  |
+| Double-click              | Enter directory / open file          |
+| Ctrl/Cmd+click            | Multi-select                         |
 
 When adding a **new setting**, specify: key, type, default, allowed values, UI control, tooltip text, and where it is used.
 
@@ -746,9 +754,7 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 
 - Check all missing remote actions and implement them
 
-- Fancy .dmg creation for macOS (drag to /Applications)
 - setup autoupdate, wails3 updater instead of what we have now
-- Tabs
 - Implement git diff highlight feature
 - search
 - archives
@@ -756,4 +762,4 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 - compare dirs
 - viewer/editor
 - progress for large trees.
-- work on CI for all OS getting failed builds
+  ~ (should be fixed, check needed) work on CI for all OS getting failed builds

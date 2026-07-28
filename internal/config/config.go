@@ -97,6 +97,10 @@ func DefaultShortcuts() map[string]string {
 		"toggleExtensions": "Mod+E",
 		// Ctrl+` (same physical key as Ctrl+~ on many layouts); not Cmd on macOS.
 		"toggleTerminal": "Ctrl+Backquote",
+		"tabNew":         "Mod+T",
+		"tabClose":       "Mod+W",
+		"tabNext":        "Ctrl+Tab",
+		"tabPrev":        "Ctrl+Shift+Tab",
 	}
 }
 
@@ -124,6 +128,10 @@ func ShortcutCatalog() []domain.ShortcutDef {
 		{"toggleHidden", "Toggle hidden files", "Show or hide dotfiles"},
 		{"toggleExtensions", "Toggle extensions", "Show or hide file extensions in names"},
 		{"toggleTerminal", "Toggle terminal", "Show or hide the terminal under the active pane (Ctrl+`)"},
+		{"tabNew", "New tab", "Duplicate the active tab's directory into a new tab"},
+		{"tabClose", "Close tab", "Close the active tab (disabled when it's the pane's last tab)"},
+		{"tabNext", "Next tab", "Switch to the next tab in the active pane"},
+		{"tabPrev", "Previous tab", "Switch to the previous tab in the active pane"},
 	}
 	defaults := DefaultShortcuts()
 	out := make([]domain.ShortcutDef, 0, len(defs))

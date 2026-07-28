@@ -1,24 +1,24 @@
-import Box from '@mui/material/Box'
-import CircularProgress from '@mui/material/CircularProgress'
-import { useTheme } from '@mui/material/styles'
-import Typography from '@mui/material/Typography'
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
-import { searchKeymap } from '@codemirror/search'
-import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { oneDark } from '@codemirror/theme-one-dark'
-import CodeMirror from '@uiw/react-codemirror'
-import { useMemo, type FC } from 'react'
-import { languageExtensionForPath } from './helpers'
-import { editorPaneSx } from './styles'
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import { useTheme } from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { searchKeymap } from '@codemirror/search';
+import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+import { oneDark } from '@codemirror/theme-one-dark';
+import CodeMirror from '@uiw/react-codemirror';
+import { useMemo, type FC } from 'react';
+import { languageExtensionForPath } from './helpers';
+import { editorPaneSx } from './styles';
 
 type Props = {
-  filePath: string | null
-  content: string
-  loading: boolean
-  loadError: string | null
-  onChange: (value: string | undefined) => void
-  onSave: () => void
-}
+  filePath: string | null;
+  content: string;
+  loading: boolean;
+  loadError: string | null;
+  onChange: (value: string | undefined) => void;
+  onSave: () => void;
+};
 
 export const CodeMirrorPane: FC<Props> = ({
   filePath,
@@ -28,19 +28,19 @@ export const CodeMirrorPane: FC<Props> = ({
   onChange,
   onSave,
 }) => {
-  const theme = useTheme()
-  const isDark = theme.palette.mode === 'dark'
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   const extensions = useMemo(() => {
     const saveKey = keymap.of([
       {
         key: 'Mod-s',
         run: () => {
-          onSave()
-          return true
+          onSave();
+          return true;
         },
       },
-    ])
+    ]);
     return [
       lineNumbers(),
       history(),
@@ -49,8 +49,8 @@ export const CodeMirrorPane: FC<Props> = ({
       EditorView.lineWrapping,
       ...languageExtensionForPath(filePath),
       ...(isDark ? [oneDark] : []),
-    ]
-  }, [filePath, isDark, onSave])
+    ];
+  }, [filePath, isDark, onSave]);
 
   return (
     <Box sx={editorPaneSx} data-testid="codemirror-pane">
@@ -87,5 +87,5 @@ export const CodeMirrorPane: FC<Props> = ({
         />
       )}
     </Box>
-  )
-}
+  );
+};

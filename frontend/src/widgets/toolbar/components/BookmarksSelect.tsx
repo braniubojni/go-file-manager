@@ -1,19 +1,20 @@
-import Box from '@mui/material/Box'
-import MenuItem from '@mui/material/MenuItem'
-import Select from '@mui/material/Select'
-import Typography from '@mui/material/Typography'
-import type { FC } from 'react'
-import { useBookmarks, useFileOps } from '../../../entities/file/queries'
-import { usePaneStore } from '../../../features/pane/paneStore'
-import { errMessage } from '../../../shared/lib/format'
-import { useSnack } from '../../../shared/ui/SnackbarHost'
-import type { BookmarksSelectProps } from '../types'
+import Box from '@mui/material/Box';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import Typography from '@mui/material/Typography';
+import type { FC } from 'react';
+import { useBookmarks, useFileOps } from '../../../entities/file/queries';
+import { usePaneStore } from '../../../features/pane/paneStore';
+import { errMessage } from '../../../shared/lib/format';
+import { useSnack } from '../../../shared/ui/SnackbarHost';
+import { enterPaneTab } from '../../file-pane/helpers';
+import type { BookmarksSelectProps } from '../types';
 
 export const BookmarksSelect: FC<BookmarksSelectProps> = ({ activePane }) => {
-  const { data: bookmarks = [] } = useBookmarks()
-  const ops = useFileOps()
-  const navigateStore = usePaneStore((s) => s.navigate)
-  const show = useSnack((s) => s.show)
+  const { data: bookmarks = [] } = useBookmarks();
+  const ops = useFileOps();
+  const navigateStore = usePaneStore((s) => s.navigate);
+  const show = useSnack((s) => s.show);
 
   return (
     <Select
@@ -24,8 +25,10 @@ export const BookmarksSelect: FC<BookmarksSelectProps> = ({ activePane }) => {
       sx={{ minWidth: 160, ml: 0.5 }}
       renderValue={() => 'Bookmarks'}
       onChange={(e) => {
-        const p = String(e.target.value)
-        if (p) navigateStore(activePane, p)
+        const p = String(e.target.value);
+        if (!p) return;
+        enterPaneTab(activePane, p);
+        navigateStore(activePane, p);
       }}
     >
       {bookmarks.length === 0 && (
@@ -42,10 +45,10 @@ export const BookmarksSelect: FC<BookmarksSelectProps> = ({ activePane }) => {
               variant="caption"
               color="error"
               onClick={(ev) => {
-                ev.stopPropagation()
+                ev.stopPropagation();
                 ops.removeBookmark.mutate(b.id, {
                   onError: (e) => show(errMessage(e), 'error'),
-                })
+                });
               }}
             >
               remove
@@ -54,5 +57,5 @@ export const BookmarksSelect: FC<BookmarksSelectProps> = ({ activePane }) => {
         </MenuItem>
       ))}
     </Select>
-  )
-}
+  );
+};

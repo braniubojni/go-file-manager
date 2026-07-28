@@ -1,30 +1,30 @@
-import type { FC } from 'react'
-import Autocomplete from '@mui/material/Autocomplete'
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import Checkbox from '@mui/material/Checkbox'
-import Dialog from '@mui/material/Dialog'
-import DialogActions from '@mui/material/DialogActions'
-import DialogContent from '@mui/material/DialogContent'
-import DialogTitle from '@mui/material/DialogTitle'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import List from '@mui/material/List'
-import ListItemButton from '@mui/material/ListItemButton'
-import ListItemText from '@mui/material/ListItemText'
-import Radio from '@mui/material/Radio'
-import RadioGroup from '@mui/material/RadioGroup'
-import TextField from '@mui/material/TextField'
-import Typography from '@mui/material/Typography'
-import { usePathCompletions } from '../../../entities/file/queries'
-import { resolveRemoteWorkdirInput } from '../../../features/connections/helpers'
-import type { ConnectionDialogProps } from '../types'
+import type { FC } from 'react';
+import Autocomplete from '@mui/material/Autocomplete';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogTitle from '@mui/material/DialogTitle';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemText from '@mui/material/ListItemText';
+import Radio from '@mui/material/Radio';
+import RadioGroup from '@mui/material/RadioGroup';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import { usePathCompletions } from '../../../entities/file/queries';
+import { resolveRemoteWorkdirInput } from '../../../features/connections/helpers';
+import type { ConnectionDialogProps } from '../types';
 
 const DIALOG_TITLES: Record<string, string> = {
   add: 'Add SSH connection',
   password: 'SSH password',
   ssh_config: 'Connect from SSH config',
   workdir: 'Choose working directory',
-}
+};
 
 export const ConnectionDialog: FC<ConnectionDialogProps> = ({
   dialog,
@@ -33,10 +33,10 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
   onLoadSSHConfig,
   onConnectFromConfig,
 }) => {
-  const workdirCustomOpen = dialog.mode === 'workdir' && Boolean(dialog.workdirCustom)
-  const workdirPartial = resolveRemoteWorkdirInput(dialog.workdirHome, dialog.workdirCustom) ?? ''
-  const workdirCompletions = usePathCompletions(workdirPartial, workdirCustomOpen)
-  const workdirOptions = workdirCompletions.data ?? []
+  const workdirCustomOpen = dialog.mode === 'workdir' && Boolean(dialog.workdirCustom);
+  const workdirPartial = resolveRemoteWorkdirInput(dialog.workdirHome, dialog.workdirCustom) ?? '';
+  const workdirCompletions = usePathCompletions(workdirPartial, workdirCustomOpen);
+  const workdirOptions = workdirCompletions.data ?? [];
 
   return (
     <Dialog
@@ -60,7 +60,7 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
               value={dialog.spec}
               onChange={(e) => dispatch({ type: 'set_spec', spec: e.target.value })}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') onSubmit()
+                if (e.key === 'Enter') onSubmit();
               }}
               data-testid="input-conn-spec"
               fullWidth
@@ -93,7 +93,7 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
                 value={dialog.sshConfigPath}
                 onChange={(e) => dispatch({ type: 'set_ssh_config_path', path: e.target.value })}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') onLoadSSHConfig(dialog.sshConfigPath)
+                  if (e.key === 'Enter') onLoadSSHConfig(dialog.sshConfigPath);
                 }}
                 size="small"
                 fullWidth
@@ -213,11 +213,11 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
                 inputValue={dialog.workdirCustom}
                 filterOptions={(x) => x}
                 onInputChange={(_, v, reason) => {
-                  if (reason === 'reset') return
-                  dispatch({ type: 'set_workdir_custom', path: v })
+                  if (reason === 'reset') return;
+                  dispatch({ type: 'set_workdir_custom', path: v });
                 }}
                 onChange={(_, v) => {
-                  if (typeof v === 'string' && v) dispatch({ type: 'set_workdir_custom', path: v })
+                  if (typeof v === 'string' && v) dispatch({ type: 'set_workdir_custom', path: v });
                 }}
                 renderInput={(params) => (
                   <TextField
@@ -227,7 +227,7 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
                     placeholder="/home/user/project"
                     helperText="Absolute path on the remote, or ssh://…"
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') onSubmit()
+                      if (e.key === 'Enter') onSubmit();
                     }}
                     data-testid="input-workdir-custom"
                   />
@@ -259,7 +259,7 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
             value={dialog.password}
             onChange={(e) => dispatch({ type: 'set_password', password: e.target.value })}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') onSubmit()
+              if (e.key === 'Enter') onSubmit();
             }}
             data-testid="input-conn-password"
             fullWidth
@@ -296,5 +296,5 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
         )}
       </DialogActions>
     </Dialog>
-  )
-}
+  );
+};

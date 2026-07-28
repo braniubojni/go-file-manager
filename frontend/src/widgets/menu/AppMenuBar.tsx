@@ -1,21 +1,21 @@
-import CheckIcon from '@mui/icons-material/Check'
-import AppBar from '@mui/material/AppBar'
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import Divider from '@mui/material/Divider'
-import ListItemIcon from '@mui/material/ListItemIcon'
-import ListItemText from '@mui/material/ListItemText'
-import Menu from '@mui/material/Menu'
-import MenuItem from '@mui/material/MenuItem'
-import Toolbar from '@mui/material/Toolbar'
-import { useQueryClient } from '@tanstack/react-query'
-import { useState, type FC, type MouseEvent } from 'react'
-import { usePatchSettings, useSettings } from '../../entities/file/queries'
-import { useDialogStore } from '../../features/ui/dialogStore'
-import { errMessage } from '../../shared/lib/format'
-import { useSnack } from '../../shared/ui/SnackbarHost'
-import { appBarSx, checkPlaceholderSx, listItemIconSx, toolbarSx } from './styles'
-import type { AppMenuBarProps } from './types'
+import CheckIcon from '@mui/icons-material/Check';
+import AppBar from '@mui/material/AppBar';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Toolbar from '@mui/material/Toolbar';
+import { useQueryClient } from '@tanstack/react-query';
+import { useState, type FC, type MouseEvent } from 'react';
+import { usePatchSettings, useSettings } from '../../entities/file/queries';
+import { useDialogStore } from '../../features/ui/dialogStore';
+import { errMessage } from '../../shared/lib/format';
+import { useSnack } from '../../shared/ui/SnackbarHost';
+import { appBarSx, checkPlaceholderSx, listItemIconSx, toolbarSx } from './styles';
+import type { AppMenuBarProps } from './types';
 
 export const AppMenuBar: FC<AppMenuBarProps> = ({
   onNewFolder,
@@ -24,33 +24,33 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
   onRename,
   onDelete,
 }) => {
-  const { data: settings } = useSettings()
-  const patch = usePatchSettings()
-  const show = useSnack((s) => s.show)
-  const openSettings = useDialogStore((s) => s.openSettings)
-  const openShortcuts = useDialogStore((s) => s.openShortcuts)
-  const qc = useQueryClient()
+  const { data: settings } = useSettings();
+  const patch = usePatchSettings();
+  const show = useSnack((s) => s.show);
+  const openSettings = useDialogStore((s) => s.openSettings);
+  const openShortcuts = useDialogStore((s) => s.openShortcuts);
+  const qc = useQueryClient();
 
-  const [fileAnchor, setFileAnchor] = useState<null | HTMLElement>(null)
-  const [viewAnchor, setViewAnchor] = useState<null | HTMLElement>(null)
+  const [fileAnchor, setFileAnchor] = useState<null | HTMLElement>(null);
+  const [viewAnchor, setViewAnchor] = useState<null | HTMLElement>(null);
 
   const closeAll = () => {
-    setFileAnchor(null)
-    setViewAnchor(null)
-  }
+    setFileAnchor(null);
+    setViewAnchor(null);
+  };
 
   const toggle = (key: 'showHidden' | 'showExtensions') => {
-    patch.mutate({ [key]: !settings?.[key] }, { onError: (e) => show(errMessage(e), 'error') })
-  }
+    patch.mutate({ [key]: !settings?.[key] }, { onError: (e) => show(errMessage(e), 'error') });
+  };
 
   const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ['dir'] })
-    closeAll()
-  }
+    void qc.invalidateQueries({ queryKey: ['dir'] });
+    closeAll();
+  };
 
   const openMenu = (setter: (el: HTMLElement | null) => void) => (e: MouseEvent<HTMLElement>) => {
-    setter(e.currentTarget)
-  }
+    setter(e.currentTarget);
+  };
 
   return (
     <AppBar position="static" color="default" elevation={0} sx={appBarSx}>
@@ -62,8 +62,8 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
           <MenuItem
             data-testid="menu-file-mkdir"
             onClick={() => {
-              closeAll()
-              onNewFolder()
+              closeAll();
+              onNewFolder();
             }}
           >
             New folder
@@ -71,8 +71,8 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
           <MenuItem
             data-testid="menu-file-mkfile"
             onClick={() => {
-              closeAll()
-              onNewFile()
+              closeAll();
+              onNewFile();
             }}
           >
             New file
@@ -80,8 +80,8 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
           <MenuItem
             data-testid="menu-file-edit"
             onClick={() => {
-              closeAll()
-              onEditFile()
+              closeAll();
+              onEditFile();
             }}
           >
             Edit
@@ -89,8 +89,8 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
           <MenuItem
             data-testid="menu-file-rename"
             onClick={() => {
-              closeAll()
-              onRename()
+              closeAll();
+              onRename();
             }}
           >
             Rename
@@ -98,8 +98,8 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
           <MenuItem
             data-testid="menu-file-delete"
             onClick={() => {
-              closeAll()
-              onDelete()
+              closeAll();
+              onDelete();
             }}
           >
             Delete
@@ -108,8 +108,8 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
           <MenuItem
             data-testid="menu-file-settings"
             onClick={() => {
-              closeAll()
-              openSettings()
+              closeAll();
+              openSettings();
             }}
           >
             Settings…
@@ -117,8 +117,8 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
           <MenuItem
             data-testid="menu-file-shortcuts"
             onClick={() => {
-              closeAll()
-              openShortcuts()
+              closeAll();
+              openShortcuts();
             }}
           >
             Keyboard shortcuts…
@@ -156,5 +156,5 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
         </Menu>
       </Toolbar>
     </AppBar>
-  )
-}
+  );
+};

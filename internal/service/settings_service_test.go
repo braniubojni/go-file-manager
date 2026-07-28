@@ -68,3 +68,80 @@ func TestSettingsEncryptedMigrateFromJSON(t *testing.T) {
 		t.Fatalf("got theme %q", s2.Theme)
 	}
 }
+
+func newTestSettingsService(t *testing.T) *SettingsService {
+	t.Helper()
+	dir := t.TempDir()
+	db, err := storage.OpenPath(filepath.Join(dir, "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	cfg, err := config.OpenDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return NewSettingsService(db, cfg)
+}
+
+func TestPaneTabsFallsBackToSettingsPaths(t *testing.T) {
+	svc := newTestSettingsService(t)
+
+	st, err := svc.GetSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.LeftPath = "/left"
+	st.RightPath = "/right"
+	if err := svc.SaveSettings(st); err != nil {
+		t.Fatal(err)
+	}
+
+	tabs, err := svc.GetPaneTabs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tabs.Left) != 1 || tabs.Left[0].Path != "/left" || tabs.LeftActive != 0 {
+		t.Fatalf("left fallback: %+v", tabs)
+	}
+	if len(tabs.Right) != 1 || tabs.Right[0].Path != "/right" || tabs.RightActive != 0 {
+		t.Fatalf("right fallback: %+v", tabs)
+	}
+}
+
+func TestPaneTabsRoundTripAndClamp(t *testing.T) {
+	svc := newTestSettingsService(t)
+
+	in := domain.PaneTabs{
+		Left:        []domain.TabState{{Path: "/a"}, {Path: "/b"}, {Path: ""}},
+		LeftActive:  99, // out of range, should clamp
+		Right:       []domain.TabState{{Path: "/c"}},
+		RightActive: -1, // out of range, should clamp
+	}
+	if err := svc.SavePaneTabs(in); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := svc.GetPaneTabs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Left) != 2 || out.Left[0].Path != "/a" || out.Left[1].Path != "/b" {
+		t.Fatalf("left after drop-empty: %+v", out.Left)
+	}
+	if out.LeftActive != 1 {
+		t.Fatalf("leftActive clamp: got %d", out.LeftActive)
+	}
+	if len(out.Right) != 1 || out.Right[0].Path != "/c" || out.RightActive != 0 {
+		t.Fatalf("right: %+v active=%d", out.Right, out.RightActive)
+	}
+
+	// Active tab paths should mirror into legacy Settings fields.
+	st, err := svc.GetSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.LeftPath != "/b" || st.RightPath != "/c" {
+		t.Fatalf("mirrored settings: %+v", st)
+	}
+}

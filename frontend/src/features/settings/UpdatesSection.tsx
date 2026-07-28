@@ -1,36 +1,36 @@
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import CircularProgress from '@mui/material/CircularProgress'
-import FormControlLabel from '@mui/material/FormControlLabel'
-import Stack from '@mui/material/Stack'
-import Switch from '@mui/material/Switch'
-import Typography from '@mui/material/Typography'
-import { useEffect, useState, type FC } from 'react'
-import type { AppSettings } from '../../entities/file/types'
-import { formatBytes } from '../updates/helpers'
-import { useUpdateActions } from '../updates/hooks/useUpdateActions'
-import { useUpdateStore } from '../updates/updateStore'
-import { UpdateService } from '../../shared/api/bindings'
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Stack from '@mui/material/Stack';
+import Switch from '@mui/material/Switch';
+import Typography from '@mui/material/Typography';
+import { useEffect, useState, type FC } from 'react';
+import type { AppSettings } from '../../entities/file/types';
+import { formatBytes } from '../updates/helpers';
+import { useUpdateActions } from '../updates/hooks/useUpdateActions';
+import { useUpdateStore } from '../updates/updateStore';
+import { UpdateService } from '../../shared/api/bindings';
 
 type Props = {
-  draft: AppSettings
-  onChange: (next: AppSettings) => void
-}
+  draft: AppSettings;
+  onChange: (next: AppSettings) => void;
+};
 
 export const UpdatesSection: FC<Props> = ({ draft, onChange }) => {
-  const [version, setVersion] = useState('…')
-  const phase = useUpdateStore((s) => s.phase)
-  const info = useUpdateStore((s) => s.info)
-  const error = useUpdateStore((s) => s.error)
-  const { check, downloadAndApply, skip, openReleases } = useUpdateActions()
+  const [version, setVersion] = useState('…');
+  const phase = useUpdateStore((s) => s.phase);
+  const info = useUpdateStore((s) => s.info);
+  const error = useUpdateStore((s) => s.error);
+  const { check, downloadAndApply, skip, openReleases } = useUpdateActions();
 
   useEffect(() => {
     void UpdateService.GetVersion()
       .then(setVersion)
-      .catch(() => setVersion('unknown'))
-  }, [])
+      .catch(() => setVersion('unknown'));
+  }, []);
 
-  const busy = phase === 'checking' || phase === 'downloading'
+  const busy = phase === 'checking' || phase === 'downloading';
 
   return (
     <Stack spacing={1.5} data-testid="settings-updates">
@@ -131,5 +131,5 @@ export const UpdatesSection: FC<Props> = ({ draft, onChange }) => {
         </Box>
       )}
     </Stack>
-  )
-}
+  );
+};

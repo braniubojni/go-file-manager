@@ -1,4 +1,4 @@
-import type { SxProps, Theme } from '@mui/material/styles'
+import type { SxProps, Theme } from '@mui/material/styles';
 
 export const workspaceRootSx: SxProps<Theme> = {
   flex: 1,
@@ -10,7 +10,7 @@ export const workspaceRootSx: SxProps<Theme> = {
   borderRadius: 1,
   overflow: 'hidden',
   m: 1,
-}
+};
 
 export const headerSx: SxProps<Theme> = {
   display: 'flex',
@@ -22,13 +22,13 @@ export const headerSx: SxProps<Theme> = {
   borderColor: 'divider',
   bgcolor: 'action.hover',
   minHeight: 40,
-}
+};
 
 export const bodySx: SxProps<Theme> = {
   flex: 1,
   minHeight: 0,
   display: 'flex',
-}
+};
 
 export const treePaneSx: SxProps<Theme> = {
   width: 280,
@@ -38,7 +38,7 @@ export const treePaneSx: SxProps<Theme> = {
   borderColor: 'divider',
   overflow: 'auto',
   bgcolor: 'background.paper',
-}
+};
 
 export const editorPaneSx: SxProps<Theme> = {
   flex: 1,
@@ -46,7 +46,7 @@ export const editorPaneSx: SxProps<Theme> = {
   minHeight: 0,
   display: 'flex',
   flexDirection: 'column',
-}
+};
 
 export const treeRowSx = (selected: boolean, depth: number): SxProps<Theme> => ({
   display: 'flex',
@@ -59,4 +59,4 @@ export const treeRowSx = (selected: boolean, depth: number): SxProps<Theme> => (
   userSelect: 'none',
   bgcolor: selected ? 'action.selected' : 'transparent',
   '&:hover': { bgcolor: selected ? 'action.selected' : 'action.hover' },
-})
+});

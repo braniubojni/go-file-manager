@@ -26,6 +26,19 @@ type PanePaths struct {
 	Right string `json:"right"`
 }
 
+// TabState is one open tab in a pane (path only; history is not persisted).
+type TabState struct {
+	Path string `json:"path"`
+}
+
+// PaneTabs holds each pane's open tabs and which one is active.
+type PaneTabs struct {
+	Left        []TabState `json:"left"`
+	LeftActive  int        `json:"leftActive"`
+	Right       []TabState `json:"right"`
+	RightActive int        `json:"rightActive"`
+}
+
 // ThemeMode values for Settings.Theme.
 const (
 	ThemeSystem = "system"

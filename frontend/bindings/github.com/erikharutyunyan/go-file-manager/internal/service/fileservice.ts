@@ -121,7 +121,7 @@ export function Open(path: string): $CancellablePromise<void> {
 }
 
 /**
- * ReadTextFile reads a local text file for the built-in editor.
+ * ReadTextFile reads a text file for the built-in editor (local or remote).
  */
 export function ReadTextFile(path: string): $CancellablePromise<string> {
     return $Call.ByID(2975228065, path);
@@ -139,7 +139,7 @@ export function SearchTree(root: string, query: string, showHidden: boolean, lim
 }
 
 /**
- * WriteTextFile writes a local text file from the built-in editor.
+ * WriteTextFile writes a text file from the built-in editor (local or remote).
  */
 export function WriteTextFile(path: string, content: string): $CancellablePromise<void> {
     return $Call.ByID(1752048786, path, content);

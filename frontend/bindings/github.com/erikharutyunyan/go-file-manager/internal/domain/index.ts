@@ -7,11 +7,12 @@ export type {
     ConnectResult,
     ConnectionProfile,
     FileEntry,
-    PanePaths,
+    PaneTabs,
     RemoteRecent,
     SSHConfigHost,
     SearchHit,
     Settings,
     ShortcutDef,
+    TabState,
     UpdateInfo
 } from "./models.js";

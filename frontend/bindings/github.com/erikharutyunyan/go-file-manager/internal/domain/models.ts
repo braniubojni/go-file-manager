@@ -111,11 +111,13 @@ export interface FileEntry {
 }
 
 /**
- * PanePaths holds last-used left/right directory paths.
+ * PaneTabs holds each pane's open tabs and which one is active.
  */
-export interface PanePaths {
-    "left": string;
-    "right": string;
+export interface PaneTabs {
+    "left": TabState[] | null;
+    "leftActive": number;
+    "right": TabState[] | null;
+    "rightActive": number;
 }
 
 /**
@@ -193,6 +195,13 @@ export interface ShortcutDef {
     "label": string;
     "description": string;
     "binding": string;
+}
+
+/**
+ * TabState is one open tab in a pane (path only; history is not persisted).
+ */
+export interface TabState {
+    "path": string;
 }
 
 /**

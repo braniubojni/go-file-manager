@@ -1,78 +1,80 @@
-import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
-import Typography from '@mui/material/Typography'
-import { Component, useEffect, useState, type ErrorInfo, type FC, type ReactNode } from 'react'
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import { Component, useEffect, useState, type ErrorInfo, type FC, type ReactNode } from 'react';
 
-type BoundaryState = { error: Error | null }
+type BoundaryState = { error: Error | null };
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, BoundaryState> {
-  state: BoundaryState = { error: null }
+  state: BoundaryState = { error: null };
 
   static getDerivedStateFromError(error: Error): BoundaryState {
-    return { error }
+    return { error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('React error boundary:', error, info.componentStack)
+    // eslint-disable-next-line no-console
+    console.error('React error boundary:', error, info.componentStack);
   }
 
   render() {
     if (this.state.error) {
-      return <ErrorRecovery message={this.state.error.message} />
+      return <ErrorRecovery message={this.state.error.message} />;
     }
-    return this.props.children
+    return this.props.children;
   }
 }
 
 /** Catches window error / unhandledrejection and shows the same recovery UI. */
 export const GlobalErrorHost: FC<{ children: ReactNode }> = ({ children }) => {
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const onError = (e: ErrorEvent) => {
       // Ignore benign resource load failures (e.g. missing custom.js in server mode)
-      if (e.message === 'Script error.' && !e.filename) return
-      if (e.message?.includes('ResizeObserver')) return
-      setError(e.message || 'Unexpected error')
-    }
+      if (e.message === 'Script error.' && !e.filename) return;
+      if (e.message?.includes('ResizeObserver')) return;
+      setError(e.message || 'Unexpected error');
+    };
     const onRejection = (e: PromiseRejectionEvent) => {
-      const reason = e.reason
+      const reason = e.reason;
       const msg =
         reason instanceof Error
           ? reason.message
           : typeof reason === 'string'
             ? reason
-            : 'Unhandled promise rejection'
+            : 'Unhandled promise rejection';
       // DataGrid multi-select was a crash; still surface other rejections that break UX
       if (msg.includes('rowSelectionModel can only contain 1 item')) {
-        setError(msg)
-        return
+        setError(msg);
+        return;
       }
       // Non-fatal network noise: log only
       if (msg.includes('Failed to fetch') || msg.includes('Load failed')) {
-        console.warn('Unhandled rejection:', msg)
-        return
+        // eslint-disable-next-line no-console
+        console.warn('Unhandled rejection:', msg);
+        return;
       }
-      setError(msg)
-    }
-    window.addEventListener('error', onError)
-    window.addEventListener('unhandledrejection', onRejection)
+      setError(msg);
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
     return () => {
-      window.removeEventListener('error', onError)
-      window.removeEventListener('unhandledrejection', onRejection)
-    }
-  }, [])
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
 
   if (error) {
-    return <ErrorRecovery message={error} onDismiss={() => setError(null)} />
+    return <ErrorRecovery message={error} onDismiss={() => setError(null)} />;
   }
-  return <>{children}</>
-}
+  return <>{children}</>;
+};
 
 const ErrorRecovery = ({ message, onDismiss }: { message: string; onDismiss?: () => void }) => {
   const refresh = () => {
-    window.location.reload()
-  }
+    window.location.reload();
+  };
 
   return (
     <Box
@@ -126,5 +128,5 @@ const ErrorRecovery = ({ message, onDismiss }: { message: string; onDismiss?: ()
         </Typography>
       </Box>
     </Box>
-  )
-}
+  );
+};

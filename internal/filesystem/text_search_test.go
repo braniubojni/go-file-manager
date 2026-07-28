@@ -73,3 +73,31 @@ func TestSearchTree(t *testing.T) {
 		}
 	}
 }
+
+func TestSearchTreeFindsLaterSiblingAfterLargeEarlierSubtree(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "aaa", "deep"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < maxSearchVisits+50; i++ {
+		// Use quotient+remainder to ensure filenames are unique without extra imports.
+		name := filepath.Join(root, "aaa", "deep", "f"+strings.Repeat("a", i%200)+strings.Repeat("b", i/200)+".txt")
+		if err := os.WriteFile(name, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(root, "target"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	hits, err := SearchTree(root, "target", false, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected target folder to be found after large earlier subtree")
+	}
+	if hits[0].Name != "target" || !hits[0].IsDir {
+		t.Fatalf("expected target dir first, got %+v", hits[0])
+	}
+}

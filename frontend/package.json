@@ -9,7 +9,7 @@
     "build": "tsc && vite build --mode production",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint . --quiet",
+    "lint": "tsc --noEmit && oxlint . --quiet",
     "knip": "knip",
     "format": "oxfmt --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "oxfmt --check \"src/**/*.{ts,tsx,css,json}\""
@@ -42,6 +42,8 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "react": "^18.2.0",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^18.2.0",
     "zustand": "^5.0.14"
   },

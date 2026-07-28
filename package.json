@@ -5,7 +5,7 @@
   "scripts": {
     "prepare": "husky",
     "precommit": "lint-staged",
-    "knip": "cd frontend && npm run knip"
+    "knip": "npm run knip --prefix frontend"
   },
   "devDependencies": {
     "husky": "^9.1.7",
