@@ -13,7 +13,8 @@ export const FILE_ROW_ITEM = 'FILE_ROWS';
  * modifiers, so track it with one module-level listener pair instead of one
  * per FileTable instance (there are always exactly two: left + right pane). */
 const ctrlHeld = { current: false };
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && !(window as unknown as { __gfmCtrlListeners?: boolean }).__gfmCtrlListeners) {
+  (window as unknown as { __gfmCtrlListeners?: boolean }).__gfmCtrlListeners = true;
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Control') ctrlHeld.current = true;
   });
