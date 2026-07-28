@@ -9,7 +9,7 @@
     "build": "tsc && vite build --mode production",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint . --quiet",
+    "lint": "tsc --noEmit && oxlint . --quiet",
     "knip": "knip",
     "format": "oxfmt --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "oxfmt --check \"src/**/*.{ts,tsx,css,json}\""

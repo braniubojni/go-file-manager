@@ -116,7 +116,8 @@ func SearchTree(root, query string, showHidden bool, limit int) ([]domain.Search
 				})
 			}
 
-			if entry.IsDir() && depth < maxSearchDepth {
+			// Empty query: immediate children only — do not walk the tree.
+			if q != "" && entry.IsDir() && depth < maxSearchDepth {
 				queue = append(queue, pendingDir{path: path, rel: rel, depth: depth})
 			}
 		}
