@@ -13,6 +13,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as domain$0 from "../domain/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
 
 /**
  * Archive packs sources into destPath using format (zip, tar.gz, …).
@@ -121,6 +124,13 @@ export function Open(path: string): $CancellablePromise<void> {
 }
 
 /**
+ * OpenPrivacySettings opens OS privacy / full-disk access settings when possible.
+ */
+export function OpenPrivacySettings(): $CancellablePromise<void> {
+    return $Call.ByID(3870616985);
+}
+
+/**
  * ReadTextFile reads a text file for the built-in editor (local or remote).
  */
 export function ReadTextFile(path: string): $CancellablePromise<string> {
@@ -132,10 +142,40 @@ export function Rename(oldPath: string, newName: string): $CancellablePromise<st
 }
 
 /**
+ * ReplaceAllInPaths replaces find with replace in each path (all occurrences per file).
+ */
+export function ReplaceAllInPaths(paths: string[] | null, find: string, replace: string, caseSensitive: boolean): $CancellablePromise<domain$0.ReplaceAllResult> {
+    return $Call.ByID(1188295608, paths, find, replace, caseSensitive);
+}
+
+/**
+ * ReplaceOccurrence replaces one content match at path:line:column.
+ */
+export function ReplaceOccurrence(path: string, find: string, replace: string, line: number, column: number, caseSensitive: boolean): $CancellablePromise<void> {
+    return $Call.ByID(1113297057, path, find, replace, line, column, caseSensitive);
+}
+
+/**
  * SearchTree finds nested files/folders under root (local only; Go-to).
  */
 export function SearchTree(root: string, query: string, showHidden: boolean, limit: number): $CancellablePromise<domain$0.SearchHit[] | null> {
     return $Call.ByID(3279656272, root, query, showHidden, limit);
+}
+
+/**
+ * SetApp injects the application for search event emission (call after application.New).
+ */
+export function SetApp(app: application$0.App | null): $CancellablePromise<void> {
+    return $Call.ByID(4031634559, app);
+}
+
+/**
+ * StartSearch runs a cancellable content or folder-name search and streams
+ * events: search:hit, search:denied, search:done, search:error.
+ * jobID should come from NewJobID. Mode is domain.SearchModeContent or SearchModeFolders.
+ */
+export function StartSearch(jobID: string, root: string, query: string, mode: string, include: string, exclude: string, caseSensitive: boolean, showHidden: boolean, limit: number): $CancellablePromise<void> {
+    return $Call.ByID(2272785060, jobID, root, query, mode, include, exclude, caseSensitive, showHidden, limit);
 }
 
 /**

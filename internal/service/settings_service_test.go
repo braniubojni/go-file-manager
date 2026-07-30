@@ -145,3 +145,51 @@ func TestPaneTabsRoundTripAndClamp(t *testing.T) {
 		t.Fatalf("mirrored settings: %+v", st)
 	}
 }
+
+func TestSearchPrefsAndHistory(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GFM_CONFIG_DIR", dir)
+	db, err := storage.OpenPath(filepath.Join(dir, "app.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	svc := NewSettingsService(db, nil)
+
+	prefs, err := svc.GetSearchPrefs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if prefs.Mode != domain.SearchModeContent {
+		t.Fatalf("default mode: %q", prefs.Mode)
+	}
+	prefs.Query = "needle"
+	prefs.Include = "*.go"
+	prefs.Exclude = "build"
+	prefs.Mode = domain.SearchModeFolders
+	prefs.ReplaceOpen = true
+	if err := svc.SaveSearchPrefs(prefs); err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.GetSearchPrefs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Query != "needle" || got.Mode != domain.SearchModeFolders || !got.ReplaceOpen {
+		t.Fatalf("got %+v", got)
+	}
+
+	if err := svc.AddSearchHistory("query", "needle"); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.AddSearchHistory("query", "other"); err != nil {
+		t.Fatal(err)
+	}
+	hist, err := svc.ListSearchHistory("query", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hist) < 2 || hist[0] != "other" {
+		t.Fatalf("hist=%#v", hist)
+	}
+}

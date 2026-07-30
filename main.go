@@ -77,6 +77,7 @@ func main() {
 	}
 
 	termSvc.SetApp(app)
+	fileSvc.SetApp(app)
 	service.AttachUpdateApp(updateSvc, app)
 
 	app.OnShutdown(func() {

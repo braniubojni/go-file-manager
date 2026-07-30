@@ -8,10 +8,10 @@
     "build:dev": "tsc && vite build --minify false --mode development",
     "build": "tsc && vite build --mode production",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit && oxlint . --quiet",
+    "lint": "tsc --noEmit && oxlint --config .oxlintrc.json --quiet",
+    "lint:fix": "oxlint --fix --config .oxlintrc.json",
     "knip": "knip",
-    "format": "oxfmt --write \"src/**/*.{ts,tsx,css,json}\"",
+    "format": "oxfmt --write --config .oxfmtrc.json \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "oxfmt --check \"src/**/*.{ts,tsx,css,json}\""
   },
   "dependencies": {

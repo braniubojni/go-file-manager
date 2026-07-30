@@ -732,23 +732,24 @@ wails3 task test:all
 
 ## Keyboard (defaults; editable in UI / shortcuts.json)
 
-| Binding                   | Action                               |
-| ------------------------- | ------------------------------------ |
-| Tab                       | Switch active pane                   |
-| ↑ / ↓                     | Move row selection (file list)       |
-| Enter                     | Open folder or open file with OS app |
-| F5                        | Refresh                              |
-| F2                        | Rename                               |
-| Delete                    | Delete                               |
-| Mod+Shift+C / X           | Copy / Move                          |
-| Alt+ArrowUp               | Parent folder                        |
-| Mod+, / Mod+/             | Settings / Shortcuts                 |
-| Ctrl+`                    | Toggle terminal under active pane    |
-| Mod+T                     | New tab (active pane)                |
-| Mod+W                     | Close tab (active pane)              |
-| Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab                  |
-| Double-click              | Enter directory / open file          |
-| Ctrl/Cmd+click            | Multi-select                         |
+| Binding                   | Action                                 |
+| ------------------------- | -------------------------------------- |
+| Tab                       | Switch active pane                     |
+| ↑ / ↓                     | Move row selection (file list)         |
+| Enter                     | Open folder or open file with OS app   |
+| F5                        | Refresh                                |
+| F2                        | Rename                                 |
+| Delete                    | Delete                                 |
+| Mod+Shift+C / X           | Copy / Move                            |
+| Alt+ArrowUp               | Parent folder                          |
+| Mod+, / Mod+/             | Settings / Shortcuts                   |
+| Mod+Shift+F               | Find in files (content / folder names) |
+| Ctrl+`                    | Toggle terminal under active pane      |
+| Mod+T                     | New tab (active pane)                  |
+| Mod+W                     | Close tab (active pane)                |
+| Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab                    |
+| Double-click              | Enter directory / open file            |
+| Ctrl/Cmd+click            | Multi-select                           |
 
 When adding a **new setting**, specify: key, type, default, allowed values, UI control, tooltip text, and where it is used.
 
@@ -756,11 +757,10 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 
 - Check all missing remote actions and implement them
 
+- When we do not have builtIn editor support(like in case of .pdf files) instead of message `binary or unsupported encoding:` let's open by default app
 - Redo option with 10 second in case of delete tooltip `Delete completed`
-- search
 - archives
 - FTP
 - compare dirs
 - viewer/editor
 - progress for large trees.
-  ~ (should be fixed, check needed) work on CI for all OS getting failed builds

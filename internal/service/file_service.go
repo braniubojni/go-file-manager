@@ -10,6 +10,7 @@ import (
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 	"github.com/erikharutyunyan/go-file-manager/internal/filesystem"
 	"github.com/erikharutyunyan/go-file-manager/internal/remote"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // FileService exposes filesystem operations to the frontend.
@@ -17,10 +18,22 @@ type FileService struct {
 	jobs   sync.Map // jobID -> *jobHandle
 	jobSeq atomic.Uint64
 	remote *remote.Manager
+	app    *application.App
 }
 
 func NewFileService(remoteMgr *remote.Manager) *FileService {
 	return &FileService{remote: remoteMgr}
+}
+
+// SetApp injects the application for search event emission (call after application.New).
+func (s *FileService) SetApp(app *application.App) {
+	s.app = app
+}
+
+func (s *FileService) emit(name string, data any) {
+	if s.app != nil {
+		s.app.Event.Emit(name, data)
+	}
 }
 
 type jobHandle struct {
@@ -257,6 +270,124 @@ func (s *FileService) SearchTree(root, query string, showHidden bool, limit int)
 		return nil, fmt.Errorf("go-to is not available on remote connections yet")
 	}
 	return filesystem.SearchTree(root, query, showHidden, limit)
+}
+
+// StartSearch runs a cancellable content or folder-name search and streams
+// events: search:hit, search:denied, search:done, search:error.
+// jobID should come from NewJobID. Mode is domain.SearchModeContent or SearchModeFolders.
+func (s *FileService) StartSearch(
+	jobID, root, query, mode, include, exclude string,
+	caseSensitive, showHidden bool,
+	limit int,
+) error {
+	if remote.IsRemote(root) {
+		return fmt.Errorf("search is not available on remote connections yet")
+	}
+	if jobID == "" {
+		return fmt.Errorf("jobID required")
+	}
+	ctx := s.jobCtx(jobID)
+	go s.runSearch(ctx, jobID, root, query, mode, include, exclude, caseSensitive, showHidden, limit)
+	return nil
+}
+
+func (s *FileService) runSearch(
+	ctx context.Context,
+	jobID, root, query, mode, include, exclude string,
+	caseSensitive, showHidden bool,
+	limit int,
+) {
+	defer func() { _ = s.FinishJob(jobID) }()
+
+	if mode == "" {
+		mode = domain.SearchModeContent
+	}
+	var (
+		truncated   bool
+		err         error
+		hitCount    int
+		deniedCount int
+	)
+
+	onDenied := func(path string, derr error) {
+		deniedCount++
+		msg := ""
+		if derr != nil {
+			msg = derr.Error()
+		}
+		s.emit("search:denied", domain.SearchDeniedPayload{
+			JobID: jobID,
+			Path:  path,
+			Error: msg,
+		})
+	}
+
+	switch mode {
+	case domain.SearchModeFolders:
+		truncated, err = filesystem.SearchFolders(ctx, root, query, include, exclude, showHidden, limit, filesystem.FolderSearchCallbacks{
+			OnHit: func(h domain.SearchHit) {
+				hitCount++
+				cp := h
+				s.emit("search:hit", domain.SearchHitPayload{
+					JobID:  jobID,
+					Mode:   domain.SearchModeFolders,
+					Folder: &cp,
+				})
+			},
+			OnDenied: onDenied,
+		})
+	default:
+		truncated, err = filesystem.SearchContent(ctx, root, query, include, exclude, showHidden, caseSensitive, limit, filesystem.ContentSearchCallbacks{
+			OnHit: func(h domain.ContentSearchHit) {
+				hitCount++
+				cp := h
+				s.emit("search:hit", domain.SearchHitPayload{
+					JobID:   jobID,
+					Mode:    domain.SearchModeContent,
+					Content: &cp,
+				})
+			},
+			OnDenied: onDenied,
+		})
+	}
+
+	if err != nil && ctx.Err() == nil {
+		s.emit("search:error", domain.SearchErrorPayload{JobID: jobID, Error: err.Error()})
+		return
+	}
+	s.emit("search:done", domain.SearchDonePayload{
+		JobID:       jobID,
+		Truncated:   truncated,
+		HitCount:    hitCount,
+		DeniedCount: deniedCount,
+	})
+}
+
+// ReplaceOccurrence replaces one content match at path:line:column.
+func (s *FileService) ReplaceOccurrence(path, find, replace string, line, column int, caseSensitive bool) error {
+	if remote.IsRemote(path) {
+		return fmt.Errorf("replace is not available on remote connections yet")
+	}
+	return filesystem.ReplaceOccurrence(path, find, replace, line, column, caseSensitive)
+}
+
+// ReplaceAllInPaths replaces find with replace in each path (all occurrences per file).
+func (s *FileService) ReplaceAllInPaths(paths []string, find, replace string, caseSensitive bool) (domain.ReplaceAllResult, error) {
+	for _, p := range paths {
+		if remote.IsRemote(p) {
+			return domain.ReplaceAllResult{}, fmt.Errorf("replace is not available on remote connections yet")
+		}
+	}
+	files, reps, err := filesystem.ReplaceAllInPaths(paths, find, replace, caseSensitive)
+	if err != nil {
+		return domain.ReplaceAllResult{}, err
+	}
+	return domain.ReplaceAllResult{FilesChanged: files, Replacements: reps}, nil
+}
+
+// OpenPrivacySettings opens OS privacy / full-disk access settings when possible.
+func (s *FileService) OpenPrivacySettings() error {
+	return config.OpenPrivacySettings()
 }
 
 // Open opens a path with the OS default application.

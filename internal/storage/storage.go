@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
@@ -102,8 +103,79 @@ CREATE TABLE IF NOT EXISTS remote_recent (
   label       TEXT NOT NULL,
   visited_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS search_history (
+  id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  field   TEXT NOT NULL,
+  value   TEXT NOT NULL,
+  used_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_search_history_field_value
+  ON search_history(field, value);
 `)
 	return err
+}
+
+const maxSearchHistoryPerField = 500
+
+// AddSearchHistory upserts a history value for field (query|replace|include|exclude)
+// and caps stored rows at maxSearchHistoryPerField per field.
+func (db *DB) AddSearchHistory(field, value string) error {
+	field = strings.TrimSpace(field)
+	value = strings.TrimSpace(value)
+	if field == "" || value == "" {
+		return nil
+	}
+	now := time.Now().UTC().Format("2006-01-02T15:04:05.000000000Z")
+	_, err := db.sql.Exec(`
+INSERT INTO search_history(field, value, used_at)
+VALUES(?, ?, ?)
+ON CONFLICT(field, value) DO UPDATE SET used_at = excluded.used_at
+`, field, value, now)
+	if err != nil {
+		return err
+	}
+	_, err = db.sql.Exec(`
+DELETE FROM search_history
+WHERE field = ? AND id NOT IN (
+  SELECT id FROM search_history
+  WHERE field = ?
+  ORDER BY used_at DESC, id DESC
+  LIMIT ?
+)
+`, field, field, maxSearchHistoryPerField)
+	return err
+}
+
+// ListSearchHistory returns newest-first history values for field (max limit).
+func (db *DB) ListSearchHistory(field string, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = maxSearchHistoryPerField
+	}
+	if limit > maxSearchHistoryPerField {
+		limit = maxSearchHistoryPerField
+	}
+	rows, err := db.sql.Query(`
+SELECT value FROM search_history
+WHERE field = ?
+ORDER BY used_at DESC, id DESC
+LIMIT ?
+`, field, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []string
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	if out == nil {
+		out = []string{}
+	}
+	return out, rows.Err()
 }
 
 // GetKV returns decrypted plaintext for key, or nil if missing.

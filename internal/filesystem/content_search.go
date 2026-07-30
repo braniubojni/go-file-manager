@@ -1,0 +1,360 @@
+package filesystem
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"unicode/utf8"
+
+	"github.com/erikharutyunyan/go-file-manager/internal/domain"
+)
+
+const (
+	defaultContentHitLimit  = 2000
+	maxContentSearchVisits  = 100_000
+	maxContentFileBytes     = 2 << 20 // 2 MiB
+	contentBinarySniffBytes = 8192
+)
+
+// ContentSearchCallbacks receive streaming results from SearchContent.
+type ContentSearchCallbacks struct {
+	OnHit    func(domain.ContentSearchHit)
+	OnDenied func(path string, err error)
+}
+
+// SearchContent walks root and finds literal text matches in files.
+func SearchContent(
+	ctx context.Context,
+	root, query, include, exclude string,
+	showHidden, caseSensitive bool,
+	limit int,
+	cb ContentSearchCallbacks,
+) (truncated bool, err error) {
+	if strings.TrimSpace(query) == "" {
+		return false, nil
+	}
+	abs, err := Resolve(root)
+	if err != nil {
+		return false, err
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, ErrNotFound
+		}
+		return false, err
+	}
+	if !info.IsDir() {
+		return false, fmt.Errorf("not a directory: %s", abs)
+	}
+	if limit <= 0 {
+		limit = defaultContentHitLimit
+	}
+
+	filter := NewPathFilter(include, exclude)
+	needle := query
+	if !caseSensitive {
+		needle = strings.ToLower(query)
+	}
+
+	type fileJob struct {
+		path string
+		rel  string
+	}
+
+	workers := runtime.NumCPU()
+	if workers < 2 {
+		workers = 2
+	}
+	if workers > 8 {
+		workers = 8
+	}
+
+	jobs := make(chan fileJob, workers*4)
+	var (
+		hitCount  atomic.Int64
+		visits    atomic.Int64
+		truncFlag atomic.Bool
+		wg        sync.WaitGroup
+	)
+
+	emitHit := func(h domain.ContentSearchHit) bool {
+		if int(hitCount.Load()) >= limit {
+			truncFlag.Store(true)
+			return false
+		}
+		n := hitCount.Add(1)
+		if int(n) > limit {
+			truncFlag.Store(true)
+			return false
+		}
+		if cb.OnHit != nil {
+			cb.OnHit(h)
+		}
+		return true
+	}
+
+	scanFile := func(job fileJob) {
+		if ctx.Err() != nil || truncFlag.Load() {
+			return
+		}
+		hits, err := scanFileContent(job.path, job.rel, needle, caseSensitive, limit-int(hitCount.Load()))
+		if err != nil {
+			if os.IsPermission(err) && cb.OnDenied != nil {
+				cb.OnDenied(job.path, err)
+			}
+			return
+		}
+		for _, h := range hits {
+			if !emitHit(h) {
+				return
+			}
+		}
+	}
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				scanFile(job)
+			}
+		}()
+	}
+
+	type pendingDir struct {
+		path string
+		rel  string
+	}
+	queue := []pendingDir{{path: abs, rel: ""}}
+
+walk:
+	for len(queue) > 0 {
+		if ctx.Err() != nil {
+			break
+		}
+		if truncFlag.Load() || int(hitCount.Load()) >= limit {
+			truncFlag.Store(true)
+			break
+		}
+		if int(visits.Load()) > maxContentSearchVisits {
+			truncFlag.Store(true)
+			break
+		}
+
+		current := queue[0]
+		queue = queue[1:]
+
+		entries, readErr := os.ReadDir(current.path)
+		if readErr != nil {
+			if os.IsPermission(readErr) && cb.OnDenied != nil {
+				cb.OnDenied(current.path, readErr)
+			}
+			continue
+		}
+
+		for _, entry := range entries {
+			if ctx.Err() != nil {
+				break walk
+			}
+			v := visits.Add(1)
+			if int(v) > maxContentSearchVisits {
+				truncFlag.Store(true)
+				break walk
+			}
+
+			name := entry.Name()
+			if !showHidden && strings.HasPrefix(name, ".") {
+				continue
+			}
+
+			rel := name
+			if current.rel != "" {
+				rel = filepath.ToSlash(filepath.Join(current.rel, name))
+			}
+			full := filepath.Join(current.path, name)
+
+			// Prefer Dir() without following symlinks for type checks.
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			if info.Mode()&os.ModeSymlink != 0 {
+				// Do not follow symlink directories; skip symlink files for content.
+				continue
+			}
+
+			if entry.IsDir() {
+				if !filter.MatchDir(rel) {
+					continue
+				}
+				queue = append(queue, pendingDir{path: full, rel: rel})
+				continue
+			}
+
+			if !filter.Match(rel) {
+				continue
+			}
+			if info.Size() > maxContentFileBytes || info.Size() == 0 {
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				break walk
+			case jobs <- fileJob{path: full, rel: rel}:
+			}
+		}
+	}
+
+	close(jobs)
+	wg.Wait()
+	if ctx.Err() != nil && ctx.Err() != context.Canceled {
+		return truncFlag.Load(), ctx.Err()
+	}
+	return truncFlag.Load(), nil
+}
+
+func scanFileContent(path, rel, needle string, caseSensitive bool, remaining int) ([]domain.ContentSearchHit, error) {
+	if remaining <= 0 {
+		return nil, nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+
+	// Sniff binary
+	head := make([]byte, contentBinarySniffBytes)
+	n, _ := io.ReadFull(f, head)
+	head = head[:n]
+	if bytes.IndexByte(head, 0) >= 0 {
+		return nil, nil
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+
+	var hits []domain.ContentSearchHit
+	scanner := bufio.NewScanner(f)
+	// Allow long lines up to 1MiB
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1<<20)
+
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		line := scanner.Text()
+		if !utf8.ValidString(line) {
+			return hits, nil // stop this file
+		}
+		searchLine := line
+		if !caseSensitive {
+			searchLine = strings.ToLower(line)
+		}
+		from := 0
+		for remaining > 0 {
+			idx := strings.Index(searchLine[from:], needle)
+			if idx < 0 {
+				break
+			}
+			start := from + idx
+			end := start + len(needle)
+			// For case-insensitive, needle length is in lowercased bytes; map via same byte indices
+			// since ToLower on ASCII-heavy code keeps length for common cases. For multi-byte
+			// we still use byte indices on the original line of equal length when possible.
+			matchStart, matchEnd := start, end
+			if !caseSensitive && len(line) != len(searchLine) {
+				// Fallback: find first occurrence only with EqualFold walk
+				matchStart, matchEnd = indexFold(line, needle, from)
+				if matchStart < 0 {
+					break
+				}
+				end = matchEnd
+			}
+			hits = append(hits, domain.ContentSearchHit{
+				Path:       path,
+				RelPath:    rel,
+				Line:       lineNo,
+				Column:     matchStart + 1,
+				LineText:   trimPreview(line, 240),
+				MatchStart: matchStart,
+				MatchEnd:   matchEnd,
+			})
+			remaining--
+			from = end
+			if from >= len(searchLine) {
+				break
+			}
+		}
+		if remaining <= 0 {
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return hits, err
+	}
+	return hits, nil
+}
+
+// indexFold finds needle (already lowercased) in s starting at from using EqualFold per rune span.
+func indexFold(s, needleLower string, from int) (start, end int) {
+	if from > len(s) {
+		return -1, -1
+	}
+	// Simple path: if same length mapping, use lower of s
+	lower := strings.ToLower(s)
+	if len(lower) == len(s) {
+		idx := strings.Index(lower[from:], needleLower)
+		if idx < 0 {
+			return -1, -1
+		}
+		st := from + idx
+		return st, st + len(needleLower)
+	}
+	// Rare unequal lower mapping: linear scan
+	nrunes := []rune(needleLower)
+	srunes := []rune(s)
+	// convert from byte to rune index approximately
+	ri := utf8.RuneCountInString(s[:from])
+	for i := ri; i+len(nrunes) <= len(srunes); i++ {
+		ok := true
+		for j := 0; j < len(nrunes); j++ {
+			if !strings.EqualFold(string(srunes[i+j]), string(nrunes[j])) {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			// map rune indices back to bytes
+			prefix := string(srunes[:i])
+			matched := string(srunes[i : i+len(nrunes)])
+			st := len(prefix)
+			return st, st + len(matched)
+		}
+	}
+	return -1, -1
+}
+
+func trimPreview(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	// cut on rune boundary
+	if max <= 1 {
+		return s[:max]
+	}
+	for max > 0 && !utf8.ValidString(s[:max]) {
+		max--
+	}
+	return s[:max] + "…"
+}
