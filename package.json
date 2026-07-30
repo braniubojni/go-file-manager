@@ -15,7 +15,7 @@
   },
   "lint-staged": {
     "*.go": "gofmt -w",
-    "frontend/src/**/*.{js,jsx,ts,tsx,mjs,cjs}": "npm run lint--prefix frontend",
+    "frontend/src/**/*.{js,jsx,ts,tsx,mjs,cjs}": "npm run lint --prefix frontend",
     "frontend/src/**/*.{ts,tsx,css,json}": "npm run format --prefix frontend"
   }
 }
