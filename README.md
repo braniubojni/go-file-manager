@@ -756,7 +756,8 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 
 - Check all missing remote actions and implement them
 
-- When we do not have builtIn editor support(like in case of .pdf files) instead of message `binary or unsupported encoding:` let's open by default app
+- If the built-in editor can’t open a file (e.g. PDFs), open it with the OS default app instead of showing “binary or unsupported encoding”.
+
 - Redo option with 10 second in case of delete tooltip `Delete completed`
 - archives
 - FTP
