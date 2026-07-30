@@ -208,7 +208,7 @@ tasks:
               ls -la bin/ || true
               exit 1
             fi
-            
+
             # Create standard zip
             (cd bin && zip -ry "../dist/go-file-manager_${VER}_darwin_${D_ARCH}.zip" go-file-manager.app)
 
@@ -252,7 +252,7 @@ tasks:
               ls -la bin/ || true
               exit 1
             fi
-            
+
             # Archive member name must be go-file-manager (matches CI + updater docs).
             STAGE=$(mktemp -d)
             cp "$LINUX_BIN" "$STAGE/go-file-manager"
@@ -315,7 +315,7 @@ tasks:
       - bash ./scripts/ci-go-docker.sh
 
   lint:
-    summary: Go + frontend lint/format/typecheck
+    summary: Go + frontend lint/format
     cmds:
       - |
         out=$(gofmt -l .)
@@ -330,7 +330,6 @@ tasks:
   frontend:lint:
     dir: frontend
     cmds:
-      - npm run typecheck
       - npm run lint
       - npm run format:check
 

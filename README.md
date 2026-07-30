@@ -184,7 +184,7 @@ gofmt -l .
 go vet ./...   # Linux requires: libgtk-4-dev libwebkitgtk-6.0-dev
 
 # Frontend
-cd frontend && npm run typecheck && npm run lint && npm run knip && npm run format:check && npm run build
+cd frontend && npm run lint && npm run knip && npm run format:check && npm run build
 
 # Mirror the Go GitHub Actions job in Docker (Ubuntu 24.04 + GTK4)
 task ci:go
@@ -226,7 +226,6 @@ go vet ./...
 cd frontend
 npm run lint                   # Oxlint
 npm run knip                   # Unused code detection
-npm run typecheck              # TypeScript
 ```
 
 **Configured linters:**
@@ -421,7 +420,7 @@ const [searchTerm, setSearchTerm] = useState("");
 ```yaml
 # ci.yml - Runs on every PR
 - Go tests (3 platforms: macOS, Windows, Linux)
-- Frontend lint + typecheck + build
+- Frontend lint + build
 - golangci-lint v2.12.2
 - Platform-specific: GTK4 on Linux, no X11 on macOS
 

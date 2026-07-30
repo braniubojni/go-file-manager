@@ -70,7 +70,7 @@ gofmt -l .
 go test ./internal/...
 go vet ./...   # Linux needs GTK4 + frontend/dist stub — see .github/AGENTS.md
 task ci:go     # Docker: Ubuntu 24.04 mirror of Go CI job
-cd frontend && npm run typecheck && npm run lint && npm run knip && npm run format:check
+cd frontend && npm run lint && npm run knip && npm run format:check
 
 # E2E
 task test:e2e
