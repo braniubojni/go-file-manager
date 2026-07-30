@@ -365,7 +365,7 @@ func OpenPrivacySettings() error {
 	case "windows":
 		return runDetached("cmd", "/c", "start", "", "ms-settings:privacy")
 	default:
-		// Linux: no standard privacy pane; open home as a harmless no-op alternative.
+		// Linux: no standard privacy pane; open system privacy settings manually for your distribution.
 		return fmt.Errorf("open system privacy settings manually for your distribution")
 	}
 }
