@@ -1,12 +1,14 @@
 package remote
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -38,11 +40,13 @@ type Manager struct {
 	keys     HostKeyStore
 }
 
-// Session is one connected SSH host.
+// Session is one connected SSH host (native Go crypto or system OpenSSH SFTP).
 type Session struct {
 	Spec   Spec
-	client *ssh.Client
+	client *ssh.Client // nil when using system OpenSSH
 	sftp   *sftp.Client
+	cmd    *exec.Cmd // system ssh process when client == nil
+	stderr *bytes.Buffer
 }
 
 // NewManager creates a session manager. keys may be nil (accept all first-seen; no persist).
@@ -54,7 +58,7 @@ func NewManager(keys HostKeyStore) *Manager {
 }
 
 // Connect dials SSH and opens SFTP. password may be empty (try keys/agent first).
-// When non-empty, password is tried as private-key passphrase and as server password.
+// Prefers system OpenSSH (`ssh -s sftp`) so ~/.ssh/config and host quirks match the CLI. Falls back to native Go crypto if OpenSSH fails (no binary, no keys, etc.).
 func (m *Manager) Connect(spec Spec, password string) error {
 	spec = EnrichSpec(spec)
 	if spec.Port <= 0 {
@@ -65,11 +69,47 @@ func (m *Manager) Connect(spec Spec, password string) error {
 	m.mu.Lock()
 	if existing, ok := m.sessions[key]; ok {
 		m.mu.Unlock()
-		// already connected
 		_ = existing
 		return nil
 	}
 	m.mu.Unlock()
+
+	if sess, err := dialOpenSSH(spec, password); err == nil {
+		return m.storeSession(key, sess)
+	} else if password == "" {
+		// Surface OpenSSH auth failure so UI can prompt for password/passphrase.
+		if strings.Contains(strings.ToLower(err.Error()), "authentication required") {
+			return err
+		}
+		// Fall through to native for non-auth OpenSSH failures (no binary, etc.)
+		if !strings.Contains(err.Error(), "openssh not found") {
+			// Still try native as last resort; keep OpenSSH error if both fail.
+			if err2 := m.connectNative(spec, password); err2 != nil {
+				return err // prefer OpenSSH diagnostic (matches CLI)
+			}
+			return nil
+		}
+	}
+
+	// (password retry, missing OpenSSH, etc.)
+	return m.connectNative(spec, password)
+}
+
+func (m *Manager) storeSession(key string, sess *Session) error {
+	m.mu.Lock()
+	if old, ok := m.sessions[key]; ok {
+		m.mu.Unlock()
+		_ = sess.closeTransport()
+		_ = old
+		return nil
+	}
+	m.sessions[key] = sess
+	m.mu.Unlock()
+	return nil
+}
+
+func (m *Manager) connectNative(spec Spec, password string) error {
+	key := spec.SessionKey()
 
 	auth, info := buildAuthMethods(spec.User, password, spec.IdentityFiles)
 	if len(auth) == 0 {
@@ -102,20 +142,7 @@ func (m *Manager) Connect(spec Spec, password string) error {
 		return fmt.Errorf("sftp: %w", err)
 	}
 
-	sess := &Session{Spec: spec, client: conn, sftp: sftpClient}
-
-	m.mu.Lock()
-	// Close race-created duplicate
-	if old, ok := m.sessions[key]; ok {
-		m.mu.Unlock()
-		_ = sftpClient.Close()
-		_ = conn.Close()
-		_ = old
-		return nil
-	}
-	m.sessions[key] = sess
-	m.mu.Unlock()
-	return nil
+	return m.storeSession(key, &Session{Spec: spec, client: conn, sftp: sftpClient})
 }
 
 // Disconnect closes a session by key (user@host:port) or any path under that host.
@@ -137,8 +164,7 @@ func (m *Manager) Disconnect(keyOrPath string) error {
 	if !ok {
 		return nil
 	}
-	_ = sess.sftp.Close()
-	return sess.client.Close()
+	return sess.closeTransport()
 }
 
 // ListSessions returns active session keys.
@@ -164,8 +190,7 @@ func (m *Manager) CloseAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for k, s := range m.sessions {
-		_ = s.sftp.Close()
-		_ = s.client.Close()
+		_ = s.closeTransport()
 		delete(m.sessions, k)
 	}
 }

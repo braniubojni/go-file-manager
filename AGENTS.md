@@ -93,4 +93,4 @@ task test:e2e
 ## Deferred / partial
 
 - Tabs: open in `todo.features.md`.
-- Remote SSH: list/ops + local↔remote copy/move; `~/.ssh/config` re-resolve + IdentityFile + workdir picker; deep “live remote” UX still evolving — don’t rip out without ask.
+- Remote SSH: prefer **system OpenSSH** (`ssh -s host sftp`) for connect (VS Code parity); fallback Go crypto; local↔remote copy/move; workdir picker.

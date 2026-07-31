@@ -754,11 +754,16 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 
 ## Later ideas
 
-- Check all missing remote actions and implement them
-
 - If the built-in editor can’t open a file (e.g. PDFs), open it with the OS default app instead of showing “binary or unsupported encoding”.
-
 - Redo option with 10 second in case of delete tooltip `Delete completed`
+- Add more verbose logging only for dev
+- Add back/forward buttons history
+- key handler for scroll into file and highlight(not selected)
+- Shorten paths, especially for SSH (e.g., `user@host:/path/to/dir` → `host:/path/to/dir`), but on hover show full path with ability to copy full path to clipboard. Copy to clipboard should also work for local paths and for short paths.
+- Redo option with 10 second in case of delete tooltip `Delete completed`
+- Ability to bookmark remote directories (SSH/SFTP) some icon in the bookmarks list to indicate remote vs local
+- Check remote folder size calculation (SSH/SFTP). Also in case of windows/linux remote folder size calculation, check if the folder is a symlink and if so, resolve the symlink to get the actual folder size.
+- search
 - archives
 - FTP
 - compare dirs
