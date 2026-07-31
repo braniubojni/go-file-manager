@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // @ts-ignore: Unused imports
 import * as domain$0 from "../domain/models.js";
 
+/**
+ * AddSearchHistory records a non-empty value for field (query|replace|include|exclude).
+ */
+export function AddSearchHistory(field: string, value: string): $CancellablePromise<void> {
+    return $Call.ByID(3012693094, field, value);
+}
+
 export function GetConfigDir(): $CancellablePromise<string> {
     return $Call.ByID(780043014);
 }
@@ -27,6 +34,13 @@ export function GetConfigDir(): $CancellablePromise<string> {
  */
 export function GetPaneTabs(): $CancellablePromise<domain$0.PaneTabs> {
     return $Call.ByID(1411864435);
+}
+
+/**
+ * GetSearchPrefs returns last Find-in-files dialog fields.
+ */
+export function GetSearchPrefs(): $CancellablePromise<domain$0.SearchPrefs> {
+    return $Call.ByID(2690969973);
 }
 
 export function GetSettings(): $CancellablePromise<domain$0.Settings> {
@@ -43,6 +57,13 @@ export function GetShortcuts(): $CancellablePromise<{ [_ in string]?: string } |
 
 export function GetShortcutsPath(): $CancellablePromise<string> {
     return $Call.ByID(378564007);
+}
+
+/**
+ * ListSearchHistory returns newest-first history for field (max 500).
+ */
+export function ListSearchHistory(field: string, limit: number): $CancellablePromise<string[] | null> {
+    return $Call.ByID(151217717, field, limit);
 }
 
 export function ListShortcutDefs(): $CancellablePromise<domain$0.ShortcutDef[] | null> {
@@ -63,6 +84,13 @@ export function RevealInOS(path: string): $CancellablePromise<void> {
  */
 export function SavePaneTabs(tabs: domain$0.PaneTabs): $CancellablePromise<void> {
     return $Call.ByID(4028892756, tabs);
+}
+
+/**
+ * SaveSearchPrefs persists Find-in-files dialog fields.
+ */
+export function SaveSearchPrefs(prefs: domain$0.SearchPrefs): $CancellablePromise<void> {
+    return $Call.ByID(3692396904, prefs);
 }
 
 export function SaveSettings(settings: domain$0.Settings): $CancellablePromise<void> {

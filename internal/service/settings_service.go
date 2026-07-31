@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	kvSettings  = "settings"
-	kvShortcuts = "shortcuts"
-	kvTabs      = "tabs"
+	kvSettings    = "settings"
+	kvShortcuts   = "shortcuts"
+	kvTabs        = "tabs"
+	kvSearchPrefs = "search_prefs"
 )
 
 // SettingsService persists app settings and shortcuts in encrypted SQLite (app.db).
@@ -205,6 +206,57 @@ func (s *SettingsService) OpenInOS(path string) error {
 
 func (s *SettingsService) RevealInOS(path string) error {
 	return config.RevealInOS(path)
+}
+
+// GetSearchPrefs returns last Find-in-files dialog fields.
+func (s *SettingsService) GetSearchPrefs() (domain.SearchPrefs, error) {
+	raw, err := s.db.GetKV(kvSearchPrefs)
+	if err != nil {
+		return domain.SearchPrefs{}, err
+	}
+	if raw == nil {
+		return defaultSearchPrefs(), nil
+	}
+	var p domain.SearchPrefs
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return defaultSearchPrefs(), nil
+	}
+	return normalizeSearchPrefs(p), nil
+}
+
+// SaveSearchPrefs persists Find-in-files dialog fields.
+func (s *SettingsService) SaveSearchPrefs(prefs domain.SearchPrefs) error {
+	prefs = normalizeSearchPrefs(prefs)
+	data, err := json.Marshal(prefs)
+	if err != nil {
+		return err
+	}
+	return s.db.SetKV(kvSearchPrefs, data)
+}
+
+// AddSearchHistory records a non-empty value for field (query|replace|include|exclude).
+func (s *SettingsService) AddSearchHistory(field, value string) error {
+	return s.db.AddSearchHistory(field, value)
+}
+
+// ListSearchHistory returns newest-first history for field (max 500).
+func (s *SettingsService) ListSearchHistory(field string, limit int) ([]string, error) {
+	return s.db.ListSearchHistory(field, limit)
+}
+
+func defaultSearchPrefs() domain.SearchPrefs {
+	return domain.SearchPrefs{
+		Mode: domain.SearchModeContent,
+	}
+}
+
+func normalizeSearchPrefs(p domain.SearchPrefs) domain.SearchPrefs {
+	switch p.Mode {
+	case domain.SearchModeContent, domain.SearchModeFolders:
+	default:
+		p.Mode = domain.SearchModeContent
+	}
+	return p
 }
 
 // migrateJSONIfNeeded imports settings.json / shortcuts.json when present.

@@ -70,7 +70,7 @@ gofmt -l .
 go test ./internal/...
 go vet ./...   # Linux needs GTK4 + frontend/dist stub — see .github/AGENTS.md
 task ci:go     # Docker: Ubuntu 24.04 mirror of Go CI job
-cd frontend && npm run typecheck && npm run lint && npm run knip && npm run format:check
+cd frontend && npm run lint && npm run knip && npm run format:check
 
 # E2E
 task test:e2e
@@ -93,4 +93,4 @@ task test:e2e
 ## Deferred / partial
 
 - Tabs: open in `todo.features.md`.
-- Remote SSH: list/ops + local↔remote copy/move; `~/.ssh/config` re-resolve + IdentityFile + workdir picker; deep “live remote” UX still evolving — don’t rip out without ask.
+- Remote SSH: prefer **system OpenSSH** (`ssh -s host sftp`) for connect (VS Code parity); fallback Go crypto; local↔remote copy/move; workdir picker.

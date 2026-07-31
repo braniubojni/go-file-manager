@@ -4,6 +4,7 @@ import { useEditorStore } from '../../../features/editor/editorStore';
 import { useFileOpsStore } from '../../../features/file-ops/fileOpsStore';
 import { useGoToStore } from '../../../features/go-to/goToStore';
 import { usePaneStore } from '../../../features/pane/paneStore';
+import { useSearchStore } from '../../../features/search/searchStore';
 import { useTerminalStore } from '../../../features/terminal/terminalStore';
 import { useDialogStore } from '../../../features/ui/dialogStore';
 import { findMatchingAction, isCtrlBackquote } from '../../../shared/lib/shortcuts';
@@ -20,6 +21,7 @@ export const useFileManagerKeyboard = () => {
   const trigger = useFileOpsStore((s) => s.trigger);
   const toggleTerminal = useTerminalStore((s) => s.toggleActive);
   const openGoTo = useGoToStore((s) => s.openGoTo);
+  const openSearch = useSearchStore((s) => s.openSearch);
 
   useEffect(() => {
     const map = buildShortcutMap(shortcutDefs);
@@ -36,6 +38,15 @@ export const useFileManagerKeyboard = () => {
         return;
       }
 
+      // Find in files: Mod+Shift+F (works with editor open too)
+      if (findMatchingAction(e, map) === 'openSearch') {
+        e.preventDefault();
+        const path = usePaneStore.getState().getPath(usePaneStore.getState().activePane);
+        if (path.startsWith('ssh://')) return;
+        openSearch();
+        return;
+      }
+
       if (isCtrlBackquote(e) || findMatchingAction(e, map) === 'toggleTerminal') {
         if (editorOpen) return;
         if (isCtrlBackquote(e) || map.toggleTerminal) {
@@ -48,7 +59,7 @@ export const useFileManagerKeyboard = () => {
         }
       }
 
-      // While editor open, only allow a few globals (settings/shortcuts)
+      // While editor open, only allow a few globals (settings/shortcuts/search)
       if (editorOpen) {
         if (isEditableTarget(e.target)) return;
         const action = findMatchingAction(e, map);
@@ -58,6 +69,9 @@ export const useFileManagerKeyboard = () => {
         } else if (action === 'openShortcuts') {
           e.preventDefault();
           openShortcuts();
+        } else if (action === 'openSearch') {
+          e.preventDefault();
+          openSearch();
         }
         return;
       }
@@ -181,6 +195,9 @@ export const useFileManagerKeyboard = () => {
         case 'goTo':
           openGoTo();
           break;
+        case 'openSearch':
+          openSearch();
+          break;
         case 'goParent':
           trigger('goParent');
           break;
@@ -256,5 +273,6 @@ export const useFileManagerKeyboard = () => {
     settings,
     toggleTerminal,
     openGoTo,
+    openSearch,
   ]);
 };

@@ -95,6 +95,77 @@ type SearchHit struct {
 	RelPath string `json:"relPath"`
 }
 
+// Search mode values for Find-in-files dialog.
+const (
+	SearchModeContent = "content"
+	SearchModeFolders = "folders"
+)
+
+// ContentSearchHit is one text match inside a file.
+type ContentSearchHit struct {
+	Path       string `json:"path"`
+	RelPath    string `json:"relPath"`
+	Line       int    `json:"line"`       // 1-based
+	Column     int    `json:"column"`     // 1-based start of match
+	LineText   string `json:"lineText"`   // single line preview
+	MatchStart int    `json:"matchStart"` // 0-based rune/byte index in LineText
+	MatchEnd   int    `json:"matchEnd"`   // exclusive
+}
+
+// SearchPrefs is the last Find-in-files dialog state (persisted).
+type SearchPrefs struct {
+	Query         string `json:"query"`
+	Replace       string `json:"replace"`
+	Include       string `json:"include"`
+	Exclude       string `json:"exclude"`
+	Mode          string `json:"mode"` // content | folders
+	ReplaceOpen   bool   `json:"replaceOpen"`
+	CaseSensitive bool   `json:"caseSensitive"`
+}
+
+// SearchDonePayload is emitted when a streaming search finishes.
+type SearchDonePayload struct {
+	JobID       string `json:"jobId"`
+	Truncated   bool   `json:"truncated"`
+	HitCount    int    `json:"hitCount"`
+	DeniedCount int    `json:"deniedCount"`
+}
+
+// SearchHitPayload wraps a streaming search hit for the UI.
+type SearchHitPayload struct {
+	JobID   string            `json:"jobId"`
+	Mode    string            `json:"mode"` // content | folders
+	Content *ContentSearchHit `json:"content,omitempty"`
+	Folder  *SearchHit        `json:"folder,omitempty"`
+}
+
+// SearchDeniedPayload is one path the walker could not open.
+type SearchDeniedPayload struct {
+	JobID string `json:"jobId"`
+	Path  string `json:"path"`
+	Error string `json:"error"`
+}
+
+// SearchErrorPayload is a fatal search failure.
+type SearchErrorPayload struct {
+	JobID string `json:"jobId"`
+	Error string `json:"error"`
+}
+
+// ReplaceAllRequest replaces find with replace across paths (content mode).
+type ReplaceAllRequest struct {
+	Paths         []string `json:"paths"`
+	Find          string   `json:"find"`
+	Replace       string   `json:"replace"`
+	CaseSensitive bool     `json:"caseSensitive"`
+}
+
+// ReplaceAllResult summarizes a batch replace.
+type ReplaceAllResult struct {
+	FilesChanged int `json:"filesChanged"`
+	Replacements int `json:"replacements"`
+}
+
 // ShortcutDef describes one bindable action (for UI + docs).
 type ShortcutDef struct {
 	ID          string `json:"id"`

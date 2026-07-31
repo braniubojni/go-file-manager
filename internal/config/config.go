@@ -89,6 +89,7 @@ func DefaultShortcuts() map[string]string {
 		"editFile":         "F4",
 		"gitDiff":          "Mod+Shift+D",
 		"goTo":             "Mod+P",
+		"openSearch":       "Mod+Shift+F",
 		"goParent":         "Alt+ArrowUp",
 		"goHome":           "Mod+Home",
 		"goBack":           "Backspace",
@@ -122,6 +123,7 @@ func ShortcutCatalog() []domain.ShortcutDef {
 		{"editFile", "Edit file", "Open the selected file in the built-in editor"},
 		{"gitDiff", "Git diff", "Side-by-side HEAD vs working tree in the built-in editor"},
 		{"goTo", "Go to file/folder", "Quick open nested files and folders in the active pane (Mod+P)"},
+		{"openSearch", "Find in files", "Search file contents or folder names under the active pane (Mod+Shift+F)"},
 		{"goParent", "Parent folder", "Go to the parent of the active pane"},
 		{"goHome", "Home", "Go to the home directory in the active pane"},
 		{"goBack", "Back", "Navigate back in the active pane history (also mouse back button)"},
@@ -348,6 +350,24 @@ func OpenInOS(path string) error {
 // RevealInOS reveals path in the file manager (Finder/Explorer).
 func RevealInOS(path string) error {
 	return openPath(path, true)
+}
+
+// OpenPrivacySettings opens OS privacy settings for disk access when possible.
+// Best-effort: Full Disk Access cannot be granted programmatically on macOS.
+func OpenPrivacySettings() error {
+	switch runtime.GOOS {
+	case "darwin":
+		// Prefer Full Disk Access pane; falls back if URL scheme fails.
+		if err := runDetached("open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"); err == nil {
+			return nil
+		}
+		return runDetached("open", "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension")
+	case "windows":
+		return runDetached("cmd", "/c", "start", "", "ms-settings:privacy")
+	default:
+		// Linux: no standard privacy pane; open system privacy settings manually for your distribution.
+		return fmt.Errorf("open system privacy settings manually for your distribution")
+	}
 }
 
 func openPath(path string, reveal bool) error {

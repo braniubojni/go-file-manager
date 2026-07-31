@@ -189,3 +189,53 @@ func TestRemoteRecent_isolatedBySessionKey(t *testing.T) {
 		t.Errorf("session B isolation failed: %+v", listB)
 	}
 }
+
+func TestSearchHistoryCap(t *testing.T) {
+	db, err := OpenPath(filepath.Join(t.TempDir(), "hist.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+
+	if err := db.AddSearchHistory("query", "  "); err != nil {
+		t.Fatal(err)
+	}
+	list, err := db.ListSearchHistory("query", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("blank should be ignored: %#v", list)
+	}
+
+	for i := 0; i < 10; i++ {
+		if err := db.AddSearchHistory("query", fmt.Sprintf("q-%d", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// re-use old entry — should move to top
+	if err := db.AddSearchHistory("query", "q-0"); err != nil {
+		t.Fatal(err)
+	}
+	list, err = db.ListSearchHistory("query", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 10 || list[0] != "q-0" {
+		t.Fatalf("got %#v", list)
+	}
+
+	// cap at maxSearchHistoryPerField
+	for i := 0; i < maxSearchHistoryPerField+20; i++ {
+		if err := db.AddSearchHistory("include", fmt.Sprintf("inc-%d", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list, err = db.ListSearchHistory("include", 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != maxSearchHistoryPerField {
+		t.Fatalf("want cap %d got %d", maxSearchHistoryPerField, len(list))
+	}
+}

@@ -11,6 +11,7 @@ import Toolbar from '@mui/material/Toolbar';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type FC, type MouseEvent } from 'react';
 import { usePatchSettings, useSettings } from '../../entities/file/queries';
+import { useSearchStore } from '../../features/search/searchStore';
 import { useDialogStore } from '../../features/ui/dialogStore';
 import { errMessage } from '../../shared/lib/format';
 import { useSnack } from '../../shared/ui/SnackbarHost';
@@ -30,6 +31,7 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
   const show = useSnack((s) => s.show);
   const openSettings = useDialogStore((s) => s.openSettings);
   const openShortcuts = useDialogStore((s) => s.openShortcuts);
+  const openSearch = useSearchStore((s) => s.openSearch);
   const qc = useQueryClient();
 
   const [fileAnchor, setFileAnchor] = useState<null | HTMLElement>(null);
@@ -116,6 +118,15 @@ export const AppMenuBar: FC<AppMenuBarProps> = ({
             Delete
           </MenuItem>
           <Divider />
+          <MenuItem
+            data-testid="menu-file-search"
+            onClick={() => {
+              closeAll();
+              openSearch();
+            }}
+          >
+            Find in files…
+          </MenuItem>
           <MenuItem
             data-testid="menu-file-settings"
             onClick={() => {

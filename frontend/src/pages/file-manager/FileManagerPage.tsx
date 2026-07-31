@@ -8,6 +8,7 @@ import { useAutoUpdateCheck } from '../../features/updates/hooks/useAutoUpdateCh
 import { FilePane } from '../../widgets/file-pane/FilePane';
 import { GoToHost } from '../../widgets/go-to/GoToHost';
 import { AppMenuBar } from '../../widgets/menu/AppMenuBar';
+import { SearchHost } from '../../widgets/search/SearchHost';
 import { StatusBar } from '../../widgets/status-bar/StatusBar';
 import { Toolbar } from '../../widgets/toolbar/Toolbar';
 import { useFileManagerKeyboard } from './hooks/useFileManagerKeyboard';
@@ -75,6 +76,7 @@ export const FileManagerPage: FC = () => {
       )}
       {!editorOpen && <StatusBar />}
       <GoToHost />
+      <SearchHost />
 
       <Suspense fallback={null}>
         {settingsOpen && <SettingsDialog open={settingsOpen} onClose={closeSettings} />}

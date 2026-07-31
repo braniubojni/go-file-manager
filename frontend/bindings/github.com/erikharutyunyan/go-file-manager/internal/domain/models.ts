@@ -186,6 +186,14 @@ export interface RemoteRecent {
 }
 
 /**
+ * ReplaceAllResult summarizes a batch replace.
+ */
+export interface ReplaceAllResult {
+    "filesChanged": number;
+    "replacements": number;
+}
+
+/**
  * SSHConfigHost is a host entry from an OpenSSH client config file.
  */
 export interface SSHConfigHost {
@@ -204,6 +212,23 @@ export interface SearchHit {
     "path": string;
     "isDir": boolean;
     "relPath": string;
+}
+
+/**
+ * SearchPrefs is the last Find-in-files dialog state (persisted).
+ */
+export interface SearchPrefs {
+    "query": string;
+    "replace": string;
+    "include": string;
+    "exclude": string;
+
+    /**
+     * content | folders
+     */
+    "mode": string;
+    "replaceOpen": boolean;
+    "caseSensitive": boolean;
 }
 
 /**

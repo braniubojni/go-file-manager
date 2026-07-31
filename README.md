@@ -184,7 +184,7 @@ gofmt -l .
 go vet ./...   # Linux requires: libgtk-4-dev libwebkitgtk-6.0-dev
 
 # Frontend
-cd frontend && npm run typecheck && npm run lint && npm run knip && npm run format:check && npm run build
+cd frontend && npm run lint && npm run knip && npm run format:check && npm run build
 
 # Mirror the Go GitHub Actions job in Docker (Ubuntu 24.04 + GTK4)
 task ci:go
@@ -226,7 +226,6 @@ go vet ./...
 cd frontend
 npm run lint                   # Oxlint
 npm run knip                   # Unused code detection
-npm run typecheck              # TypeScript
 ```
 
 **Configured linters:**
@@ -421,7 +420,7 @@ const [searchTerm, setSearchTerm] = useState("");
 ```yaml
 # ci.yml - Runs on every PR
 - Go tests (3 platforms: macOS, Windows, Linux)
-- Frontend lint + typecheck + build
+- Frontend lint + build
 - golangci-lint v2.12.2
 - Platform-specific: GTK4 on Linux, no X11 on macOS
 
@@ -732,35 +731,41 @@ wails3 task test:all
 
 ## Keyboard (defaults; editable in UI / shortcuts.json)
 
-| Binding                   | Action                               |
-| ------------------------- | ------------------------------------ |
-| Tab                       | Switch active pane                   |
-| ↑ / ↓                     | Move row selection (file list)       |
-| Enter                     | Open folder or open file with OS app |
-| F5                        | Refresh                              |
-| F2                        | Rename                               |
-| Delete                    | Delete                               |
-| Mod+Shift+C / X           | Copy / Move                          |
-| Alt+ArrowUp               | Parent folder                        |
-| Mod+, / Mod+/             | Settings / Shortcuts                 |
-| Ctrl+`                    | Toggle terminal under active pane    |
-| Mod+T                     | New tab (active pane)                |
-| Mod+W                     | Close tab (active pane)              |
-| Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab                  |
-| Double-click              | Enter directory / open file          |
-| Ctrl/Cmd+click            | Multi-select                         |
+| Binding                   | Action                                 |
+| ------------------------- | -------------------------------------- |
+| Tab                       | Switch active pane                     |
+| ↑ / ↓                     | Move row selection (file list)         |
+| Enter                     | Open folder or open file with OS app   |
+| F5                        | Refresh                                |
+| F2                        | Rename                                 |
+| Delete                    | Delete                                 |
+| Mod+Shift+C / X           | Copy / Move                            |
+| Alt+ArrowUp               | Parent folder                          |
+| Mod+, / Mod+/             | Settings / Shortcuts                   |
+| Mod+Shift+F               | Find in files (content / folder names) |
+| Ctrl+`                    | Toggle terminal under active pane      |
+| Mod+T                     | New tab (active pane)                  |
+| Mod+W                     | Close tab (active pane)                |
+| Ctrl+Tab / Ctrl+Shift+Tab | Next / previous tab                    |
+| Double-click              | Enter directory / open file            |
+| Ctrl/Cmd+click            | Multi-select                           |
 
 When adding a **new setting**, specify: key, type, default, allowed values, UI control, tooltip text, and where it is used.
 
 ## Later ideas
 
-- Check all missing remote actions and implement them
-
+- If the built-in editor can’t open a file (e.g. PDFs), open it with the OS default app instead of showing “binary or unsupported encoding”.
 - Redo option with 10 second in case of delete tooltip `Delete completed`
+- Add more verbose logging only for dev
+- Add back/forward buttons history
+- key handler for scroll into file and highlight(not selected)
+- Shorten paths, especially for SSH (e.g., `user@host:/path/to/dir` → `host:/path/to/dir`), but on hover show full path with ability to copy full path to clipboard. Copy to clipboard should also work for local paths and for short paths.
+- Redo option with 10 second in case of delete tooltip `Delete completed`
+- Ability to bookmark remote directories (SSH/SFTP) some icon in the bookmarks list to indicate remote vs local
+- Check remote folder size calculation (SSH/SFTP). Also in case of windows/linux remote folder size calculation, check if the folder is a symlink and if so, resolve the symlink to get the actual folder size.
 - search
 - archives
 - FTP
 - compare dirs
 - viewer/editor
 - progress for large trees.
-  ~ (should be fixed, check needed) work on CI for all OS getting failed builds

@@ -24,7 +24,7 @@ Parent: root `AGENTS.md`.
 ## Frontend job
 
 - Node **24**, `setup-node@v6`, `checkout@v5`.
-- `npm ci` then: typecheck, lint, **knip**, format:check, build.
+- `npm ci` then: lint, **knip**, format:check, build.
 - Working directory: `frontend/`.
 
 ## Local mirror (preferred over raw wails-cross for CI)

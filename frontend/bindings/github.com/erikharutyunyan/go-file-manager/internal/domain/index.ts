@@ -12,8 +12,10 @@ export type {
     GitStatusEntry,
     PaneTabs,
     RemoteRecent,
+    ReplaceAllResult,
     SSHConfigHost,
     SearchHit,
+    SearchPrefs,
     Settings,
     ShortcutDef,
     TabState

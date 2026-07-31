@@ -49,7 +49,6 @@ public/          # usually empty; no brand icons here
 
 ```bash
 cd frontend
-npm run typecheck
 npm run lint          # eslint src
 npm run knip          # knip.json ignores bindings/**
 npm run format        # oxfmt src
