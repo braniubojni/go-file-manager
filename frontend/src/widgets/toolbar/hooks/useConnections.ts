@@ -1,9 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useReducer, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import {
   addConnectionReducer,
   initialAddConnectionState,
 } from '../../../features/connections/addConnectionReducer';
+import {
+  useConnectRequestStore,
+  type ConnectRequest,
+} from '../../../features/connections/connectRequestStore';
+import { ensureSessionThenNavigate } from '../../../features/connections/navigate';
 import {
   isAuthErrorMessage,
   resolveRemoteWorkdirInput,
@@ -154,6 +159,11 @@ export const useConnections = () => {
     }
   };
 
+  const onForgetRecent = (path: string) => {
+    dispatch({ type: 'remove_workdir_path', path });
+    void ConnectionService.RemoveRecentPath(path).catch((e) => show(errMessage(e), 'error'));
+  };
+
   const onMenuConnect = (p: ConnectionProfile) => {
     setAnchor(null);
     void connectProfile(p.id);
@@ -179,6 +189,53 @@ export const useConnections = () => {
     }
   };
 
+  /**
+   * A pane (bookmark jump / reconnect prompt) hit an auth wall. Reuse this
+   * dialog for the password instead of owning a second one, then send the pane
+   * to the path it originally asked for — no workdir picker, the target is known.
+   */
+  const pendingConnect = useConnectRequestStore((s) => s.request);
+  const pendingNonce = useConnectRequestStore((s) => s.nonce);
+  useEffect(() => {
+    if (!pendingConnect) return;
+    setAnchor(null);
+    dispatch({
+      type: 'open_password',
+      profileId: pendingConnect.profileId ?? '',
+      label: pendingConnect.label,
+    });
+    // nonce re-opens the dialog even for a repeat of the same request
+  }, [pendingConnect, pendingNonce]);
+
+  // Drop the pending request when the password dialog goes away (cancel or
+  // success), so a later unrelated password prompt can't inherit it.
+  const inPasswordDialog = useRef(false);
+  useEffect(() => {
+    if (dialog.open && dialog.mode === 'password') {
+      inPasswordDialog.current = true;
+      return;
+    }
+    if (inPasswordDialog.current) {
+      inPasswordDialog.current = false;
+      useConnectRequestStore.getState().consume();
+    }
+  }, [dialog.open, dialog.mode]);
+
+  const submitPendingConnect = async (req: ConnectRequest) => {
+    try {
+      if (req.profileId) await ConnectionService.ConnectProfile(req.profileId, dialog.password);
+      else await ConnectionService.ConnectSpec(req.spec ?? '', dialog.password, false);
+    } catch (e) {
+      const msg = errMessage(e);
+      dispatch({ type: 'set_error', error: msg });
+      return;
+    }
+    useConnectRequestStore.getState().consume();
+    dispatch({ type: 'close' });
+    refresh();
+    await ensureSessionThenNavigate(req.paneId, req.targetPath);
+  };
+
   const submitDialog = async () => {
     if (dialog.mode === 'workdir') {
       await confirmWorkdir();
@@ -186,6 +243,10 @@ export const useConnections = () => {
     }
     dispatch({ type: 'set_busy', busy: true });
     try {
+      if (dialog.mode === 'password' && pendingConnect) {
+        await submitPendingConnect(pendingConnect);
+        return;
+      }
       if (dialog.mode === 'ssh_config') {
         if (dialog.selectedConfigHost) {
           await connectFromConfig(dialog.selectedConfigHost, dialog.password);
@@ -234,6 +295,7 @@ export const useConnections = () => {
     onMenuConnect,
     onDisconnect,
     onRemove,
+    onForgetRecent,
     submitDialog,
     openSSHConfigMode,
     loadSSHConfig,

@@ -12,6 +12,7 @@ Dual-pane desktop file manager (Double Commander style) built with **Wails v3**,
 - Navigate: enter folder, parent, Autocomplete path bar, home
 - Multi-select (Ctrl/Cmd+click)
 - Copy / Move to opposite pane
+- Drag-and-drop: internal between panes/folders (badge `+` copy / `−` move — hold **⌘** on macOS or **Ctrl** on Win/Linux **before** starting the drag; WebKit does not deliver Cmd mid-HTML5-drag). **OS → app** copies into pane/folder (no badge). Same-folder drop cancels. Drag **out** to the OS is not supported yet
 - Delete, rename, create folder
 - Bookmarks (SQLite)
 - Theme: **system / dark / light** (default system)
@@ -754,18 +755,13 @@ When adding a **new setting**, specify: key, type, default, allowed values, UI c
 
 ## Later ideas
 
-- If the built-in editor can’t open a file (e.g. PDFs), open it with the OS default app instead of showing “binary or unsupported encoding”.
-- Redo option with 10 second in case of delete tooltip `Delete completed`
-- Add more verbose logging only for dev
-- Add back/forward buttons history
-- key handler for scroll into file and highlight(not selected)
-- Shorten paths, especially for SSH (e.g., `user@host:/path/to/dir` → `host:/path/to/dir`), but on hover show full path with ability to copy full path to clipboard. Copy to clipboard should also work for local paths and for short paths.
-- Redo option with 10 second in case of delete tooltip `Delete completed`
-- Ability to bookmark remote directories (SSH/SFTP) some icon in the bookmarks list to indicate remote vs local
-- Check remote folder size calculation (SSH/SFTP). Also in case of windows/linux remote folder size calculation, check if the folder is a symlink and if so, resolve the symlink to get the actual folder size.
-- search
-- archives
-- FTP
-- compare dirs
-- viewer/editor
-- progress for large trees.
+[] Key handler for scroll into file and highlight (not selected) + when user keeps clicking we scroll into the next file
+[] Remote bookmarked directories (SSH/SFTP) some colored icon in the bookmarks list to indicate remote vs local
+[] Lazy task manager where u can see running resources graphs the same way as we have in windows task manager MUI charts can be used + ability to search by port, process name, etc.
+[] 
+
+[] Archives we still need to support `rar` format
+[] FTP
+[] Compare dirs
+[] Viewer/editor
+[] Progress for large trees

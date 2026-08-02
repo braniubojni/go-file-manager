@@ -1,3 +1,17 @@
+/**
+ * Session key (`user@host:port`) for an `ssh://` virtual path — mirrors
+ * `remote.Spec.SessionKey` in internal/remote/path.go. Null for local paths.
+ */
+export const sessionKeyFromPath = (path: string): string | null => {
+  const m = path.match(/^ssh:\/\/([^@/]+)@([^/:]+)(?::(\d+))?(?:\/|$)/i);
+  if (!m) return null;
+  return `${m[1]}@${m[2]}:${m[3] || '22'}`;
+};
+
+/** True when the pane error means the SSH session is gone / never dialled. */
+export const isNotConnectedMessage = (msg: string): boolean =>
+  /not connected to .*connect first/i.test(msg);
+
 export const isAuthErrorMessage = (msg: string): boolean => {
   const m = msg.toLowerCase();
   return (

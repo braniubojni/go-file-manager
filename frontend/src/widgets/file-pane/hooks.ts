@@ -24,6 +24,7 @@ import {
 } from '../../entities/file/queries';
 import type { FileEntry, PaneId } from '../../entities/file/types';
 import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
+import { useContextMenuStore } from '../../features/file-ops/contextMenuStore';
 import { useFolderSizeStore } from '../../features/folder-size/folderSizeStore';
 import { newJobId, usePaneJobStore } from '../../features/jobs/paneJobStore';
 import { usePaneStore } from '../../features/pane/paneStore';
@@ -38,13 +39,17 @@ import {
   allSameParentAsDest,
   displayName,
   enterPaneTab,
+  findTypeAheadPath,
   isCellKeyboardEvent,
   isNestedInSelf,
+  isTypeAheadKey,
   mapChildSizes,
   parentOfPath,
   sortRowsPinParent,
 } from './helpers';
 import type { DragPayload, FileTableProps } from './types';
+
+const TYPE_AHEAD_RESET_MS = 800;
 
 type GridKeyboardHelpers = {
   __gfmMoveFocus?: (d: number, extend?: boolean) => void;
@@ -53,6 +58,13 @@ type GridKeyboardHelpers = {
   __gfmToggleMulti?: () => void;
   __gfmFocusHome?: () => void;
   __gfmFocusEnd?: () => void;
+};
+
+/** Typing inside an embedded input must not reach grid navigation. */
+const isEditingTarget = (target: EventTarget | null): boolean => {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || Boolean(el.isContentEditable);
 };
 
 export const useFilePane = (id: PaneId) => {
@@ -94,6 +106,7 @@ export const useFilePane = (id: PaneId) => {
   const toggleTerminal = useTerminalStore((s) => s.toggle);
 
   const folderSizes = useFolderSizeStore((s) => s.getSizes(id));
+  const deniedPaths = useFolderSizeStore((s) => s.getDenied(id));
   const beginSizes = useFolderSizeStore((s) => s.begin);
   const finishSizes = useFolderSizeStore((s) => s.finish);
   const failSizes = useFolderSizeStore((s) => s.fail);
@@ -154,11 +167,9 @@ export const useFilePane = (id: PaneId) => {
       navigate(entry.path);
       return;
     }
-    if (entry.path.startsWith('ssh://')) {
-      show('Built-in editor is not available on remote connections yet', 'warning');
-      return;
-    }
-    if (settings?.useBuiltInEditor !== false) {
+    // Remote files are fine: ReadTextFile/WriteTextFile dispatch over SFTP.
+    // FileService.Open (the "open in OS" path) is the local-only one.
+    if (settings?.useBuiltInEditor !== false || entry.path.startsWith('ssh://')) {
       openWorkspace(parentDirOf(entry.path), entry.path);
       return;
     }
@@ -168,7 +179,7 @@ export const useFilePane = (id: PaneId) => {
   const onDropPaths = (
     paths: string[],
     destDir: string,
-    sourcePane: PaneId,
+    _sourcePane: PaneId,
     mode: 'copy' | 'move',
   ) => {
     const dest = destDir || path;
@@ -177,8 +188,9 @@ export const useFilePane = (id: PaneId) => {
       show(`Cannot ${mode} a folder into itself`, 'warning');
       return;
     }
-    // Move into same folder is a no-op; copy may create "name (1)" duplicates.
-    if (mode === 'move' && allSameParentAsDest(paths, dest) && sourcePane === id) return;
+    // Dropping back into the same parent dir = cancel (user regretted the drag).
+    // Applies to both copy and move so we never create "name (1)" self-duplicates.
+    if (allSameParentAsDest(paths, dest)) return;
     const op = mode === 'move' ? FileService.Move : FileService.Copy;
     const verb = mode === 'move' ? 'Moved' : 'Copied';
     void op(paths, dest)
@@ -216,10 +228,16 @@ export const useFilePane = (id: PaneId) => {
           backendJobId: backendJobId || undefined,
         });
         return FileService.DirChildSizes(backendJobId || '', path)
-          .then((map) => {
-            finishSizes(id, gen, mapChildSizes(map));
+          .then((res) => {
+            const denied = res.denied ?? [];
+            finishSizes(id, gen, mapChildSizes(res.sizes), denied);
             finishJob(id, uiJobId);
-            show('Folder sizes calculated', 'success');
+            show(
+              denied.length
+                ? `Folder sizes calculated — ${denied.length} folder(s) not fully readable`
+                : 'Folder sizes calculated',
+              denied.length ? 'warning' : 'success',
+            );
           })
           .catch((e) => {
             failSizes(id, gen);
@@ -252,6 +270,7 @@ export const useFilePane = (id: PaneId) => {
     terminalOpen,
     terminalHeight,
     folderSizes,
+    deniedPaths,
     job,
     navigate,
     goUp,
@@ -283,6 +302,7 @@ export const useFileTable = ({
   showExtensions,
   gitByName,
   folderSizes,
+  deniedPaths,
   onSelect,
   onFocus,
   onToggleMulti,
@@ -294,6 +314,7 @@ export const useFileTable = ({
 }: FileTableProps) => {
   const apiRef = useGridApiRef();
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const showContextMenu = useContextMenuStore((s) => s.show);
   const widths = useColumnStore((s) => s.widths);
   const setWidth = useColumnStore((s) => s.setWidth);
   const [sortModel, setSortModel] = useState<GridSortModel>([
@@ -342,8 +363,8 @@ export const useFileTable = ({
   const orderedPaths = useMemo(() => rows.map((r) => r.path), [rows]);
 
   const columns = useMemo<GridColDef[]>(
-    () => getColumns(widths, selected, folderSizes),
-    [widths, folderSizes, selected],
+    () => getColumns(widths, selected, folderSizes, deniedPaths),
+    [widths, folderSizes, selected, deniedPaths],
   );
 
   const moveFocus = useCallback(
@@ -370,6 +391,30 @@ export const useFileTable = ({
       }
     },
     [rows, focused, onFocus, onSelectRange, apiRef],
+  );
+
+  // Type-ahead: bare letters move the cursor (highlight only, never selection).
+  const typeAhead = useRef({ buffer: '', timer: 0 });
+  useEffect(() => () => window.clearTimeout(typeAhead.current.timer), []);
+
+  const typeAheadJump = useCallback(
+    (key: string) => {
+      const ta = typeAhead.current;
+      window.clearTimeout(ta.timer);
+      ta.buffer += key.toLowerCase();
+      ta.timer = window.setTimeout(() => {
+        ta.buffer = '';
+      }, TYPE_AHEAD_RESET_MS);
+      const path = findTypeAheadPath(rows, ta.buffer);
+      if (!path) return;
+      onFocus(path);
+      try {
+        apiRef.current?.scrollToIndexes?.({ rowIndex: rows.findIndex((r) => r.path === path) });
+      } catch {
+        /* ignore */
+      }
+    },
+    [rows, onFocus, apiRef],
   );
 
   const openFocused = useCallback(() => {
@@ -411,6 +456,7 @@ export const useFileTable = ({
 
   const handleKeys = useCallback(
     (e: KeyboardEvent) => {
+      if (isEditingTarget(e.target)) return;
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         e.stopPropagation();
@@ -442,9 +488,53 @@ export const useFileTable = ({
         e.preventDefault();
         e.stopPropagation();
         if (focused) onToggleMulti(focused);
+      } else if (isTypeAheadKey(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        onActivate();
+        typeAheadJump(e.key);
       }
     },
-    [onActivate, moveFocus, openFocusedDirOnly, openFocused, rows, onFocus, focused, onToggleMulti],
+    [
+      onActivate,
+      moveFocus,
+      openFocusedDirOnly,
+      openFocused,
+      rows,
+      onFocus,
+      focused,
+      onToggleMulti,
+      typeAheadJump,
+    ],
+  );
+
+  /**
+   * Right-click anywhere in the pane. One handler on the wrapper rather than a
+   * per-row prop: the clicked row is recovered from the DataGrid's `data-id`.
+   * A row that is not already selected becomes the selection first, so the
+   * menu's actions target what was actually clicked.
+   */
+  const onContextMenu = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onActivate();
+      const rowEl = (e.target as HTMLElement).closest?.('.MuiDataGrid-row');
+      const rowPath = rowEl?.getAttribute('data-id') ?? '';
+      const row = rows.find((r) => r.path === rowPath && r.name !== '..') ?? null;
+      if (row) {
+        onFocus(row.path);
+        if (!selected.includes(row.path)) onSelect([row.path]);
+      }
+      showContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        paneId,
+        panePath,
+        entry: row,
+      });
+    },
+    [onActivate, rows, onFocus, onSelect, selected, showContextMenu, paneId, panePath],
   );
 
   const getRowClassName = useCallback(
@@ -478,12 +568,25 @@ export const useFileTable = ({
         key: string;
         code: string;
         shiftKey: boolean;
+        ctrlKey: boolean;
+        metaKey: boolean;
+        altKey: boolean;
+        target?: EventTarget | null;
         defaultMuiPrevented?: boolean;
         preventDefault: () => void;
         stopPropagation: () => void;
       },
     ) => {
-      if (!isCellKeyboardEvent(event.key, event.code)) return;
+      if (isEditingTarget(event.target ?? null)) return;
+      if (!isCellKeyboardEvent(event.key, event.code)) {
+        if (isTypeAheadKey(event)) {
+          event.defaultMuiPrevented = true;
+          event.preventDefault();
+          event.stopPropagation();
+          typeAheadJump(event.key);
+        }
+        return;
+      }
       event.defaultMuiPrevented = true;
       event.preventDefault();
       event.stopPropagation();
@@ -499,7 +602,17 @@ export const useFileTable = ({
       // ArrowLeft: let window handler do history back
       focusGrid();
     },
-    [moveFocus, openFocusedDirOnly, openFocused, rows, onFocus, focused, onToggleMulti, focusGrid],
+    [
+      moveFocus,
+      openFocusedDirOnly,
+      openFocused,
+      rows,
+      onFocus,
+      focused,
+      onToggleMulti,
+      focusGrid,
+      typeAheadJump,
+    ],
   );
 
   const onRowClick = useCallback(
@@ -598,5 +711,6 @@ export const useFileTable = ({
     onCellKeyDown,
     onRowClick,
     onRowDoubleClick,
+    onContextMenu,
   };
 };

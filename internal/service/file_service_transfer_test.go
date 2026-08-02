@@ -76,7 +76,7 @@ func TestTransferKind(t *testing.T) {
 
 func TestCopyMoveRemoteNil(t *testing.T) {
 	t.Parallel()
-	s := NewFileService(nil)
+	s := NewFileService(nil, t.TempDir())
 	if err := s.Copy([]string{"ssh://u@h:22/a"}, "/tmp"); err == nil {
 		t.Fatal("expected error when remote manager is nil")
 	} else if !strings.Contains(err.Error(), "remote not available") {

@@ -68,6 +68,8 @@ interface PaneState {
   /** Shift range from anchor to path using ordered row paths */
   selectRange: (id: PaneId, orderedPaths: string[], toPath: string) => void;
   clearSelection: (id?: PaneId) => void;
+  /** Exchange the whole left/right pane state (tabs, history, selection, focus). */
+  swapPanes: () => void;
   getPath: (id: PaneId) => string;
   getSelection: (id: PaneId) => string[];
   getFocus: (id: PaneId) => string;
@@ -300,6 +302,21 @@ export const usePaneStore = create<PaneState>((set, get) => ({
     }
     set(id === 'left' ? { leftSelection: [] } : { rightSelection: [] });
   },
+
+  swapPanes: () =>
+    set((s) => ({
+      leftTabs: s.rightTabs,
+      rightTabs: s.leftTabs,
+      leftIndex: s.rightIndex,
+      rightIndex: s.leftIndex,
+      leftSelection: s.rightSelection,
+      rightSelection: s.leftSelection,
+      leftFocus: s.rightFocus,
+      rightFocus: s.leftFocus,
+      leftAnchor: s.rightAnchor,
+      rightAnchor: s.leftAnchor,
+      activePane: s.activePane === 'left' ? 'right' : 'left',
+    })),
 
   getPath: (id) => {
     const tabs = get().getTabs(id);

@@ -9,9 +9,10 @@ interface ColumnState {
 const defaults: Record<string, number> = {
   icon: 44,
   displayName: 220,
-  size: 100,
-  modTime: 160,
-  ext: 80,
+  size: 90,
+  modTime: 150,
+  ext: 70,
+  access: 90,
 };
 
 export const useColumnStore = create<ColumnState>((set) => ({

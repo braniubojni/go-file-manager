@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"log"
+	"path/filepath"
 
 	"github.com/erikharutyunyan/go-file-manager/internal/config"
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
@@ -10,6 +11,7 @@ import (
 	"github.com/erikharutyunyan/go-file-manager/internal/storage"
 	"github.com/erikharutyunyan/go-file-manager/internal/version"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/updater"
 	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 )
@@ -29,7 +31,10 @@ func main() {
 	}
 
 	remoteMgr := service.NewRemoteManager(db)
-	fileSvc := service.NewFileService(remoteMgr)
+	fileSvc := service.NewFileService(remoteMgr, filepath.Join(cfgStore.Dir(), "trash"))
+	if err := fileSvc.PurgeTrash(); err != nil {
+		log.Printf("purge trash: %v", err)
+	}
 	settingsSvc := service.NewSettingsService(db, cfgStore)
 	bookmarkSvc := service.NewBookmarkService(db)
 	termSvc := service.NewTerminalService(remoteMgr)
@@ -87,12 +92,13 @@ func main() {
 		_ = db.Close()
 	})
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:     "Go File Manager",
-		Width:     1280,
-		Height:    800,
-		MinWidth:  900,
-		MinHeight: 500,
+	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title:          "Go File Manager",
+		Width:          1280,
+		Height:         800,
+		MinWidth:       900,
+		MinHeight:      500,
+		EnableFileDrop: true,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 0,
 			Backdrop:                application.MacBackdropNormal,
@@ -100,6 +106,27 @@ func main() {
 		},
 		BackgroundColour: application.NewRGB(18, 18, 18),
 		URL:              "/",
+	})
+
+	// OS file manager → app (Finder / Explorer / Linux FMs). Frontend marks
+	// panes and folder rows with data-file-drop-target; drop is forwarded as
+	// a custom event so the UI can copy into the resolved destination.
+	win.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
+		files := event.Context().DroppedFiles()
+		if len(files) == 0 {
+			return
+		}
+		payload := map[string]any{"files": files}
+		if details := event.Context().DropTargetDetails(); details != nil {
+			payload["target"] = map[string]any{
+				"id":         details.ElementID,
+				"classList":  details.ClassList,
+				"attributes": details.Attributes,
+				"x":          details.X,
+				"y":          details.Y,
+			}
+		}
+		app.Event.Emit("files-dropped", payload)
 	})
 
 	if err := app.Run(); err != nil {

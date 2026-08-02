@@ -1,7 +1,9 @@
 package filesystem
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"unicode/utf8"
@@ -33,13 +35,26 @@ func CreateFile(parent, name string) (string, error) {
 	return dest, nil
 }
 
+// TooLargeError is the shared "won't open" message for oversized files.
+func TooLargeError() error {
+	return fmt.Errorf("file too large for built-in editor (max %d bytes)", MaxTextFileBytes)
+}
+
+// EncodingError is the shared "not text" message. The frontend matches on it to
+// hand the file to the OS default app, so keep it distinct from ErrExecutable.
+func EncodingError(path string) error {
+	return fmt.Errorf("binary or unsupported encoding: %s", path)
+}
+
 // ReadTextFile reads a local text file for the built-in editor.
+// Stat, not Lstat: a symlink must be judged by what it points at, and the
+// remote reader follows links too.
 func ReadTextFile(path string) (string, error) {
 	abs, err := Resolve(path)
 	if err != nil {
 		return "", err
 	}
-	info, err := os.Lstat(abs)
+	info, err := os.Stat(abs)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", fmt.Errorf("%w: %s", ErrNotFound, abs)
@@ -49,15 +64,32 @@ func ReadTextFile(path string) (string, error) {
 	if info.IsDir() {
 		return "", fmt.Errorf("not a file: %s", abs)
 	}
-	if info.Size() > MaxTextFileBytes {
-		return "", fmt.Errorf("file too large for built-in editor (max %d bytes)", MaxTextFileBytes)
-	}
-	data, err := os.ReadFile(abs)
+	f, err := os.Open(abs)
 	if err != nil {
 		return "", err
 	}
+	defer func() { _ = f.Close() }()
+
+	// Format before size: an 80 MB binary should say "executable", not "too large".
+	head := make([]byte, HeadBytes)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return "", err
+	}
+	head = head[:n]
+	if IsExecutable(head) {
+		return "", ErrExecutable
+	}
+	if info.Size() > MaxTextFileBytes {
+		return "", TooLargeError()
+	}
+	rest, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	data := append(head, rest...)
 	if !utf8.Valid(data) {
-		return "", fmt.Errorf("binary or unsupported encoding: %s", abs)
+		return "", EncodingError(abs)
 	}
 	return string(data), nil
 }

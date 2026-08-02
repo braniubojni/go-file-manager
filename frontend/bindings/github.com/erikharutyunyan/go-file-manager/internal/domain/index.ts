@@ -6,6 +6,7 @@ export type {
     Bookmark,
     ConnectResult,
     ConnectionProfile,
+    DirSizes,
     FileEntry,
     GitDirStatus,
     GitFileDiff,

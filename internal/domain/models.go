@@ -9,6 +9,19 @@ type FileEntry struct {
 	ModTime   int64  `json:"modTime"` // unix milliseconds
 	Ext       string `json:"ext"`
 	IsSymlink bool   `json:"isSymlink"`
+	// Access is "full" | "readonly" | "partial" | "none", or "" when unknown.
+	// Remote (SFTP) entries are always "": Windows OpenSSH reports a constant
+	// mode for everything, so the bits would be a lie. Remote access is instead
+	// discovered by operations that actually get denied — see DirSizes.Denied.
+	Access string `json:"access"`
+}
+
+// DirSizes is the result of a recursive child-size calculation. Denied lists the
+// child directories the walk could not fully read, so the UI can mark them
+// rather than silently reporting an undercount.
+type DirSizes struct {
+	Sizes  map[string]int64 `json:"sizes"`
+	Denied []string         `json:"denied"`
 }
 
 // GitStatusEntry is one child name with a compact git working-tree status.

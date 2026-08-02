@@ -98,6 +98,13 @@ export const addConnectionReducer = (
       return { ...state, workdirChosen: action.path, workdirCustom: '' };
     case 'set_workdir_custom':
       return { ...state, workdirCustom: action.path, workdirChosen: '__custom__' };
+    case 'remove_workdir_path':
+      return {
+        ...state,
+        workdirPaths: state.workdirPaths.filter((r) => r.path !== action.path),
+        workdirChosen:
+          state.workdirChosen === action.path ? state.workdirHome : state.workdirChosen,
+      };
     case 'set_workdir_remember':
       return { ...state, workdirRemember: action.remember };
     default:

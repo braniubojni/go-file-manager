@@ -34,6 +34,7 @@ export type ToolbarBarProps = {
   otherPaneLabel: PaneId;
   onBack: () => void;
   onForward: () => void;
+  onSwapPanes: () => void;
   onCopy: () => void;
   onMove: () => void;
   onMkdir: () => void;
@@ -50,8 +51,17 @@ export type ToolbarBarProps = {
   onSettings: () => void;
 };
 
+export type FileActionsMenuProps = {
+  otherPaneLabel: PaneId;
+  onCopy: () => void;
+  onMove: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+};
+
 export type BookmarksSelectProps = {
   activePane: PaneId;
+  onAddCurrent: () => void;
 };
 
 export type NameDialogProps = {
@@ -95,6 +105,7 @@ export type ConnectionDialogProps = {
   onSubmit: () => void;
   onLoadSSHConfig: (path: string) => void;
   onConnectFromConfig: (host: SSHConfigHost) => void;
+  onForgetRecent: (path: string) => void;
 };
 
 export type FileOpDialogsArgs = {

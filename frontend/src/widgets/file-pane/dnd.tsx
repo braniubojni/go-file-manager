@@ -1,35 +1,26 @@
 import { GridRow } from '@mui/x-data-grid/components';
 import type { GridSlotProps } from '@mui/x-data-grid/models';
-import { createContext, useContext, type RefCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type RefCallback,
+} from 'react';
 import { useDrag, useDrop } from 'react-dnd';
+import { dropModeForDrag, setDropValidity } from '../../features/dnd/dragState';
 import type { PaneId } from '../../entities/file/types';
+import { allSameParentAsDest, isNestedInSelf } from './helpers';
 import type { DragPayload, FileTableProps, FileTableRow } from './types';
+
+// Drop-mode (copy/move) and drop-validity signals live in features/dnd/dragState
+// (shared with FileDragLayer); re-exported here since dnd.tsx is the historical
+// import path hooks.ts uses.
+export { dropModeForDrag } from '../../features/dnd/dragState';
 
 /** react-dnd item type shared by every FileTable row (drag source + drop target). */
 export const FILE_ROW_ITEM = 'FILE_ROWS';
-
-/** Ctrl-drop = move, plain drop = copy — same rule the old native dragover/drop
- * handlers used (`e.ctrlKey`). react-dnd's monitor doesn't expose keyboard
- * modifiers, so track it with one module-level listener pair instead of one
- * per FileTable instance (there are always exactly two: left + right pane). */
-const ctrlHeld = { current: false };
-if (
-  typeof window !== 'undefined' &&
-  !(window as unknown as { __gfmCtrlListeners?: boolean }).__gfmCtrlListeners
-) {
-  (window as unknown as { __gfmCtrlListeners?: boolean }).__gfmCtrlListeners = true;
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Control') ctrlHeld.current = true;
-  });
-  window.addEventListener('keyup', (e) => {
-    if (e.key === 'Control') ctrlHeld.current = false;
-  });
-  // Don't get stuck in "move" if Ctrl was released while the window was unfocused.
-  window.addEventListener('blur', () => {
-    ctrlHeld.current = false;
-  });
-}
-export const dropModeForDrag = (): 'copy' | 'move' => (ctrlHeld.current ? 'move' : 'copy');
 
 interface FileRowContextValue {
   paneId: PaneId;
@@ -42,47 +33,105 @@ export const FileRowProvider = FileRowContext.Provider;
 
 const isParentRow = (name: string): boolean => name === '..';
 
-/** DataGrid `slots.row` override — makes each row a react-dnd drag source, and
- * (for directories) a drop target. Replaces the old native-DataTransfer +
- * MutationObserver approach; wraps MUI's own `GridRow` (which forwards its
- * ref to the row's root element) so no extra wrapper div is introduced. */
+/** Wails OS file-drop targets (no badge — drop handling only). */
+const applyOsDropAttrs = (
+  el: HTMLElement | null,
+  opts: { enabled: boolean; paneId: PaneId; path: string },
+): void => {
+  if (!el) return;
+  if (!opts.enabled) {
+    el.removeAttribute('data-file-drop-target');
+    el.removeAttribute('data-drop-kind');
+    el.removeAttribute('data-drop-path');
+    el.removeAttribute('data-pane-id');
+    return;
+  }
+  el.setAttribute('data-file-drop-target', '');
+  el.setAttribute('data-drop-kind', 'folder');
+  el.setAttribute('data-drop-path', opts.path);
+  el.setAttribute('data-pane-id', opts.paneId);
+};
+
+/** DataGrid `slots.row` — react-dnd drag source + directory drop target. */
 export const FileGridRow = (props: GridSlotProps['row']) => {
   const ctx = useContext(FileRowContext);
   const row = props.row as FileTableRow;
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const isFolderDrop = Boolean(row.isDir && !isParentRow(row.name));
 
-  const [, dragRef] = useDrag(
+  const [{ isDragging }, dragRef] = useDrag(
     () => ({
       type: FILE_ROW_ITEM,
-      item: (): DragPayload => ({
-        sourcePane: ctx!.paneId,
-        paths:
-          ctx!.selected.includes(row.path) && ctx!.selected.length ? ctx!.selected : [row.path],
-      }),
+      item: (): DragPayload => {
+        const paths =
+          ctx!.selected.includes(row.path) && ctx!.selected.length ? ctx!.selected : [row.path];
+        return {
+          sourcePane: ctx!.paneId,
+          paths,
+          primary: { name: row.name, isDir: row.isDir },
+        };
+      },
       canDrag: !isParentRow(row.name),
+      collect: (monitor) => ({ isDragging: monitor.isDragging() }),
     }),
     [ctx, row],
   );
 
-  const [{ isOver }, dropRef] = useDrop<DragPayload, void, { isOver: boolean }>(
+  const [{ hovered, canDrop }, dropRef] = useDrop<
+    DragPayload,
+    void,
+    { hovered: boolean; canDrop: boolean }
+  >(
     () => ({
       accept: FILE_ROW_ITEM,
-      canDrop: () => row.isDir && !isParentRow(row.name),
+      canDrop: (item) =>
+        isFolderDrop &&
+        !isNestedInSelf(item.paths, row.path) &&
+        !allSameParentAsDest(item.paths, row.path),
       drop: (item) => ctx!.onDropPaths(item.paths, row.path, item.sourcePane, dropModeForDrag()),
-      collect: (monitor) => ({ isOver: monitor.isOver() && monitor.canDrop() }),
+      collect: (monitor) => ({
+        hovered: monitor.isOver({ shallow: true }),
+        canDrop: monitor.canDrop(),
+      }),
     }),
-    [ctx, row],
+    [ctx, row, isFolderDrop],
   );
+  const isOver = hovered && canDrop;
+
+  useEffect(() => {
+    if (hovered) setDropValidity(canDrop);
+  }, [hovered, canDrop]);
+
+  useLayoutEffect(() => {
+    applyOsDropAttrs(elRef.current, {
+      enabled: isFolderDrop && Boolean(ctx),
+      paneId: ctx?.paneId ?? 'left',
+      path: row.path,
+    });
+  }, [isFolderDrop, ctx, row.path]);
 
   const setRefs: RefCallback<HTMLDivElement> = (el) => {
+    elRef.current = el;
     dragRef(el);
     dropRef(el);
+    applyOsDropAttrs(el, {
+      enabled: isFolderDrop && Boolean(ctx),
+      paneId: ctx?.paneId ?? 'left',
+      path: row.path,
+    });
   };
 
   return (
     <GridRow
       {...props}
       ref={setRefs}
-      className={[props.className, isOver ? 'row-drop-target' : ''].filter(Boolean).join(' ')}
+      className={[
+        props.className,
+        isOver ? 'row-drop-target' : '',
+        isDragging ? 'row-dragging' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     />
   );
 };

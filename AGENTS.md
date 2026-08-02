@@ -68,12 +68,14 @@ task dist VERSION=0.1.0                   # all platforms → dist/ (Linux arch 
 # Quality
 gofmt -l .
 go test ./internal/...
+go test ./internal/filesystem/... -run TestName -v   # single package/test
 go vet ./...   # Linux needs GTK4 + frontend/dist stub — see .github/AGENTS.md
 task ci:go     # Docker: Ubuntu 24.04 mirror of Go CI job
 cd frontend && npm run lint && npm run knip && npm run format:check
 
 # E2E
 task test:e2e
+cd e2e && npx playwright test specs/bookmarks.spec.ts   # single spec
 ```
 
 ## CI traps (summary)

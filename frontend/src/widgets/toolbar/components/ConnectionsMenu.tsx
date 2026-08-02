@@ -26,6 +26,7 @@ export const ConnectionsMenu: FC = () => {
     onMenuConnect,
     onDisconnect,
     onRemove,
+    onForgetRecent,
     submitDialog,
     openSSHConfigMode,
     loadSSHConfig,
@@ -151,6 +152,7 @@ export const ConnectionsMenu: FC = () => {
         onSubmit={() => void submitDialog()}
         onLoadSSHConfig={(path) => void loadSSHConfig(path)}
         onConnectFromConfig={(host) => void connectFromConfig(host)}
+        onForgetRecent={onForgetRecent}
       />
     </>
   );

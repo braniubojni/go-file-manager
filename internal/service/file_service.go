@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/erikharutyunyan/go-file-manager/internal/config"
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
@@ -13,16 +14,25 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+// TrashMaxAge is how long an undoable delete stays on disk.
+const TrashMaxAge = 24 * time.Hour
+
 // FileService exposes filesystem operations to the frontend.
 type FileService struct {
 	jobs   sync.Map // jobID -> *jobHandle
 	jobSeq atomic.Uint64
 	remote *remote.Manager
+	trash  *filesystem.Trash
 	app    *application.App
 }
 
-func NewFileService(remoteMgr *remote.Manager) *FileService {
-	return &FileService{remote: remoteMgr}
+func NewFileService(remoteMgr *remote.Manager, trashDir string) *FileService {
+	return &FileService{remote: remoteMgr, trash: filesystem.NewTrash(trashDir)}
+}
+
+// PurgeTrash drops undo batches older than TrashMaxAge (called at startup).
+func (s *FileService) PurgeTrash() error {
+	return s.trash.PurgeOlderThan(TrashMaxAge)
 }
 
 // SetApp injects the application for search event emission (call after application.New).
@@ -210,14 +220,22 @@ func transferKind(sources []string, destDir string) (xferKind, error) {
 	}
 }
 
-func (s *FileService) Delete(paths []string) error {
+// Delete removes paths and returns an undo batch id. The id is empty when the
+// delete cannot be undone: remote (SFTP has no trash) or a cross-volume path
+// that had to be removed outright. The frontend only offers Undo for a non-empty id.
+func (s *FileService) Delete(paths []string) (string, error) {
 	if anyRemote(paths) {
 		if !allRemote(paths) {
-			return fmt.Errorf("mixed local/remote delete not supported")
+			return "", fmt.Errorf("mixed local/remote delete not supported")
 		}
-		return s.remote.Delete(paths)
+		return "", s.remote.Delete(paths)
 	}
-	return filesystem.Delete(paths)
+	return s.trash.MoveToTrash(paths)
+}
+
+// RestoreDeleted puts a delete batch back where it came from.
+func (s *FileService) RestoreDeleted(batchID string) error {
+	return s.trash.Restore(batchID)
 }
 
 func (s *FileService) Rename(oldPath, newName string) (string, error) {
@@ -398,13 +416,14 @@ func (s *FileService) Open(path string) error {
 	return config.OpenInOS(path)
 }
 
-// DirChildSizes returns recursive sizes for immediate child directories.
+// DirChildSizes returns recursive sizes for immediate child directories, plus
+// the children that could not be fully read (permission denied).
 // jobID from NewJobID enables CancelJob; empty jobID is non-cancellable.
-func (s *FileService) DirChildSizes(jobID string, dir string) (map[string]int64, error) {
+func (s *FileService) DirChildSizes(jobID string, dir string) (domain.DirSizes, error) {
 	defer func() { _ = s.FinishJob(jobID) }()
 	if remote.IsRemote(dir) {
 		if s.remote == nil {
-			return nil, fmt.Errorf("remote not available")
+			return domain.DirSizes{}, fmt.Errorf("remote not available")
 		}
 		return s.remote.DirChildSizesCtx(s.jobCtx(jobID), dir)
 	}

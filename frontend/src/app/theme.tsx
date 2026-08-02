@@ -72,6 +72,17 @@ export const AppThemeProvider: FC<{ children: ReactNode }> = ({ children }) => {
                 margin: 0,
                 overflow: 'hidden',
               },
+              // Internal file-row drag: whole window shows grabbing cursor and
+              // stops text selection (pointer backend leaves native drag-select live)
+              'body.gfm-file-dragging, body.gfm-file-dragging *': {
+                cursor: 'grabbing !important',
+                userSelect: 'none !important',
+              },
+              // Hovering an invalid drop target (non-folder, self, already-parent) overrides to no-drop
+              'body.gfm-file-dragging.gfm-drop-invalid, body.gfm-file-dragging.gfm-drop-invalid *':
+                {
+                  cursor: 'no-drop !important',
+                },
               '#root': { height: '100%' },
             },
           },

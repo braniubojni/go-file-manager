@@ -136,6 +136,10 @@ export const getBoxWrapperSx = (active: boolean, dropActive: boolean): SxProps<T
   '& .MuiDataGrid-row': {
     cursor: 'grab',
   },
+  '& .MuiDataGrid-row.row-dragging': {
+    cursor: 'grabbing',
+    opacity: 0.55,
+  },
   // Suppress focus ring while dragging so it doesn't paint a blue border on neighbors
   ...(dropActive
     ? {
@@ -157,7 +161,8 @@ export const getBoxWrapperSx = (active: boolean, dropActive: boolean): SxProps<T
   '& .MuiDataGrid-row.row-selected .MuiDataGrid-cell': {
     color: 'error.main',
   },
-  '& .MuiDataGrid-row.row-drop-target': {
+  // Internal react-dnd hover + Wails OS file-drop hover (file-drop-target-active)
+  '& .MuiDataGrid-row.row-drop-target, & .MuiDataGrid-row.file-drop-target-active': {
     // Inset shadow only — avoid outline that can bleed as a line on adjacent rows
     outline: 'none',
     bgcolor: (t) =>
@@ -165,11 +170,76 @@ export const getBoxWrapperSx = (active: boolean, dropActive: boolean): SxProps<T
     boxShadow: (t) => `inset 0 0 0 3px ${t.palette.success.main}`,
     zIndex: 1,
   },
+  '&.file-drop-target-active': {
+    outline: '2px solid',
+    outlineColor: 'success.main',
+  },
   '& .MuiDataGrid-row:hover': dropActive ? { bgcolor: 'transparent' } : undefined,
   '&:focus': {
     outlineColor: dropActive ? 'success.main' : active ? 'primary.main' : 'divider',
   },
 });
+
+/**
+ * The path input always holds the full path — swapping in a shortened value
+ * fights the controlled input and eats keystrokes typed in the same tick.
+ * Shortening is instead an overlay (pathOverlaySx) that CSS hides on focus, so
+ * editing always sees, and types into, the real value.
+ */
+export const pathFieldWrapSx = (shortened: boolean): SxProps<Theme> => ({
+  position: 'relative',
+  flex: 1,
+  minWidth: 0,
+  // Blank the input's own text ONLY while an overlay is actually covering it —
+  // a path that needs no shortening renders no overlay, and hiding the input
+  // text there would leave the field looking empty.
+  ...(shortened
+    ? {
+        '&:not(:focus-within) input': { color: 'transparent' },
+        '&:focus-within .gfm-path-overlay': { display: 'none' },
+      }
+    : {}),
+});
+
+export const pathOverlaySx: SxProps<Theme> = {
+  position: 'absolute',
+  left: 14,
+  right: 14,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  pointerEvents: 'none',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  fontFamily: 'ui-monospace, monospace',
+  fontSize: 12,
+  color: 'text.primary',
+};
+
+export const pathTooltipSlotSx: SxProps<Theme> = {
+  fontFamily: 'ui-monospace, monospace',
+  fontSize: 13,
+  maxWidth: 'none',
+  px: 1.5,
+  py: 1,
+  wordBreak: 'break-all',
+};
+
+export const pathInputSx: SxProps<Theme> = {
+  '& input': {
+    fontFamily: 'ui-monospace, monospace',
+    fontSize: 12,
+  },
+};
+
+export const reconnectNoticeSx: SxProps<Theme> = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 1,
+  p: 4,
+};
 
 export const dataGridSx: SxProps<Theme> = {
   height: '100%',

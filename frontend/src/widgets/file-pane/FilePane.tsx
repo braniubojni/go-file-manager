@@ -1,5 +1,7 @@
 import Box from '@mui/material/Box';
+import LinearProgress from '@mui/material/LinearProgress';
 import type { FC } from 'react';
+import { useConnectRequestStore } from '../../features/connections/connectRequestStore';
 import { errMessage } from '../../shared/lib/format';
 import { PaneTerminal } from '../terminal/PaneTerminal';
 import { FileTable } from './FileTable';
@@ -12,6 +14,7 @@ import type { FilePaneProps } from './types';
 
 export const FilePane: FC<FilePaneProps> = ({ id }) => {
   const p = useFilePane(id);
+  const connecting = useConnectRequestStore((s) => s.connecting[id]);
 
   return (
     <Box data-testid={`pane-${id}`} sx={paneRootSx(p.active)}>
@@ -44,6 +47,7 @@ export const FilePane: FC<FilePaneProps> = ({ id }) => {
         onHome={p.goHome}
         onFocusPane={p.activatePane}
       />
+      {connecting && <LinearProgress data-testid={`pane-connecting-${id}`} />}
       <Box sx={paneBodySx}>
         <FileTable
           paneId={id}
@@ -58,6 +62,7 @@ export const FilePane: FC<FilePaneProps> = ({ id }) => {
           showExtensions={p.showExtensions}
           gitByName={p.gitByName}
           folderSizes={p.folderSizes}
+          deniedPaths={p.deniedPaths}
           onSelect={(paths) => p.setSelection(id, paths)}
           onFocus={(path, opts) => p.setFocus(id, path, opts)}
           onToggleMulti={(path) => p.toggleMultiSelect(id, path)}
