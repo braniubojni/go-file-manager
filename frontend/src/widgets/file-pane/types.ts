@@ -3,6 +3,8 @@ import type { FileEntry, PaneId } from '../../entities/file/types';
 export type DragPayload = {
   sourcePane: PaneId;
   paths: string[];
+  /** Primary (first-clicked) row, for the drag preview icon/label. */
+  primary: { name: string; isDir: boolean };
 };
 
 export type FileTableRow = FileEntry & { id: string; displayName: string };
@@ -35,6 +37,8 @@ export type FileTableProps = {
   /** Basename → git status code (M/A/D/U/?). Empty when disabled or not a repo. */
   gitByName?: Map<string, string>;
   folderSizes?: Record<string, number>;
+  /** Children a size walk could not fully read (rendered as "No access"). */
+  deniedPaths?: Set<string>;
   /** @deprecated overlay removed — sizes use pane header job spinner */
   sizesLoading?: boolean;
   onSelect: (paths: string[]) => void;
@@ -43,7 +47,7 @@ export type FileTableProps = {
   onSelectRange: (orderedPaths: string[], toPath: string) => void;
   onActivate: () => void;
   onOpen: (entry: FileEntry) => void;
-  /** mode: default drop is copy; Ctrl-drop is move. */
+  /** mode: default drop is copy; Cmd (macOS) / Ctrl (Win·Linux) = move. */
   onDropPaths: (
     paths: string[],
     destDir: string,

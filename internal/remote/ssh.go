@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -18,14 +19,11 @@ import (
 	"unicode/utf8"
 
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
+	"github.com/erikharutyunyan/go-file-manager/internal/filesystem"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
-
-// MaxTextFileBytes is the largest remote file the built-in editor will open.
-// Mirrors filesystem.MaxTextFileBytes.
-const MaxTextFileBytes = 5 << 20 // 5 MiB
 
 // HostKeyStore loads/saves TOFU host key fingerprints (base64 SHA256).
 type HostKeyStore interface {
@@ -328,20 +326,33 @@ func (m *Manager) ReadTextFile(vpath string) (string, error) {
 	if info.IsDir() {
 		return "", fmt.Errorf("not a file: %s", loc.RemotePath)
 	}
-	if info.Size() > MaxTextFileBytes {
-		return "", fmt.Errorf("file too large for built-in editor (max %d bytes)", MaxTextFileBytes)
-	}
 	f, err := s.sftp.Open(loc.RemotePath)
 	if err != nil {
 		return "", err
 	}
 	defer func() { _ = f.Close() }()
-	data, err := io.ReadAll(f)
+
+	// Same order as the local reader: format before size, so a big binary says
+	// "executable" rather than "too large".
+	head := make([]byte, filesystem.HeadBytes)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return "", err
+	}
+	head = head[:n]
+	if filesystem.IsExecutable(head) {
+		return "", filesystem.ErrExecutable
+	}
+	if info.Size() > filesystem.MaxTextFileBytes {
+		return "", filesystem.TooLargeError()
+	}
+	rest, err := io.ReadAll(f)
 	if err != nil {
 		return "", err
 	}
+	data := append(head, rest...)
 	if !utf8.Valid(data) {
-		return "", fmt.Errorf("binary or unsupported encoding: %s", loc.RemotePath)
+		return "", filesystem.EncodingError(loc.RemotePath)
 	}
 	return string(data), nil
 }
@@ -393,14 +404,15 @@ func (m *Manager) WriteTextFile(vpath, content string) error {
 
 // DirChildSizesCtx returns recursive byte sizes for each immediate child directory
 // of a remote dir. Keys are ssh:// virtual paths. Symlinks are not followed.
-func (m *Manager) DirChildSizesCtx(ctx context.Context, vpath string) (map[string]int64, error) {
+func (m *Manager) DirChildSizesCtx(ctx context.Context, vpath string) (domain.DirSizes, error) {
+	empty := domain.DirSizes{Sizes: map[string]int64{}, Denied: []string{}}
 	loc, err := ParseLocation(vpath)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	s, err := m.get(loc)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	rp := loc.RemotePath
 	if rp == "" {
@@ -408,61 +420,70 @@ func (m *Manager) DirChildSizesCtx(ctx context.Context, vpath string) (map[strin
 	}
 	info, err := s.sftp.Stat(rp)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("not a directory: %s", rp)
+		return empty, fmt.Errorf("not a directory: %s", rp)
 	}
 	entries, err := s.sftp.ReadDir(rp)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
-	out := make(map[string]int64)
+	out := domain.DirSizes{Sizes: map[string]int64{}, Denied: []string{}}
 	for _, e := range entries {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return empty, err
 		}
 		if !e.IsDir() || e.Mode()&os.ModeSymlink != 0 {
 			continue
 		}
 		child := path.Join(rp, e.Name())
-		size, err := remoteDirSizeCtx(ctx, s.sftp, child)
+		size, denied, err := remoteDirSizeCtx(ctx, s.sftp, child)
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil, ctx.Err()
+				return empty, ctx.Err()
 			}
+			out.Denied = append(out.Denied, loc.JoinPath(child))
 			continue
 		}
-		out[loc.JoinPath(child)] = size
+		out.Sizes[loc.JoinPath(child)] = size
+		if denied {
+			out.Denied = append(out.Denied, loc.JoinPath(child))
+		}
 	}
 	return out, nil
 }
 
-func remoteDirSizeCtx(ctx context.Context, c *sftp.Client, root string) (int64, error) {
-	var total int64
+// remoteDirSizeCtx sums a remote tree. An unreadable subdirectory contributes 0
+// and sets denied instead of aborting: on a Windows host most of the tree is
+// unreadable, and aborting made every top-level child disappear from the result.
+// ponytail: serial — one SFTP round-trip per directory. If deep trees feel slow,
+// the upgrade is a bounded worker pool over the child directories.
+func remoteDirSizeCtx(ctx context.Context, c *sftp.Client, root string) (total int64, denied bool, err error) {
 	entries, err := c.ReadDir(root)
 	if err != nil {
-		return 0, err
+		return 0, true, nil
 	}
 	for _, e := range entries {
 		if err := ctx.Err(); err != nil {
-			return 0, err
+			return 0, denied, err
 		}
 		if e.Mode()&os.ModeSymlink != 0 {
 			continue
 		}
 		child := path.Join(root, e.Name())
 		if e.IsDir() {
-			sub, err := remoteDirSizeCtx(ctx, c, child)
+			sub, subDenied, err := remoteDirSizeCtx(ctx, c, child)
 			if err != nil {
-				return 0, err
+				return 0, denied, err
 			}
 			total += sub
+			denied = denied || subDenied
 			continue
 		}
 		total += e.Size()
 	}
-	return total, nil
+	return total, denied, nil
 }
 
 // ListPathCompletions returns ssh:// path suggestions for a partial remote path (max 50).

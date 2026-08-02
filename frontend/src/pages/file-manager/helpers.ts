@@ -1,4 +1,7 @@
 import type { PaneId } from '../../entities/file/types';
+import { useFolderSizeStore } from '../../features/folder-size/folderSizeStore';
+import { usePaneJobStore } from '../../features/jobs/paneJobStore';
+import { usePaneStore } from '../../features/pane/paneStore';
 
 export type PaneGridApi = HTMLElement & {
   __gfmMoveFocus?: (d: number, extend?: boolean) => void;
@@ -7,6 +10,7 @@ export type PaneGridApi = HTMLElement & {
   __gfmToggleMulti?: () => void;
   __gfmFocusHome?: () => void;
   __gfmFocusEnd?: () => void;
+  __gfmStartRename?: (path?: string) => void;
 };
 
 export const isEditableTarget = (target: EventTarget | null): boolean => {
@@ -24,6 +28,17 @@ export const isEditableTarget = (target: EventTarget | null): boolean => {
 
 export const getPaneGrid = (pane: PaneId): PaneGridApi | null =>
   document.querySelector(`[data-pane-grid="${pane}"]`);
+
+/**
+ * Exchange the two panes. Everything keyed by path (tabs, selection, folder
+ * sizes, running jobs) follows its directory; the terminals stay put because
+ * their PTY cwd is driven by the pane path effect, not by this store.
+ */
+export const swapPanes = (): void => {
+  usePaneStore.getState().swapPanes();
+  useFolderSizeStore.getState().swap();
+  usePaneJobStore.getState().swap();
+};
 
 export const buildShortcutMap = (
   defs: { id: string; binding: string }[] | undefined,

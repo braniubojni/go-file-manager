@@ -1,13 +1,20 @@
 import { FileEntry } from '../../entities/file/types';
 import { FileTypeIcon } from '../../shared/ui/FileTypeIcon';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { formatModTime, formatSize } from '../../shared/lib/format';
-import { sizeValue, typeValue } from './helpers';
+import { accessLabel, sizeValue, typeValue } from './helpers';
+
+/** Effective access for a row: a size walk that got denied overrides the
+ * listing's value, and is the only source of truth for remote entries. */
+const rowAccess = (e: FileEntry, denied: Set<string> | undefined): string =>
+  denied?.has(e.path) ? 'none' : e.access;
 
 export const getColumns = (
   widths: Record<string, number>,
   selected: string[],
   folderSizes: Record<string, number> | undefined,
+  deniedPaths?: Set<string>,
 ) => [
   {
     field: 'icon',
@@ -50,7 +57,7 @@ export const getColumns = (
   {
     field: 'size',
     headerName: 'Size',
-    width: widths.size ?? 100,
+    width: widths.size ?? 90,
     cellClassName: 'no-select-cell',
     valueGetter: (_v, row) => sizeValue(row as FileEntry, folderSizes),
     valueFormatter: (value, row) => {
@@ -67,15 +74,34 @@ export const getColumns = (
   {
     field: 'modTime',
     headerName: 'Modified',
-    width: widths.modTime ?? 160,
+    width: widths.modTime ?? 150,
     cellClassName: 'no-select-cell',
     valueFormatter: (value) => formatModTime(Number(value) || 0),
   },
   {
     field: 'ext',
     headerName: 'Type',
-    width: widths.ext ?? 80,
+    width: widths.ext ?? 70,
     cellClassName: 'no-select-cell',
     valueGetter: (_v, row) => typeValue(row as FileEntry),
+  },
+  {
+    field: 'access',
+    headerName: 'Permission',
+    width: widths.access ?? 90,
+    cellClassName: 'no-select-cell',
+    valueGetter: (_v, row) => rowAccess(row as FileEntry, deniedPaths),
+    renderCell: (params) => {
+      const e = params.row as FileEntry;
+      if (e.name === '..') return null;
+      const { text, color, title } = accessLabel(rowAccess(e, deniedPaths));
+      return (
+        <Tooltip title={title}>
+          <Typography variant="body2" noWrap sx={{ color, lineHeight: 1.2 }}>
+            {text}
+          </Typography>
+        </Tooltip>
+      );
+    },
   },
 ];

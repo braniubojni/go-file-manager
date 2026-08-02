@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { useFileOps } from '../../../entities/file/queries';
 import {
@@ -8,10 +9,14 @@ import {
   initialNameDialogState,
   nameDialogReducer,
 } from '../../../features/file-ops/nameDialogReducer';
+import { FileService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
 import { isPermissionError } from '../helpers';
 import type { FileOpDialogsArgs } from '../types';
+
+/** How long the Undo action stays on screen after a delete. */
+const UNDO_WINDOW_MS = 10_000;
 
 export const useFileOpDialogs = ({
   activePath,
@@ -21,6 +26,7 @@ export const useFileOpDialogs = ({
 }: FileOpDialogsArgs) => {
   const ops = useFileOps();
   const show = useSnack((s) => s.show);
+  const qc = useQueryClient();
   const [mkdir, dispatchMkdir] = useReducer(nameDialogReducer, initialNameDialogState);
   const [mkfile, dispatchMkfile] = useReducer(nameDialogReducer, initialNameDialogState);
   const [rename, dispatchRename] = useReducer(nameDialogReducer, initialNameDialogState);
@@ -68,11 +74,38 @@ export const useFileOpDialogs = ({
     dispatchDelete({ type: 'open_confirm', paths: realSelection });
   };
 
+  const undoDelete = (batchID: string) => {
+    void FileService.RestoreDeleted(batchID)
+      .then(() => {
+        void qc.invalidateQueries({ queryKey: ['dir'] });
+        void qc.invalidateQueries({ queryKey: ['gitStatus'] });
+        show('Delete undone', 'success');
+      })
+      .catch((e) => show(errMessage(e), 'error'));
+  };
+
   const confirmDelete = () => {
     const paths = del.paths.length ? del.paths : realSelection;
     dispatchDelete({ type: 'close_confirm' });
     ops.del.mutate(paths, {
-      onSuccess: () => onOpSuccess('Delete'),
+      // Empty batch id = nothing restorable (remote, or cross-volume): no Undo.
+      onSuccess: (batchID) => {
+        clearSelection();
+        show(
+          'Delete completed',
+          'success',
+          batchID
+            ? {
+                duration: UNDO_WINDOW_MS,
+                action: {
+                  label: 'Undo',
+                  testId: 'btn-undo-delete',
+                  onClick: () => undoDelete(batchID),
+                },
+              }
+            : undefined,
+        );
+      },
       onError: onOpError,
     });
   };

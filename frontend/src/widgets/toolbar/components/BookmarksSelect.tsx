@@ -1,61 +1,115 @@
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
+import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import type { FC } from 'react';
 import { useBookmarks, useFileOps } from '../../../entities/file/queries';
-import { usePaneStore } from '../../../features/pane/paneStore';
+import { ensureSessionThenNavigate } from '../../../features/connections/navigate';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
-import { enterPaneTab } from '../../file-pane/helpers';
+import { shortenPath } from '../../file-pane/helpers';
+import {
+  bookmarkAddIconSx,
+  bookmarkListboxSx,
+  bookmarkPaperSx,
+  bookmarkRemoveBtnSx,
+} from '../styles';
 import type { BookmarksSelectProps } from '../types';
 
-export const BookmarksSelect: FC<BookmarksSelectProps> = ({ activePane }) => {
+type Option =
+  | { kind: 'add'; group: 'Add'; label: string }
+  | { kind: 'bookmark'; group: 'Bookmarks'; label: string; id: number; path: string };
+
+export const BookmarksSelect: FC<BookmarksSelectProps> = ({ activePane, onAddCurrent }) => {
   const { data: bookmarks = [] } = useBookmarks();
   const ops = useFileOps();
-  const navigateStore = usePaneStore((s) => s.navigate);
   const show = useSnack((s) => s.show);
 
+  const options: Option[] = [
+    { kind: 'add', group: 'Add', label: 'Add current path' },
+    ...bookmarks.map<Option>((b) => ({
+      kind: 'bookmark',
+      group: 'Bookmarks',
+      label: b.name || b.path,
+      id: b.id,
+      path: b.path,
+    })),
+  ];
+
   return (
-    <Select
+    <Autocomplete<Option, false, false, false>
       data-testid="select-bookmarks"
       size="small"
-      displayEmpty
-      value=""
-      sx={{ minWidth: 160, ml: 0.5 }}
-      renderValue={() => 'Bookmarks'}
-      onChange={(e) => {
-        const p = String(e.target.value);
-        if (!p) return;
-        enterPaneTab(activePane, p);
-        navigateStore(activePane, p);
+      sx={{ minWidth: 180, ml: 0.5 }}
+      options={options}
+      value={null}
+      blurOnSelect
+      clearOnBlur
+      groupBy={(o) => o.group}
+      getOptionLabel={(o) => o.label}
+      isOptionEqualToValue={(a, b) => a.kind === b.kind && a.label === b.label}
+      slotProps={{
+        paper: { sx: bookmarkPaperSx },
+        listbox: { sx: bookmarkListboxSx },
       }}
-    >
-      {bookmarks.length === 0 && (
-        <MenuItem disabled value="">
-          No bookmarks
-        </MenuItem>
+      onChange={(_, option) => {
+        if (!option) return;
+        if (option.kind === 'add') {
+          onAddCurrent();
+          return;
+        }
+        void ensureSessionThenNavigate(activePane, option.path);
+      }}
+      renderInput={(params) => (
+        <TextField {...params} placeholder="Bookmarks" data-testid="input-bookmarks" />
       )}
-      {bookmarks.map((b) => (
-        <MenuItem key={b.id} value={b.path}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 2 }}>
-            <span>{b.name}</span>
-            <Typography
-              component="span"
-              variant="caption"
-              color="error"
+      renderOption={(props, option) => {
+        const { key, ...rest } = props;
+        if (option.kind === 'add') {
+          return (
+            <Box component="li" key={key} {...rest} data-testid="option-bookmark-add">
+              <AddIcon fontSize="small" sx={bookmarkAddIconSx} />
+              <Typography variant="body2" noWrap>
+                {option.label}
+              </Typography>
+            </Box>
+          );
+        }
+        return (
+          <Box component="li" key={key} {...rest}>
+            <Tooltip title={option.path} placement="right">
+              <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0 }}>
+                {option.label}
+                <Typography
+                  component="span"
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ ml: 1 }}
+                >
+                  {shortenPath(option.path, 30)}
+                </Typography>
+              </Typography>
+            </Tooltip>
+            <IconButton
+              size="small"
+              aria-label={`remove-bookmark-${option.label}`}
+              sx={bookmarkRemoveBtnSx}
               onClick={(ev) => {
                 ev.stopPropagation();
-                ops.removeBookmark.mutate(b.id, {
+                ops.removeBookmark.mutate(option.id, {
                   onError: (e) => show(errMessage(e), 'error'),
                 });
               }}
             >
-              remove
-            </Typography>
+              <CloseIcon sx={{ fontSize: 14 }} />
+            </IconButton>
           </Box>
-        </MenuItem>
-      ))}
-    </Select>
+        );
+      }}
+    />
   );
 };

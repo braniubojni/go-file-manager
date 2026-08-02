@@ -51,15 +51,21 @@ export function CreateFile(parent: string, name: string): $CancellablePromise<st
     return $Call.ByID(1566414454, parent, name);
 }
 
-export function Delete(paths: string[] | null): $CancellablePromise<void> {
+/**
+ * Delete removes paths and returns an undo batch id. The id is empty when the
+ * delete cannot be undone: remote (SFTP has no trash) or a cross-volume path
+ * that had to be removed outright. The frontend only offers Undo for a non-empty id.
+ */
+export function Delete(paths: string[] | null): $CancellablePromise<string> {
     return $Call.ByID(4015740351, paths);
 }
 
 /**
- * DirChildSizes returns recursive sizes for immediate child directories.
+ * DirChildSizes returns recursive sizes for immediate child directories, plus
+ * the children that could not be fully read (permission denied).
  * jobID from NewJobID enables CancelJob; empty jobID is non-cancellable.
  */
-export function DirChildSizes(jobID: string, dir: string): $CancellablePromise<{ [_ in string]?: number } | null> {
+export function DirChildSizes(jobID: string, dir: string): $CancellablePromise<domain$0.DirSizes> {
     return $Call.ByID(4082514371, jobID, dir);
 }
 
@@ -131,6 +137,13 @@ export function OpenPrivacySettings(): $CancellablePromise<void> {
 }
 
 /**
+ * PurgeTrash drops undo batches older than TrashMaxAge (called at startup).
+ */
+export function PurgeTrash(): $CancellablePromise<void> {
+    return $Call.ByID(2708353615);
+}
+
+/**
  * ReadTextFile reads a text file for the built-in editor (local or remote).
  */
 export function ReadTextFile(path: string): $CancellablePromise<string> {
@@ -153,6 +166,13 @@ export function ReplaceAllInPaths(paths: string[] | null, find: string, replace:
  */
 export function ReplaceOccurrence(path: string, find: string, replace: string, line: number, column: number, caseSensitive: boolean): $CancellablePromise<void> {
     return $Call.ByID(1113297057, path, find, replace, line, column, caseSensitive);
+}
+
+/**
+ * RestoreDeleted puts a delete batch back where it came from.
+ */
+export function RestoreDeleted(batchID: string): $CancellablePromise<void> {
+    return $Call.ByID(2741867447, batchID);
 }
 
 /**

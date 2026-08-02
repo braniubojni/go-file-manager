@@ -94,6 +94,16 @@ export interface ConnectionProfile {
 }
 
 /**
+ * DirSizes is the result of a recursive child-size calculation. Denied lists the
+ * child directories the walk could not fully read, so the UI can mark them
+ * rather than silently reporting an undercount.
+ */
+export interface DirSizes {
+    "sizes": { [_ in string]?: number } | null;
+    "denied": string[] | null;
+}
+
+/**
  * FileEntry is a single directory listing row.
  */
 export interface FileEntry {
@@ -108,6 +118,14 @@ export interface FileEntry {
     "modTime": number;
     "ext": string;
     "isSymlink": boolean;
+
+    /**
+     * Access is "full" | "readonly" | "partial" | "none", or "" when unknown.
+     * Remote (SFTP) entries are always "": Windows OpenSSH reports a constant
+     * mode for everything, so the bits would be a lie. Remote access is instead
+     * discovered by operations that actually get denied — see DirSizes.Denied.
+     */
+    "access": string;
 }
 
 /**

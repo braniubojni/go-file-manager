@@ -22,7 +22,8 @@ test.describe("bookmarks", () => {
     await input.press("Enter");
     await expect(page.getByTestId("status-path")).toContainText(folder);
 
-    await page.getByTestId("btn-bookmark").click();
+    await page.getByTestId("input-bookmarks").locator("input").click();
+    await page.getByTestId("option-bookmark-add").click();
     await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
 
     // Navigate back to left root
@@ -30,7 +31,7 @@ test.describe("bookmarks", () => {
     await input.press("Enter");
     await expect(page.getByTestId("status-path")).toContainText(LEFT_DIR);
 
-    await page.getByTestId("select-bookmarks").click();
+    await page.getByTestId("input-bookmarks").locator("input").click();
     await page
       .getByRole("option", { name: new RegExp(folder) })
       .first()

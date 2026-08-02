@@ -10,6 +10,8 @@ export interface FileEntry {
   modTime: number;
   ext: string;
   isSymlink: boolean;
+  /** 'full' | 'readonly' | 'partial' | 'none', or '' when unknown (remote). */
+  access: string;
 }
 
 interface TabState {

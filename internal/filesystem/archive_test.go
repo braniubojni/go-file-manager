@@ -82,10 +82,10 @@ func TestDirChildSizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sizes[d1] < 100 {
+	if sizes.Sizes[d1] < 100 {
 		t.Fatalf("expected size >= 100, got %v", sizes)
 	}
-	if _, ok := sizes[filepath.Join(root, "file.txt")]; ok {
+	if _, ok := sizes.Sizes[filepath.Join(root, "file.txt")]; ok {
 		t.Fatal("files should not be in DirChildSizes")
 	}
 }

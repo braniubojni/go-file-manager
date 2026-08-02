@@ -24,6 +24,8 @@ export const usePaneJobStore = create<PaneJobState>((set, get) => ({
     if (!cur || cur.id !== jobId) return;
     set({ [key]: null });
   },
+
+  swap: () => set((s) => ({ left: s.right, right: s.left })),
 }));
 
 let jobSeq = 0;

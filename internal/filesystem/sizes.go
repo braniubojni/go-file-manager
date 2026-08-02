@@ -5,45 +5,44 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 )
 
 // DirChildSizes returns recursive byte sizes for each immediate child directory of dir.
 // Symlinks are not followed. Keys are absolute paths of the child dirs.
-func DirChildSizes(dir string) (map[string]int64, error) {
+func DirChildSizes(dir string) (domain.DirSizes, error) {
 	return DirChildSizesCtx(context.Background(), dir)
 }
 
 // DirChildSizesCtx is like DirChildSizes but respects ctx cancellation.
-func DirChildSizesCtx(ctx context.Context, dir string) (map[string]int64, error) {
+// A child that could not be fully read still gets its partial size, and is
+// listed in Denied — silently undercounting is worse than saying so.
+func DirChildSizesCtx(ctx context.Context, dir string) (domain.DirSizes, error) {
+	empty := domain.DirSizes{Sizes: map[string]int64{}, Denied: []string{}}
 	abs, err := Resolve(dir)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	info, err := os.Stat(abs)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("not a directory: %s", abs)
+		return empty, fmt.Errorf("not a directory: %s", abs)
 	}
 
 	entries, err := os.ReadDir(abs)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 
-	out := make(map[string]int64)
+	out := domain.DirSizes{Sizes: map[string]int64{}, Denied: []string{}}
 	for _, e := range entries {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return empty, err
 		}
-		if !e.IsDir() {
-			if e.Type()&os.ModeSymlink != 0 {
-				continue
-			}
-			continue
-		}
-		if e.Type()&os.ModeSymlink != 0 {
+		if !e.IsDir() || e.Type()&os.ModeSymlink != 0 {
 			continue
 		}
 		child := filepath.Join(abs, e.Name())
@@ -51,26 +50,32 @@ func DirChildSizesCtx(ctx context.Context, dir string) (map[string]int64, error)
 		if err != nil || !st.IsDir() || st.Mode()&os.ModeSymlink != 0 {
 			continue
 		}
-		size, err := dirSizeCtx(ctx, child)
+		size, denied, err := dirSizeCtx(ctx, child)
 		if err != nil {
 			if ctx.Err() != nil {
-				return nil, ctx.Err()
+				return empty, ctx.Err()
 			}
+			out.Denied = append(out.Denied, child)
 			continue
 		}
-		out[child] = size
+		out.Sizes[child] = size
+		if denied {
+			out.Denied = append(out.Denied, child)
+		}
 	}
 	return out, nil
 }
 
-func dirSizeCtx(ctx context.Context, root string) (int64, error) {
-	var total int64
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+// dirSizeCtx sums a tree. Unreadable subtrees are skipped and reported via
+// denied rather than aborting the walk.
+func dirSizeCtx(ctx context.Context, root string) (total int64, denied bool, err error) {
+	err = filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err != nil {
-			if os.IsPermission(err) {
+		if walkErr != nil {
+			denied = true
+			if os.IsPermission(walkErr) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -83,5 +88,5 @@ func dirSizeCtx(ctx context.Context, root string) (int64, error) {
 		}
 		return nil
 	})
-	return total, err
+	return total, denied, err
 }

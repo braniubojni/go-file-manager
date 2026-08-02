@@ -108,6 +108,13 @@ export function RemoveProfile(id: string): $CancellablePromise<void> {
 }
 
 /**
+ * RemoveRecentPath forgets one remembered remote working directory.
+ */
+export function RemoveRecentPath(vpath: string): $CancellablePromise<void> {
+    return $Call.ByID(3878844586, vpath);
+}
+
+/**
  * SetProfileDefaultWorkDir stores the preferred start path for a saved profile.
  */
 export function SetProfileDefaultWorkDir(profileID: string, vpath: string): $CancellablePromise<void> {

@@ -3,8 +3,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import { DataGrid } from '@mui/x-data-grid/DataGrid';
 import type { FC } from 'react';
+import { isNotConnectedMessage } from '../../features/connections/helpers';
 import { FileGridRow, FileRowProvider } from './dnd';
 import { useFileTable } from './hooks';
+import { ReconnectNotice } from './ReconnectNotice';
 import { dataGridSx, getBoxWrapperSx } from './styles';
 import type { FileTableProps } from './types';
 
@@ -15,9 +17,14 @@ export const FileTable: FC<FileTableProps> = (props) => {
     <Box
       ref={t.setWrapRef}
       tabIndex={0}
+      id={`file-drop-pane-${t.paneId}`}
       data-testid={`file-grid-${t.paneId}`}
       data-pane-grid={t.paneId}
+      data-file-drop-target=""
+      data-drop-kind="pane"
+      data-pane-id={t.paneId}
       onClick={t.onActivate}
+      onContextMenu={t.onContextMenu}
       onKeyDown={t.handleKeys}
       sx={getBoxWrapperSx(t.active, t.dropActive)}
     >
@@ -26,11 +33,15 @@ export const FileTable: FC<FileTableProps> = (props) => {
           <CircularProgress size={28} />
         </Box>
       ) : t.isError ? (
-        <Box sx={{ p: 2 }}>
-          <Typography color="error" variant="body2">
-            {t.errorMessage || 'Failed to load directory'}
-          </Typography>
-        </Box>
+        isNotConnectedMessage(t.errorMessage ?? '') ? (
+          <ReconnectNotice paneId={t.paneId} path={props.panePath} />
+        ) : (
+          <Box sx={{ p: 2 }}>
+            <Typography color="error" variant="body2">
+              {t.errorMessage || 'Failed to load directory'}
+            </Typography>
+          </Box>
+        )
       ) : (
         <FileRowProvider
           value={{ paneId: t.paneId, selected: t.selected, onDropPaths: t.onDropPaths }}

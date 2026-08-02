@@ -162,16 +162,31 @@ export async function confirmMkdir(page: Page, name: string) {
   await expect(page.getByTestId("dialog-mkdir")).toBeHidden();
 }
 
+/** Copy / Move / Rename / Delete now live behind the Actions dropdown. */
+export async function fileAction(page: Page, testId: string) {
+  await page.getByTestId("btn-file-actions").click();
+  await page.getByTestId(testId).click();
+}
+
 export async function confirmRename(page: Page, newName: string) {
-  await page.getByTestId("btn-rename").click();
+  await fileAction(page, "btn-rename");
   await expect(page.getByTestId("dialog-rename")).toBeVisible();
   await page.getByTestId("input-rename-name").locator("input").fill(newName);
   await page.getByTestId("btn-rename-confirm").click();
   await expect(page.getByTestId("dialog-rename")).toBeHidden();
 }
 
+/** Right-click a row and pick a context-menu entry (ctx-* test ids). */
+export async function contextAction(page: Page, pane: "left" | "right", name: string, item: string) {
+  await page.getByTestId(`file-grid-${pane}`).getByText(name, { exact: true }).click({
+    button: "right",
+  });
+  await expect(page.getByTestId("file-context-menu")).toBeVisible();
+  await page.getByTestId(item).click();
+}
+
 export async function confirmDelete(page: Page) {
-  await page.getByTestId("btn-delete").click();
+  await fileAction(page, "btn-delete");
   await expect(page.getByTestId("dialog-delete")).toBeVisible();
   await page.getByTestId("btn-delete-confirm").click();
   await expect(page.getByTestId("dialog-delete")).toBeHidden();

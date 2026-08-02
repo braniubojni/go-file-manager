@@ -1,4 +1,5 @@
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import HomeIcon from '@mui/icons-material/Home';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
@@ -6,8 +7,14 @@ import IconButton from '@mui/material/IconButton';
 import ListItem from '@mui/material/ListItem';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { useEffect, useRef, useState, type FC } from 'react';
 import { usePathCompletions } from '../../entities/file/queries';
+import { copyText } from '../../shared/lib/clipboard';
+import { errMessage } from '../../shared/lib/format';
+import { useSnack } from '../../shared/ui/SnackbarHost';
+import { shortenPath } from './helpers';
+import { pathFieldWrapSx, pathInputSx, pathOverlaySx, pathTooltipSlotSx } from './styles';
 import type { PathBarProps } from './types';
 
 /** Normalize path for navigation: trim, strip trailing slashes (except root). */
@@ -33,12 +40,24 @@ export const PathBar: FC<PathBarProps> = ({
   const highlightedRef = useRef<string | null>(null);
   const [draft, setDraft] = useState(path);
   const [open, setOpen] = useState(false);
+  const show = useSnack((s) => s.show);
   const completions = usePathCompletions(draft, open || draft !== path);
   const options = completions.data ?? [];
 
   useEffect(() => {
     setDraft(path);
   }, [path]);
+
+  const copyPath = () => {
+    if (!path) return;
+    void copyText(path)
+      .then(() => show('Path copied', 'success'))
+      .catch((e) => show(errMessage(e), 'error'));
+  };
+
+  // Shown over the input while it is idle; CSS (not state) swaps back to the
+  // real text on focus, so nothing can clobber what is being typed.
+  const short = shortenPath(path);
 
   const submit = (value: string) => {
     const next = normalizeNavPath(value);
@@ -87,84 +106,102 @@ export const PathBar: FC<PathBarProps> = ({
           <HomeIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      <Autocomplete
-        freeSolo
-        fullWidth
-        size="small"
-        open={open}
-        onOpen={() => setOpen(true)}
-        onClose={() => {
-          setOpen(false);
-          highlightedRef.current = null;
-        }}
-        options={options}
-        inputValue={draft}
-        autoHighlight
-        filterOptions={(x) => x}
-        onHighlightChange={(_, option) => {
-          highlightedRef.current = typeof option === 'string' ? option : null;
-        }}
-        onInputChange={(_, v, reason) => {
-          if (reason === 'reset') return;
-          setDraft(v);
-          // Keep suggestions open while the user is typing a different path
-          if (v !== path) setOpen(true);
-        }}
-        onChange={(_, v) => {
-          // Mouse click / Autocomplete selection
-          if (typeof v === 'string' && v) {
-            setDraft(v);
-            submit(v);
-          }
-        }}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            data-testid={`path-input-${paneId}`}
-            onFocus={() => onFocusPane()}
-            onMouseDown={() => onFocusPane()}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                setDraft(path);
-                setOpen(false);
-                highlightedRef.current = null;
-                return;
+      <Tooltip title="Copy path">
+        <IconButton data-testid={`btn-copy-path-${paneId}`} onClick={copyPath} size="small">
+          <ContentCopyIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Tooltip
+        title={path}
+        placement="bottom-start"
+        slotProps={{ tooltip: { sx: pathTooltipSlotSx } }}
+      >
+        <Box sx={pathFieldWrapSx(short !== path)}>
+          {short !== path && (
+            <Typography
+              component="span"
+              aria-hidden
+              className="gfm-path-overlay"
+              sx={pathOverlaySx}
+            >
+              {short}
+            </Typography>
+          )}
+          <Autocomplete
+            freeSolo
+            fullWidth
+            size="small"
+            open={open}
+            onOpen={() => setOpen(true)}
+            onClose={() => {
+              setOpen(false);
+              highlightedRef.current = null;
+            }}
+            options={options}
+            inputValue={draft}
+            autoHighlight
+            filterOptions={(x) => x}
+            onHighlightChange={(_, option) => {
+              highlightedRef.current = typeof option === 'string' ? option : null;
+            }}
+            onInputChange={(_, v, reason) => {
+              if (reason === 'reset') return;
+              setDraft(v);
+              // Keep suggestions open while the user is typing a different path
+              if (v !== path) setOpen(true);
+            }}
+            onChange={(_, v) => {
+              // Mouse click / Autocomplete selection
+              if (typeof v === 'string' && v) {
+                setDraft(v);
+                submit(v);
               }
-              if (e.key !== 'Enter') return;
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                data-testid={`path-input-${paneId}`}
+                onFocus={() => onFocusPane()}
+                onMouseDown={() => onFocusPane()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setDraft(path);
+                    setOpen(false);
+                    highlightedRef.current = null;
+                    return;
+                  }
+                  if (e.key !== 'Enter') return;
 
-              e.preventDefault();
-              e.stopPropagation();
-              if (open && highlightedRef.current) {
-                const pick = highlightedRef.current;
-                setDraft(pick);
-                submit(pick);
-                return;
-              }
-              // Fallback: best completion for partial draft, else raw path.
-              if (options.length > 0 && draft.trim() !== path) {
-                const pick = pickFromOptions(draft);
-                if (pick) {
-                  setDraft(pick);
-                  submit(pick);
-                  return;
-                }
-              }
-              submit(draft);
-            }}
-            sx={{
-              '& input': {
-                fontFamily: 'ui-monospace, monospace',
-                fontSize: 12,
-              },
-            }}
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (open && highlightedRef.current) {
+                    const pick = highlightedRef.current;
+                    setDraft(pick);
+                    submit(pick);
+                    return;
+                  }
+                  // Fallback: best completion for partial draft, else raw path.
+                  if (options.length > 0 && draft.trim() !== path) {
+                    const pick = pickFromOptions(draft);
+                    if (pick) {
+                      setDraft(pick);
+                      submit(pick);
+                      return;
+                    }
+                  }
+                  submit(draft);
+                }}
+                sx={pathInputSx}
+              />
+            )}
+            renderOption={(props, option) => (
+              <ListItem {...props} key={option} aria-label={`path-option-${option}`}>
+                {option}
+              </ListItem>
+            )}
           />
-        )}
-        renderOption={(props, option) => (
-          <ListItem {...props} key={option} aria-label={`path-option-${option}`}>
-            {option}
-          </ListItem>
-        )}
-      />
+        </Box>
+      </Tooltip>
     </Box>
   );
 };

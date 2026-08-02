@@ -447,3 +447,8 @@ func (s *ConnectionService) AddRecentPath(vpath string) error {
 	}
 	return s.db.AddRemoteRecent(loc.SessionKey(), vpath, loc.RemotePath)
 }
+
+// RemoveRecentPath forgets one remembered remote working directory.
+func (s *ConnectionService) RemoveRecentPath(vpath string) error {
+	return s.db.DeleteRemoteRecent(vpath)
+}

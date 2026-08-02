@@ -49,7 +49,8 @@ export type AddConnectionAction =
   | { type: 'select_config_host'; host: SSHConfigHost }
   | { type: 'set_workdir_chosen'; path: string }
   | { type: 'set_workdir_custom'; path: string }
-  | { type: 'set_workdir_remember'; remember: boolean };
+  | { type: 'set_workdir_remember'; remember: boolean }
+  | { type: 'remove_workdir_path'; path: string };
 
 /** Saved remote connection profile (from backend). */
 export type ConnectionProfile = {

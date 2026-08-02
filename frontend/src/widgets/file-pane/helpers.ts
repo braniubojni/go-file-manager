@@ -86,6 +86,77 @@ export const tabLabel = (path: string): string => {
   return base || '/';
 };
 
+/** Human wording for the backend's access codes. '' means "not known". */
+export const accessLabel = (access: string): { text: string; color: string; title: string } => {
+  switch (access) {
+    case 'full':
+      return { text: 'Full', color: 'text.primary', title: 'Read and write' };
+    case 'readonly':
+      return { text: 'Read-only', color: 'text.secondary', title: 'Readable, not writable' };
+    case 'partial':
+      return {
+        text: 'Partial',
+        color: 'warning.main',
+        title: 'Listable but not enterable, or writable without read',
+      };
+    case 'none':
+      return { text: 'No access', color: 'error.main', title: 'Permission denied' };
+    default:
+      return {
+        text: '—',
+        color: 'text.disabled',
+        title: 'Not known for remote paths — calculate folder sizes to find out',
+      };
+  }
+};
+
+/** Sort order for the permission column: most access first. */
+const accessRank = (access: string): number =>
+  ({ full: 0, readonly: 1, partial: 2, none: 3 })[access] ?? 4;
+
+const SHORTEN_MAX = 48;
+
+/**
+ * Middle-ellipsis a path for display: keeps the first and last two segments,
+ * and for `ssh://` drops the scheme and a default `:22` so the host stays
+ * readable. Returns the input unchanged when it already fits.
+ * ponytail: no `$HOME` -> `~` collapse; that needs an async GetHomeDir lookup.
+ */
+export const shortenPath = (path: string, max = SHORTEN_MAX): string => {
+  if (!path || path.length <= max) return path;
+  let prefix = '';
+  let rest = path;
+  const m = path.match(/^ssh:\/\/([^/]+)(\/.*)?$/i);
+  if (m) {
+    prefix = `${m[1].replace(/:22$/, '')}:`;
+    rest = m[2] ?? '/';
+  }
+  const sep = rest.includes('\\') && !rest.includes('/') ? '\\' : '/';
+  const lead = /^[/\\]/.test(rest) ? sep : '';
+  const segs = rest.split(/[/\\]/).filter(Boolean);
+  if (segs.length <= 3) return prefix + rest;
+  const tail = segs.slice(-2);
+  const withHead = `${prefix}${lead}${[segs[0], '…', ...tail].join(sep)}`;
+  if (withHead.length <= max) return withHead;
+  return `${prefix}${lead}${['…', ...tail].join(sep)}`;
+};
+
+/** First row whose display name starts with the typed buffer (type-ahead). */
+export const findTypeAheadPath = (rows: FileTableRow[], buffer: string): string | null => {
+  if (!buffer) return null;
+  const q = buffer.toLowerCase();
+  const hit = rows.find((r) => r.name !== '..' && r.displayName.toLowerCase().startsWith(q));
+  return hit?.path ?? null;
+};
+
+/** A bare character key that should feed type-ahead (not a shortcut). */
+export const isTypeAheadKey = (e: {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+}): boolean => e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.metaKey && !e.altKey;
+
 export const mapChildSizes = (
   map: { [key: string]: number | undefined } | null | undefined,
 ): Record<string, number> => {
@@ -134,6 +205,8 @@ const compareRows = (
       return a.modTime - b.modTime;
     case 'ext':
       return typeValue(a).localeCompare(typeValue(b));
+    case 'access':
+      return accessRank(a.access) - accessRank(b.access);
     default:
       return a.displayName.localeCompare(b.displayName);
   }

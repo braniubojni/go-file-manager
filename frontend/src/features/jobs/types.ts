@@ -19,4 +19,5 @@ export type PaneJobState = {
   clear: (pane: PaneId, jobId?: string) => void;
   /** Clears only if the job id still matches (ignore stale completions). */
   finish: (pane: PaneId, jobId: string) => void;
+  swap: () => void;
 };

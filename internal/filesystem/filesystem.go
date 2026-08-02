@@ -229,9 +229,12 @@ func entryFromDirEntry(full string, e os.DirEntry) (domain.FileEntry, error) {
 	}
 	isSymlink := info.Mode()&os.ModeSymlink != 0
 	isDir := e.IsDir()
+	// Judge access by the target: a symlink's own mode is always 0777.
+	accessInfo := info
 	if isSymlink {
 		if target, err := os.Stat(full); err == nil {
 			isDir = target.IsDir()
+			accessInfo = target
 		}
 	}
 	size := int64(0)
@@ -250,6 +253,7 @@ func entryFromDirEntry(full string, e os.DirEntry) (domain.FileEntry, error) {
 		ModTime:   info.ModTime().UnixMilli(),
 		Ext:       ext,
 		IsSymlink: isSymlink,
+		Access:    AccessFor(accessInfo),
 	}, nil
 }
 

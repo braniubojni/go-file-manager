@@ -8,6 +8,8 @@ import {
   confirmMkdir,
   confirmRename,
   confirmDelete,
+  contextAction,
+  fileAction,
   refresh,
   LEFT_DIR,
   RIGHT_DIR,
@@ -47,7 +49,7 @@ test.describe("file operations", () => {
     fs.writeFileSync(path.join(LEFT_DIR, name), "copy");
     await refresh(page);
     await selectRow(page, "left", name);
-    await page.getByTestId("btn-copy").click();
+    await fileAction(page, "btn-copy");
     await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
     await expectRowVisible(page, "right", name);
     expect(fs.existsSync(path.join(RIGHT_DIR, name))).toBeTruthy();
@@ -60,7 +62,7 @@ test.describe("file operations", () => {
     fs.writeFileSync(path.join(LEFT_DIR, name), "move");
     await refresh(page);
     await selectRow(page, "left", name);
-    await page.getByTestId("btn-move").click();
+    await fileAction(page, "btn-move");
     await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
     await expectRowVisible(page, "right", name);
     await expectRowVisible(page, "left", name, false);
@@ -77,6 +79,49 @@ test.describe("file operations", () => {
     expect(fs.existsSync(path.join(LEFT_DIR, name))).toBeFalsy();
   });
 
+  test("undo restores a deleted file", async ({ page }) => {
+    const name = `undo-me-${Date.now()}.txt`;
+    fs.writeFileSync(path.join(LEFT_DIR, name), "back");
+    await refresh(page);
+    await selectRow(page, "left", name);
+    await confirmDelete(page);
+    await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
+    expect(fs.existsSync(path.join(LEFT_DIR, name))).toBeFalsy();
+
+    await page.getByTestId("btn-undo-delete").click();
+    await expect(page.getByTestId("snackbar")).toContainText("Delete undone", { timeout: 10_000 });
+    await expectRowVisible(page, "left", name);
+    expect(fs.readFileSync(path.join(LEFT_DIR, name), "utf8")).toBe("back");
+  });
+
+  test("right-click menu renames via the dialog", async ({ page }) => {
+    const src = `ctx-src-${Date.now()}.txt`;
+    const dest = `ctx-dst-${Date.now()}.txt`;
+    fs.writeFileSync(path.join(LEFT_DIR, src), "x");
+    await refresh(page);
+    await expectRowVisible(page, "left", src);
+
+    await contextAction(page, "left", src, "ctx-rename");
+    await expect(page.getByTestId("dialog-rename")).toBeVisible();
+    await page.getByTestId("input-rename-name").locator("input").fill(dest);
+    await page.getByTestId("btn-rename-confirm").click();
+    await expectRowVisible(page, "left", dest);
+  });
+
+  test("permission column reports an unreadable folder", async ({ page }) => {
+    const name = `locked-${Date.now()}`;
+    const full = path.join(LEFT_DIR, name);
+    fs.mkdirSync(full);
+    fs.chmodSync(full, 0o000);
+    try {
+      await refresh(page);
+      const row = page.getByTestId("file-grid-left").locator(`.MuiDataGrid-row[data-id="${full}"]`);
+      await expect(row).toContainText("No access");
+    } finally {
+      fs.chmodSync(full, 0o755);
+    }
+  });
+
   test("refresh picks up external file", async ({ page }) => {
     const name = `external-${Date.now()}.txt`;
     fs.writeFileSync(path.join(LEFT_DIR, name), "disk");
@@ -89,7 +134,7 @@ test.describe("file operations", () => {
     fs.writeFileSync(path.join(LEFT_DIR, name), "bye");
     await refresh(page);
     await selectRow(page, "left", name);
-    await page.getByTestId("btn-delete").click();
+    await fileAction(page, "btn-delete");
     await expect(page.getByTestId("dialog-delete")).toBeVisible();
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("dialog-delete")).toBeHidden({ timeout: 10_000 });

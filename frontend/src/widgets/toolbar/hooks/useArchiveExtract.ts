@@ -9,6 +9,7 @@ import {
   initialExtractState,
 } from '../../../features/archive/extractDialogReducer';
 import { FileService } from '../../../shared/api/bindings';
+import { archiveStem } from '../../../shared/lib/archives';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
 import { runPaneJob } from '../helpers';
 import type { ArchiveExtractArgs } from '../types';
@@ -91,7 +92,7 @@ export const useArchiveExtract = ({
       work: async (backendJobId) => {
         for (const src of sources) {
           const base = src.split(/[/\\]/).pop() || 'extracted';
-          const stem = base.replace(/\.(tar\.(gz|bz2|xz|zst|lz4|sz)|tgz|zip|rar|7z|tar)$/i, '');
+          const stem = archiveStem(base);
           const dest = `${activePath.replace(/\/+$/, '')}/${stem || 'extracted'}`;
           await FileService.Extract(backendJobId, src, dest, password);
         }

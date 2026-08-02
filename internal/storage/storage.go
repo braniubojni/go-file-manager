@@ -289,6 +289,12 @@ WHERE session_key = ? AND id NOT IN (
 	return err
 }
 
+// DeleteRemoteRecent drops one remembered remote path.
+func (db *DB) DeleteRemoteRecent(path string) error {
+	_, err := db.sql.Exec(`DELETE FROM remote_recent WHERE path = ?`, path)
+	return err
+}
+
 // GetRemoteRecent returns recently visited paths for a session_key, newest first.
 func (db *DB) GetRemoteRecent(sessionKey string) ([]domain.RemoteRecent, error) {
 	rows, err := db.sql.Query(`

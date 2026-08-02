@@ -20,6 +20,7 @@ import TextSnippetIcon from '@mui/icons-material/TextSnippet';
 import VideoFileIcon from '@mui/icons-material/VideoFile';
 import type { SvgIconProps } from '@mui/material/SvgIcon';
 import type { FileEntry } from '../../entities/file/types';
+import { isArchiveExt } from '../lib/archives';
 
 const size = 'small' as const;
 
@@ -34,6 +35,12 @@ export const FileTypeIcon: FC<{ entry: FileEntry } & SvgIconProps> = ({ entry, .
   }
 
   const ext = (entry.ext || entry.name.split('.').pop() || '').toLowerCase();
+
+  // Shared list so the icon, the extract menu item and the extract stem regex
+  // cannot drift apart again.
+  if (isArchiveExt(ext)) {
+    return <FolderZipIcon {...props} color={iconProps.color ?? 'warning'} />;
+  }
 
   switch (ext) {
     case 'pdf':
@@ -80,15 +87,6 @@ export const FileTypeIcon: FC<{ entry: FileEntry } & SvgIconProps> = ({ entry, .
     case 'ogg':
     case 'm4a':
       return <MusicNoteIcon {...props} color={iconProps.color ?? 'secondary'} />;
-    case 'zip':
-    case 'rar':
-    case '7z':
-    case 'gz':
-    case 'tgz':
-    case 'bz2':
-    case 'xz':
-    case 'tar':
-      return <FolderZipIcon {...props} color={iconProps.color ?? 'warning'} />;
     case 'js':
     case 'jsx':
     case 'mjs':

@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import CloseIcon from '@mui/icons-material/Close';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -8,12 +9,14 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { usePathCompletions } from '../../../entities/file/queries';
 import { resolveRemoteWorkdirInput } from '../../../features/connections/helpers';
@@ -32,6 +35,7 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
   onSubmit,
   onLoadSSHConfig,
   onConnectFromConfig,
+  onForgetRecent,
 }) => {
   const workdirCustomOpen = dialog.mode === 'workdir' && Boolean(dialog.workdirCustom);
   const workdirPartial = resolveRemoteWorkdirInput(dialog.workdirHome, dialog.workdirCustom) ?? '';
@@ -182,21 +186,35 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
               {dialog.workdirPaths
                 .filter((r) => r.path !== dialog.workdirHome)
                 .map((r) => (
-                  <FormControlLabel
-                    key={r.path}
-                    value={r.path}
-                    control={<Radio size="small" />}
-                    label={
-                      <Box>
-                        <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                          {r.label}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Recent · {r.lastVisited}
-                        </Typography>
-                      </Box>
-                    }
-                  />
+                  <Box key={r.path} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <FormControlLabel
+                      sx={{ flex: 1, minWidth: 0 }}
+                      value={r.path}
+                      control={<Radio size="small" />}
+                      label={
+                        <Box>
+                          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                            {r.label}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Recent · {r.lastVisited}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                    <Tooltip title="Forget this path">
+                      <IconButton
+                        size="small"
+                        aria-label={`forget-recent-${r.path}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onForgetRecent(r.path);
+                        }}
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
                 ))}
               <FormControlLabel
                 value="__custom__"

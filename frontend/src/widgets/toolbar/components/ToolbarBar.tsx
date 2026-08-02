@@ -2,13 +2,8 @@ import type { FC } from 'react';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import BookmarkAddIcon from '@mui/icons-material/BookmarkAdd';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
-import DeleteIcon from '@mui/icons-material/Delete';
-import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
-import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
 import DifferenceIcon from '@mui/icons-material/Difference';
 import EditIcon from '@mui/icons-material/Edit';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
@@ -16,6 +11,7 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import SettingsIcon from '@mui/icons-material/Settings';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
@@ -28,6 +24,7 @@ import type { ThemePreference } from '../../../entities/file/types';
 import type { ToolbarBarProps } from '../types';
 import { BookmarksSelect } from './BookmarksSelect';
 import { ConnectionsMenu } from './ConnectionsMenu';
+import { FileActionsMenu } from './FileActionsMenu';
 
 export type { ToolbarBarProps } from '../types';
 
@@ -63,16 +60,21 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
 
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
-        <Tooltip title={`Copy to ${p.otherPaneLabel} pane`}>
-          <Button data-testid="btn-copy" startIcon={<ContentCopyIcon />} onClick={p.onCopy}>
-            Copy
-          </Button>
+        <Tooltip title="Swap left and right panes">
+          <IconButton data-testid="btn-swap-panes" onClick={p.onSwapPanes}>
+            <SwapHorizIcon />
+          </IconButton>
         </Tooltip>
-        <Tooltip title={`Move to ${p.otherPaneLabel} pane`}>
-          <Button data-testid="btn-move" startIcon={<DriveFileMoveIcon />} onClick={p.onMove}>
-            Move
-          </Button>
-        </Tooltip>
+
+        <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+        <FileActionsMenu
+          otherPaneLabel={p.otherPaneLabel}
+          onCopy={p.onCopy}
+          onMove={p.onMove}
+          onRename={p.onRename}
+          onDelete={p.onDelete}
+        />
         <Button data-testid="btn-mkdir" startIcon={<CreateNewFolderIcon />} onClick={p.onMkdir}>
           New folder
         </Button>
@@ -87,21 +89,6 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
             Diff
           </Button>
         </Tooltip>
-        <Button
-          data-testid="btn-rename"
-          startIcon={<DriveFileRenameOutlineIcon />}
-          onClick={p.onRename}
-        >
-          Rename
-        </Button>
-        <Button
-          data-testid="btn-delete"
-          color="error"
-          startIcon={<DeleteIcon />}
-          onClick={p.onDelete}
-        >
-          Delete
-        </Button>
 
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 
@@ -119,12 +106,7 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
         <ConnectionsMenu />
 
-        <Tooltip title="Bookmark current path">
-          <IconButton data-testid="btn-bookmark" onClick={p.onBookmark}>
-            <BookmarkAddIcon />
-          </IconButton>
-        </Tooltip>
-        <BookmarksSelect activePane={p.activePane} />
+        <BookmarksSelect activePane={p.activePane} onAddCurrent={p.onBookmark} />
         <Box sx={{ flex: 1 }} />
 
         <Tooltip title="Refresh both panes (F5)">

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEditorStore } from '../../../features/editor/editorStore';
-import { FileService } from '../../../shared/api/bindings';
+import { FileService, SettingsService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
+
+/** Matches the backend messages from filesystem/text.go and remote/ssh.go. */
+const BINARY_RE = /binary or unsupported encoding/i;
+const EXECUTABLE_RE = /executable file/i;
 
 export const useEditorFile = () => {
   const filePath = useEditorStore((s) => s.filePath);
@@ -32,12 +36,27 @@ export const useEditorFile = () => {
         }
       })
       .catch((e) => {
-        if (!cancelled) {
-          const msg = errMessage(e);
-          setLoadError(msg);
-          setContent('');
-          show(msg, 'error');
+        if (cancelled) return;
+        const msg = errMessage(e);
+        setContent('');
+        // Executables are NEVER handed to the OS: "open" would run them.
+        if (EXECUTABLE_RE.test(msg)) {
+          setLoadError('Executable file — it cannot be edited.');
+          show(msg, 'warning');
+          return;
         }
+        // The editor is text-only. Anything else it cannot decode (PDFs, images,
+        // documents) goes to the OS default app instead of a dead-end error.
+        // Remote files have no local copy to hand over, so they keep the error.
+        if (BINARY_RE.test(msg) && !filePath.startsWith('ssh://')) {
+          setLoadError('Binary file — opened in your default app.');
+          void SettingsService.OpenInOS(filePath).catch((openErr) =>
+            show(errMessage(openErr), 'error'),
+          );
+          return;
+        }
+        setLoadError(msg);
+        show(msg, 'error');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
