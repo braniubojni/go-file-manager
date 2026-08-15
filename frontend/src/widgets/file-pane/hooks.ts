@@ -34,6 +34,8 @@ import { errMessage } from '../../shared/lib/format';
 import { FileService } from '../../shared/api/bindings';
 import { useSnack } from '../../shared/ui/SnackbarHost';
 import { getColumns } from './consts';
+import { setDropValidity } from '../../features/dnd/dragState';
+import { refreshAfterDrop } from '../../features/dnd/refreshAfterDrop';
 import { FILE_ROW_ITEM, dropModeForDrag } from './dnd';
 import {
   allSameParentAsDest,
@@ -43,8 +45,10 @@ import {
   isCellKeyboardEvent,
   isNestedInSelf,
   isTypeAheadKey,
+  lookupFolderSize,
   mapChildSizes,
   parentOfPath,
+  sameDirPath,
   sortRowsPinParent,
 } from './helpers';
 import type { DragPayload, FileTableProps } from './types';
@@ -197,8 +201,11 @@ export const useFilePane = (id: PaneId) => {
       .then(() => {
         show(`${verb} ${paths.length} item(s)`, 'success');
         clearSelection();
-        void qc.invalidateQueries({ queryKey: ['dir'] });
-        void qc.invalidateQueries({ queryKey: ['gitStatus'] });
+        refreshAfterDrop(qc, dest, paths);
+        setActivePane(id);
+        if (!sameDirPath(dest, path)) {
+          navigate(dest);
+        }
       })
       .catch((e) => show(errMessage(e), 'error'));
   };
@@ -210,6 +217,13 @@ export const useFilePane = (id: PaneId) => {
     }
     clearJob(id, job.id);
     show('Cancelled', 'info');
+  };
+
+  const onRefresh = () => {
+    setActivePane(id);
+    if (!path) return;
+    void qc.invalidateQueries({ queryKey: ['dir', path] });
+    void qc.invalidateQueries({ queryKey: ['gitStatus', path] });
   };
 
   const onCalcSizes = () => {
@@ -230,14 +244,28 @@ export const useFilePane = (id: PaneId) => {
         return FileService.DirChildSizes(backendJobId || '', path)
           .then((res) => {
             const denied = res.denied ?? [];
-            finishSizes(id, gen, mapChildSizes(res.sizes), denied);
+            const sizes = mapChildSizes(res.sizes);
+            // Dev diagnostics: path keys must match ListDir entry.path.
+            console.debug('[gfm] DirChildSizes', {
+              path,
+              sizeKeys: Object.keys(sizes).slice(0, 8),
+              sizeCount: Object.keys(sizes).length,
+              deniedCount: denied.length,
+              sample: res,
+            });
+            finishSizes(id, gen, sizes, denied);
             finishJob(id, uiJobId);
-            show(
-              denied.length
-                ? `Folder sizes calculated — ${denied.length} folder(s) not fully readable`
-                : 'Folder sizes calculated',
-              denied.length ? 'warning' : 'success',
-            );
+            const n = Object.keys(sizes).length;
+            if (n === 0 && denied.length === 0) {
+              show('Folder sizes calculated — no subfolders found', 'info');
+            } else {
+              show(
+                denied.length
+                  ? `Folder sizes calculated — ${denied.length} folder(s) not fully readable`
+                  : `Folder sizes calculated (${n})`,
+                denied.length ? 'warning' : 'success',
+              );
+            }
           })
           .catch((e) => {
             failSizes(id, gen);
@@ -279,6 +307,7 @@ export const useFilePane = (id: PaneId) => {
     onDropPaths,
     cancelJob,
     onCalcSizes,
+    onRefresh,
     activatePane,
     setSelection,
     setFocus,
@@ -325,17 +354,35 @@ export const useFileTable = ({
   // lands in the pane's current directory. Row-level drops are handled by
   // FileGridRow (see dnd.tsx); monitor.didDrop() here skips this when a row
   // above already consumed the drop.
-  const [{ isOver: dropActive }, dropRef] = useDrop<DragPayload, void, { isOver: boolean }>(
+  const [{ isOver: dropActive, isOverShallow, canDropPane }, dropRef] = useDrop<
+    DragPayload,
+    void,
+    { isOver: boolean; isOverShallow: boolean; canDropPane: boolean }
+  >(
     () => ({
       accept: FILE_ROW_ITEM,
+      canDrop: (item) =>
+        Boolean(panePath) &&
+        !isNestedInSelf(item.paths, panePath) &&
+        !allSameParentAsDest(item.paths, panePath),
       drop: (item, monitor) => {
         if (monitor.didDrop()) return;
         onDropPaths(item.paths, panePath, item.sourcePane, dropModeForDrag());
       },
-      collect: (monitor) => ({ isOver: monitor.isOver() }),
+      collect: (monitor) => ({
+        isOver: monitor.isOver({ shallow: false }) && monitor.canDrop(),
+        isOverShallow: monitor.isOver({ shallow: true }),
+        canDropPane: monitor.canDrop(),
+      }),
     }),
     [panePath, onDropPaths],
   );
+
+  // Empty-space / chrome hover: show drop-allowed for valid cross-pane drops
+  // (e.g. remote → local) instead of stuck no-drop from a prior file-row hover.
+  useEffect(() => {
+    if (isOverShallow) setDropValidity(canDropPane);
+  }, [isOverShallow, canDropPane]);
 
   const setWrapRef = useCallback(
     (el: HTMLDivElement | null) => {
@@ -347,12 +394,18 @@ export const useFileTable = ({
 
   const baseRows = useMemo(
     () =>
-      (entries ?? []).map((e) => ({
-        ...e,
-        id: e.path,
-        displayName: displayName(e, showExtensions),
-      })),
-    [entries, showExtensions],
+      (entries ?? []).map((e) => {
+        const folderSizeBytes =
+          e.isDir && e.name !== '..' ? lookupFolderSize(folderSizes, e.path, e.name) : undefined;
+        return {
+          ...e,
+          id: e.path,
+          displayName: displayName(e, showExtensions),
+          // Stamp size onto the row so DataGrid re-renders when calculation finishes.
+          ...(folderSizeBytes != null ? { folderSizeBytes } : {}),
+        };
+      }),
+    [entries, showExtensions, folderSizes],
   );
 
   const rows = useMemo(
@@ -401,11 +454,15 @@ export const useFileTable = ({
     (key: string) => {
       const ta = typeAhead.current;
       window.clearTimeout(ta.timer);
-      ta.buffer += key.toLowerCase();
+      const ch = key.toLowerCase();
+      // Same letter again while buffer is that single char → cycle matches
+      // (Double Commander / Explorer style). Otherwise append for multi-char prefix.
+      const cycling = ta.buffer === ch;
+      if (!cycling) ta.buffer += ch;
       ta.timer = window.setTimeout(() => {
         ta.buffer = '';
       }, TYPE_AHEAD_RESET_MS);
-      const path = findTypeAheadPath(rows, ta.buffer);
+      const path = findTypeAheadPath(rows, ta.buffer, cycling ? focused : null);
       if (!path) return;
       onFocus(path);
       try {
@@ -414,7 +471,7 @@ export const useFileTable = ({
         /* ignore */
       }
     },
-    [rows, onFocus, apiRef],
+    [rows, onFocus, apiRef, focused],
   );
 
   const openFocused = useCallback(() => {

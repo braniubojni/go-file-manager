@@ -26,6 +26,7 @@ export const FilePane: FC<FilePaneProps> = ({ id }) => {
         onActivate={p.activatePane}
         onCancelJob={p.cancelJob}
         onCalcSizes={p.onCalcSizes}
+        onRefresh={p.onRefresh}
         onToggleTerminal={() => {
           p.setActivePane(id);
           p.toggleTerminal(id);
@@ -72,7 +73,14 @@ export const FilePane: FC<FilePaneProps> = ({ id }) => {
           onDropPaths={p.onDropPaths}
         />
       </Box>
-      {p.terminalOpen && <PaneTerminal paneId={id} cwd={p.path} height={p.terminalHeight} />}
+      {p.terminalOpen && (
+        <PaneTerminal
+          paneId={id}
+          cwd={p.path}
+          height={p.terminalHeight}
+          onActivate={p.activatePane}
+        />
+      )}
     </Box>
   );
 };

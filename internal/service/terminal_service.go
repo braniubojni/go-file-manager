@@ -28,12 +28,15 @@ type TerminalService struct {
 	mu     sync.Mutex
 	// paneId -> session
 	sessions map[string]ptyHandle
+	// startSeq invalidates in-flight Start when Stop runs first (fast toggle).
+	startSeq map[string]uint64
 }
 
 func NewTerminalService(remoteMgr *remote.Manager) *TerminalService {
 	return &TerminalService{
 		remote:   remoteMgr,
 		sessions: make(map[string]ptyHandle),
+		startSeq: make(map[string]uint64),
 	}
 }
 
@@ -53,14 +56,16 @@ func (t *TerminalService) emit(name string, data any) {
 // The PTY starts at 80×24; the frontend should Resize to the fitted xterm size ASAP.
 func (t *TerminalService) Start(paneID, cwd string) error {
 	t.mu.Lock()
-	_, running := t.sessions[paneID]
-	t.mu.Unlock()
-	if running {
+	if _, running := t.sessions[paneID]; running {
+		t.mu.Unlock()
 		if cwd == "" {
 			return nil
 		}
 		return t.SetCwd(paneID, cwd)
 	}
+	seq := t.startSeq[paneID] + 1
+	t.startSeq[paneID] = seq
+	t.mu.Unlock()
 
 	const defaultCols, defaultRows = 80, 24
 
@@ -81,6 +86,11 @@ func (t *TerminalService) Start(paneID, cwd string) error {
 	}
 
 	t.mu.Lock()
+	if t.startSeq[paneID] != seq {
+		t.mu.Unlock()
+		_ = handle.Close()
+		return fmt.Errorf("terminal start cancelled")
+	}
 	t.sessions[paneID] = handle
 	t.mu.Unlock()
 
@@ -139,6 +149,7 @@ func (t *TerminalService) Resize(paneID string, cols, rows int) error {
 // Stop kills the pane's shell session.
 func (t *TerminalService) Stop(paneID string) error {
 	t.mu.Lock()
+	t.startSeq[paneID]++
 	h, ok := t.sessions[paneID]
 	if ok {
 		delete(t.sessions, paneID)

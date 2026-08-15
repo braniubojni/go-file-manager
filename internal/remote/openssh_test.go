@@ -2,6 +2,7 @@ package remote
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -15,6 +16,26 @@ func TestOpenSSHTarget_alias(t *testing.T) {
 	}
 	if len(extra) != 0 {
 		t.Fatalf("extra args: %v", extra)
+	}
+}
+
+func TestIsOpenSSHConnectionError(t *testing.T) {
+	t.Parallel()
+	conn := formatOpenSSHErr(nil, "ssh: connect to host 192.168.0.5 port 22: Operation timed out")
+	if !isOpenSSHConnectionError(conn) {
+		t.Fatal("expected timeout to be connection error")
+	}
+	auth := formatOpenSSHErr(nil, "Permission denied (publickey).")
+	if isOpenSSHConnectionError(auth) {
+		t.Fatal("auth should not be connection error")
+	}
+	if !isOpenSSHAuthError(auth) {
+		t.Fatal("expected auth sentinel")
+	}
+	// Bare "timeout" in an auth-ish message must not skip native fallback.
+	kex := formatOpenSSHErr(nil, "keyboard-interactive prompt timeout")
+	if isOpenSSHConnectionError(kex) {
+		t.Fatal("generic timeout must not classify as connection error")
 	}
 }
 
@@ -36,6 +57,60 @@ func TestIsIPLiteral(t *testing.T) {
 	}
 	if isIPLiteral("pahestain") {
 		t.Fatal("alias is not IP")
+	}
+}
+
+func TestOpenSSHBaseArgs_passwordDisablesBatchMode(t *testing.T) {
+	t.Parallel()
+	spec := Spec{User: "root", Host: "45.76.7.10", Port: 22, IdentityFiles: []string{"/tmp/id_ed25519"}}
+	target, args := openSSHBaseArgs(spec, "secret")
+	if target != "root@45.76.7.10" {
+		t.Fatalf("target: %q", target)
+	}
+	joined := strings.Join(args, " ")
+	if containsFold(joined, "BatchMode=yes") {
+		t.Fatalf("password auth must not set BatchMode: %v", args)
+	}
+	if !containsFold(joined, "-i") || !containsFold(joined, "/tmp/id_ed25519") {
+		t.Fatalf("expected identity -i: %v", args)
+	}
+	if !containsFold(joined, "PreferredAuthentications=publickey,password,keyboard-interactive") {
+		t.Fatalf("expected PreferredAuthentications without alias: %v", args)
+	}
+}
+
+func TestOpenSSHBaseArgs_aliasSkipsPreferredAuth(t *testing.T) {
+	t.Parallel()
+	_, args := openSSHBaseArgs(Spec{
+		User: "u", Host: "h", Port: 22, ConfigAlias: "pahestain",
+	}, "")
+	if containsFold(strings.Join(args, " "), "PreferredAuthentications=") {
+		t.Fatalf("alias must not force PreferredAuthentications: %v", args)
+	}
+}
+
+func TestOpenSSHBaseArgs_noPasswordUsesBatchMode(t *testing.T) {
+	t.Parallel()
+	_, args := openSSHBaseArgs(Spec{User: "u", Host: "h.example", Port: 22}, "")
+	if !containsFold(strings.Join(args, " "), "BatchMode=yes") {
+		t.Fatalf("key-only should BatchMode: %v", args)
+	}
+}
+
+func TestOpenSSHBaseArgs_configFileAndPort(t *testing.T) {
+	t.Parallel()
+	target, args := openSSHBaseArgs(Spec{
+		User: "u", Host: "h.example", Port: 2222, ConfigFile: "/tmp/ssh_config",
+	}, "")
+	if target != "u@h.example" {
+		t.Fatalf("target: %q", target)
+	}
+	joined := strings.Join(args, " ")
+	if !containsFold(joined, "-F") || !containsFold(joined, "/tmp/ssh_config") {
+		t.Fatalf("expected -F: %v", args)
+	}
+	if !containsFold(joined, "-p") || !containsFold(joined, "2222") {
+		t.Fatalf("expected -p 2222: %v", args)
 	}
 }
 

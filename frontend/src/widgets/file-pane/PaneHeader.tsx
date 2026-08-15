@@ -1,4 +1,5 @@
 import CancelIcon from '@mui/icons-material/Cancel';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import StorageIcon from '@mui/icons-material/Storage';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import Box from '@mui/material/Box';
@@ -31,6 +32,7 @@ type Props = {
   onActivate: () => void;
   onCancelJob: () => void;
   onCalcSizes: () => void;
+  onRefresh: () => void;
   onToggleTerminal: () => void;
 };
 
@@ -42,6 +44,7 @@ export const PaneHeader: FC<Props> = ({
   onActivate,
   onCancelJob,
   onCalcSizes,
+  onRefresh,
   onToggleTerminal,
 }) => (
   <Box onClick={onActivate} data-testid={`pane-header-${id}`} sx={paneHeaderSx(active)}>
@@ -91,6 +94,18 @@ export const PaneHeader: FC<Props> = ({
       </Tooltip>
     )}
     <Box sx={headerSpacerSx} />
+    <Tooltip title="Refresh this pane">
+      <IconButton
+        data-testid={`btn-pane-refresh-${id}`}
+        size="small"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRefresh();
+        }}
+      >
+        <RefreshIcon fontSize="small" />
+      </IconButton>
+    </Tooltip>
     <Tooltip title="Calculate folder sizes">
       <IconButton
         data-testid={`btn-folder-sizes-${id}`}

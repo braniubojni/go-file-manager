@@ -123,18 +123,21 @@ export const useConnections = () => {
   };
 
   const connectFromConfig = async (host: SSHConfigHost, password = '') => {
+    dispatch({ type: 'select_config_host', host });
+    dispatch({ type: 'set_busy', busy: true });
     try {
       const res = await ConnectionService.ConnectFromConfig(host, password, dialog.save);
-      dispatch({ type: 'select_config_host', host });
       await afterConnect(res);
     } catch (e) {
       const msg = errMessage(e);
       if (isAuthErrorMessage(msg) && !password) {
-        dispatch({ type: 'select_config_host', host });
         dispatch({ type: 'need_password' });
         return;
       }
-      throw e;
+      dispatch({ type: 'set_error', error: msg });
+      show(msg, 'error');
+    } finally {
+      dispatch({ type: 'set_busy', busy: false });
     }
   };
 

@@ -5,6 +5,7 @@ import { useDragLayer } from 'react-dnd';
 import {
   dropModeForDrag,
   dropValidity,
+  setDropValidity,
   subscribeDropMode,
   subscribeDropValidity,
 } from '../../features/dnd/dragState';
@@ -40,7 +41,12 @@ export const FileDragLayer: FC = () => {
   useEffect(() => subscribeDropValidity(() => setValid(dropValidity())), []);
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging) {
+      setDropValidity(true);
+      return;
+    }
+    // Require an explicit valid target under the cursor (folder / pane).
+    setDropValidity(false);
     document.body.classList.add('gfm-file-dragging');
     // The first few px before the drag threshold can already have painted a
     // native text selection; drop it (CSS only blocks new selection).
@@ -48,6 +54,7 @@ export const FileDragLayer: FC = () => {
     return () => {
       document.body.classList.remove('gfm-file-dragging', 'gfm-drop-invalid');
       window.getSelection()?.removeAllRanges();
+      setDropValidity(true);
     };
   }, [isDragging]);
 

@@ -11,6 +11,7 @@ import { CodeMirrorPane } from './CodeMirrorPane';
 import { DiffMergePane } from './DiffMergePane';
 import { EditorHeader } from './EditorHeader';
 import { FolderTree } from './FolderTree';
+import { handleDialogEnter, handleDialogFormSubmit } from '../../shared/lib/dialogSubmit';
 import { useEditorFile } from './hooks/useEditorFile';
 import { useFolderTree } from './hooks/useFolderTree';
 import { useGitFileDiff } from './hooks/useGitFileDiff';
@@ -141,23 +142,32 @@ export const EditorWorkspace: FC = () => {
         )}
       </Box>
 
-      <Dialog open={confirmClose} onClose={cancelConfirm} data-testid="dialog-editor-discard">
-        <DialogTitle>Unsaved changes</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {pendingMode === 'diff'
-              ? 'Discard unsaved changes and open git diff?'
-              : pendingPath
-                ? 'Discard unsaved changes and open another file?'
-                : 'Discard unsaved changes?'}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={cancelConfirm}>Cancel</Button>
-          <Button color="error" onClick={discardAndContinue} data-testid="btn-editor-discard">
-            Discard
-          </Button>
-        </DialogActions>
+      <Dialog
+        open={confirmClose}
+        onClose={cancelConfirm}
+        data-testid="dialog-editor-discard"
+        onKeyDown={(e) => handleDialogEnter(e, discardAndContinue)}
+      >
+        <form onSubmit={(e) => handleDialogFormSubmit(e, discardAndContinue)}>
+          <DialogTitle>Unsaved changes</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {pendingMode === 'diff'
+                ? 'Discard unsaved changes and open git diff?'
+                : pendingPath
+                  ? 'Discard unsaved changes and open another file?'
+                  : 'Discard unsaved changes?'}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button type="button" onClick={cancelConfirm}>
+              Cancel
+            </Button>
+            <Button type="submit" color="error" autoFocus data-testid="btn-editor-discard">
+              Discard
+            </Button>
+          </DialogActions>
+        </form>
       </Dialog>
     </Box>
   );

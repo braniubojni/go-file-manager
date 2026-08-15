@@ -220,6 +220,11 @@ export interface SSHConfigHost {
     "user": string;
     "port": number;
     "identityFiles": string[] | null;
+
+    /**
+     * absolute path of the file this entry was read from
+     */
+    "configPath"?: string;
 }
 
 /**

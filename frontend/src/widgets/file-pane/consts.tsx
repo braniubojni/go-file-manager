@@ -3,7 +3,7 @@ import { FileTypeIcon } from '../../shared/ui/FileTypeIcon';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { formatModTime, formatSize } from '../../shared/lib/format';
-import { accessLabel, sizeValue, typeValue } from './helpers';
+import { accessLabel, lookupFolderSize, sizeValue, typeValue } from './helpers';
 
 /** Effective access for a row: a size walk that got denied overrides the
  * listing's value, and is the only source of truth for remote entries. */
@@ -59,13 +59,18 @@ export const getColumns = (
     headerName: 'Size',
     width: widths.size ?? 90,
     cellClassName: 'no-select-cell',
-    valueGetter: (_v, row) => sizeValue(row as FileEntry, folderSizes),
+    // Prefer row.folderSizeBytes (stamped when sizes finish) so DataGrid always
+    // re-renders; fall back to live folderSizes map for sorting/valueGetter.
+    valueGetter: (_v, row) => {
+      const e = row as FileEntry & { folderSizeBytes?: number };
+      if (e.isDir && e.folderSizeBytes != null) return e.folderSizeBytes;
+      return sizeValue(e, folderSizes);
+    },
     valueFormatter: (value, row) => {
-      const e = row as FileEntry;
+      const e = row as FileEntry & { folderSizeBytes?: number };
       if (e.isDir) {
-        if (folderSizes && folderSizes[e.path] != null) {
-          return formatSize(folderSizes[e.path], false);
-        }
+        const n = e.folderSizeBytes ?? lookupFolderSize(folderSizes, e.path, e.name);
+        if (n != null) return formatSize(n, false);
         return '<DIR>';
       }
       return formatSize(Number(value) || 0, false);

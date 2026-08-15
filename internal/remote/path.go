@@ -24,6 +24,7 @@ type Spec struct {
 	Port          int
 	IdentityFiles []string // private key paths to try (e.g. from SSH config IdentityFile)
 	ConfigAlias   string   // optional ~/.ssh/config Host alias used for re-resolve
+	ConfigFile    string   // optional ssh -F path (when host came from a non-default config)
 }
 
 // SessionKey returns user@host:port.

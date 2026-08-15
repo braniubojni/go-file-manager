@@ -752,16 +752,3 @@ wails3 task test:all
 | Ctrl/Cmd+click            | Multi-select                           |
 
 When adding a **new setting**, specify: key, type, default, allowed values, UI control, tooltip text, and where it is used.
-
-## Later ideas
-
-[] Key handler for scroll into file and highlight (not selected) + when user keeps clicking we scroll into the next file
-[] Remote bookmarked directories (SSH/SFTP) some colored icon in the bookmarks list to indicate remote vs local
-[] Lazy task manager where u can see running resources graphs the same way as we have in windows task manager MUI charts can be used + ability to search by port, process name, etc.
-[] 
-
-[] Archives we still need to support `rar` format
-[] FTP
-[] Compare dirs
-[] Viewer/editor
-[] Progress for large trees

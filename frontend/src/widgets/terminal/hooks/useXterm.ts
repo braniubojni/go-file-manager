@@ -43,6 +43,7 @@ export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme
 
   useEffect(() => {
     if (!hostRef.current) return;
+    let cancelled = false;
     const host = hostRef.current;
     const lastSize = { cols: 0, rows: 0 };
     lastSizeRef.current = lastSize;
@@ -71,10 +72,12 @@ export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme
     fitRef.current = fit;
 
     const onData = term.onData((data) => {
+      if (cancelled) return;
       void TerminalService.Write(paneId, data);
     });
 
     const unsubData = Events.On('terminal:data', (ev: { data?: TermPayload }) => {
+      if (cancelled) return;
       const payload = (ev?.data ?? ev) as TermPayload;
       if (payload?.paneId === paneId && typeof payload.data === 'string') {
         term.write(payload.data);
@@ -82,6 +85,7 @@ export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme
     });
 
     const unsubExit = Events.On('terminal:exit', (ev: { data?: TermPayload }) => {
+      if (cancelled) return;
       const payload = (ev?.data ?? ev) as TermPayload;
       if (payload?.paneId === paneId) {
         term.writeln('\r\n[process exited]');
@@ -95,6 +99,7 @@ export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme
 
     void TerminalService.Start(paneId, cwdRef.current)
       .then(async () => {
+        if (cancelled) return;
         startedRef.current = true;
         // Force one PTY resize even if lastSize was set only on the xterm side.
         try {
@@ -109,10 +114,12 @@ export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme
         } catch {
           /* ignore */
         }
+        if (cancelled) return;
         // Re-focus after layout/start; fit/async start can steal focus.
         term.focus();
       })
       .catch((e) => {
+        if (cancelled) return;
         term.writeln(`\r\nFailed to start terminal: ${String(e)}`);
       });
 
@@ -121,19 +128,26 @@ export const useXterm = (paneId: PaneId, cwd: string, height: number, xtermTheme
     const ro = new ResizeObserver(() => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
+        if (cancelled) return;
         fitAndMaybeResize(host, term, fit, paneId, startedRef.current, lastSize);
       });
     });
     ro.observe(host);
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(raf);
       onData.dispose();
       if (typeof unsubData === 'function') unsubData();
       if (typeof unsubExit === 'function') unsubExit();
       ro.disconnect();
-      term.dispose();
       termRef.current = null;
+      fitRef.current = null;
+      try {
+        term.dispose();
+      } catch {
+        /* xterm can throw if already tearing down */
+      }
       void TerminalService.Stop(paneId);
       startedRef.current = false;
     };
