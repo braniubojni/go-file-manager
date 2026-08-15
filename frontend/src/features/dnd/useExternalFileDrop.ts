@@ -6,7 +6,13 @@ import { usePaneStore } from '../pane/paneStore';
 import { FileService } from '../../shared/api/bindings';
 import { errMessage } from '../../shared/lib/format';
 import { useSnack } from '../../shared/ui/SnackbarHost';
-import { allSameParentAsDest, isNestedInSelf } from '../../widgets/file-pane/helpers';
+import {
+  allSameParentAsDest,
+  enterPaneTab,
+  isNestedInSelf,
+  sameDirPath,
+} from '../../widgets/file-pane/helpers';
+import { refreshAfterDrop } from './refreshAfterDrop';
 
 type DropTargetPayload = {
   id?: string;
@@ -75,8 +81,16 @@ export const useExternalFileDrop = (enabled: boolean): void => {
       void FileService.Copy(files, dest)
         .then(() => {
           show(`Copied ${files.length} item(s)`, 'success');
-          void qc.invalidateQueries({ queryKey: ['dir'] });
-          void qc.invalidateQueries({ queryKey: ['gitStatus'] });
+          refreshAfterDrop(qc, dest, files);
+          const paneId = payload.target?.attributes?.['data-pane-id'];
+          if (isPaneId(paneId)) {
+            const current = usePaneStore.getState().getPath(paneId);
+            usePaneStore.getState().setActivePane(paneId);
+            if (!sameDirPath(dest, current)) {
+              enterPaneTab(paneId, dest);
+              usePaneStore.getState().navigate(paneId, dest);
+            }
+          }
         })
         .catch((e) => show(errMessage(e), 'error'));
     });

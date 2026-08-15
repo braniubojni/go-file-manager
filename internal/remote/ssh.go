@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -40,11 +41,12 @@ type Manager struct {
 
 // Session is one connected SSH host (native Go crypto or system OpenSSH SFTP).
 type Session struct {
-	Spec   Spec
-	client *ssh.Client // nil when using system OpenSSH
-	sftp   *sftp.Client
-	cmd    *exec.Cmd // system ssh process when client == nil
-	stderr *bytes.Buffer
+	Spec     Spec
+	client   *ssh.Client // nil when using system OpenSSH
+	sftp     *sftp.Client
+	cmd      *exec.Cmd // system ssh process when client == nil
+	stderr   *bytes.Buffer
+	password string // in-memory only; reused to spawn extra ssh (remote shell)
 }
 
 // NewManager creates a session manager. keys may be nil (accept all first-seen; no persist).
@@ -76,14 +78,19 @@ func (m *Manager) Connect(spec Spec, password string) error {
 		return m.storeSession(key, sess)
 	} else if password == "" {
 		// Surface OpenSSH auth failure so UI can prompt for password/passphrase.
-		if strings.Contains(strings.ToLower(err.Error()), "authentication required") {
+		if isOpenSSHAuthError(err) {
 			return err
 		}
-		// Fall through to native for non-auth OpenSSH failures (no binary, etc.)
+		// Connection-level failures (timeout, refused, unreachable) will fail the
+		// same way via native Go crypto — don't double-wait on ConnectTimeout.
+		if isOpenSSHConnectionError(err) {
+			return err
+		}
+		// Fall through to native for other OpenSSH failures (no binary, odd
+		// subsystem issues, etc.). Prefer OpenSSH diagnostic if both fail.
 		if !strings.Contains(err.Error(), "openssh not found") {
-			// Still try native as last resort; keep OpenSSH error if both fail.
 			if err2 := m.connectNative(spec, password); err2 != nil {
-				return err // prefer OpenSSH diagnostic (matches CLI)
+				return err
 			}
 			return nil
 		}
@@ -140,7 +147,7 @@ func (m *Manager) connectNative(spec Spec, password string) error {
 		return fmt.Errorf("sftp: %w", err)
 	}
 
-	return m.storeSession(key, &Session{Spec: spec, client: conn, sftp: sftpClient})
+	return m.storeSession(key, &Session{Spec: spec, client: conn, sftp: sftpClient, password: password})
 }
 
 // Disconnect closes a session by key (user@host:port) or any path under that host.
@@ -231,10 +238,7 @@ func (m *Manager) ListDir(vpath string, showHidden bool) ([]domain.FileEntry, er
 	if err != nil {
 		return nil, err
 	}
-	rp := loc.RemotePath
-	if rp == "" {
-		rp = "/"
-	}
+	rp := remoteAbsPath(loc.RemotePath)
 	entries, err := s.sftp.ReadDir(rp)
 	if err != nil {
 		return nil, fmt.Errorf("list %s: %w", rp, err)
@@ -256,18 +260,9 @@ func (m *Manager) ListDir(vpath string, showHidden bool) ([]domain.FileEntry, er
 		if !showHidden && strings.HasPrefix(name, ".") {
 			continue
 		}
-		child := path.Join(rp, name)
-		if !strings.HasPrefix(child, "/") {
-			child = "/" + child
-		}
+		child := remoteChildPath(rp, name)
 		mode := e.Mode()
-		isDir := e.IsDir()
-		// Follow symlink type for listing convenience
-		if mode&os.ModeSymlink != 0 {
-			if st, err := s.sftp.Stat(child); err == nil {
-				isDir = st.IsDir()
-			}
-		}
+		isDir := sftpEntryIsDir(s.sftp, e, child)
 		ext := ""
 		if !isDir {
 			ext = strings.TrimPrefix(filepath.Ext(name), ".")
@@ -403,7 +398,9 @@ func (m *Manager) WriteTextFile(vpath, content string) error {
 }
 
 // DirChildSizesCtx returns recursive byte sizes for each immediate child directory
-// of a remote dir. Keys are ssh:// virtual paths. Symlinks are not followed.
+// of a remote dir. Keys are ssh:// virtual paths (same form as ListDir).
+// Symlink/junction children that resolve to directories are included (Windows
+// OpenSSH often surfaces junctions with the symlink bit).
 func (m *Manager) DirChildSizesCtx(ctx context.Context, vpath string) (domain.DirSizes, error) {
 	empty := domain.DirSizes{Sizes: map[string]int64{}, Denied: []string{}}
 	loc, err := ParseLocation(vpath)
@@ -418,6 +415,7 @@ func (m *Manager) DirChildSizesCtx(ctx context.Context, vpath string) (domain.Di
 	if rp == "" {
 		rp = "/"
 	}
+	rp = remoteAbsPath(rp)
 	info, err := s.sftp.Stat(rp)
 	if err != nil {
 		return empty, err
@@ -430,33 +428,88 @@ func (m *Manager) DirChildSizesCtx(ctx context.Context, vpath string) (domain.Di
 		return empty, err
 	}
 	out := domain.DirSizes{Sizes: map[string]int64{}, Denied: []string{}}
+	var nDir int
 	for _, e := range entries {
 		if err := ctx.Err(); err != nil {
 			return empty, err
 		}
-		if !e.IsDir() || e.Mode()&os.ModeSymlink != 0 {
+		child := remoteChildPath(rp, e.Name())
+		if !sftpEntryIsDir(s.sftp, e, child) {
 			continue
 		}
-		child := path.Join(rp, e.Name())
+		nDir++
 		size, denied, err := remoteDirSizeCtx(ctx, s.sftp, child)
 		if err != nil {
 			if ctx.Err() != nil {
 				return empty, ctx.Err()
 			}
+			// Still publish partial/zero size so the UI leaves <DIR> mode.
+			out.Sizes[loc.JoinPath(child)] = size
 			out.Denied = append(out.Denied, loc.JoinPath(child))
 			continue
 		}
+		// Key must match ListDir's Path field exactly so the UI can look up by e.path.
 		out.Sizes[loc.JoinPath(child)] = size
 		if denied {
 			out.Denied = append(out.Denied, loc.JoinPath(child))
 		}
 	}
+	log.Printf("gfm: DirChildSizes remote dir=%q entries=%d dirs=%d sized=%d denied=%d",
+		vpath, len(entries), nDir, len(out.Sizes), len(out.Denied))
 	return out, nil
+}
+
+// remoteAbsPath ensures a leading slash for SFTP paths (Windows OpenSSH Getwd
+// can return "C:/Users/…" without one).
+func remoteAbsPath(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(p, "/") {
+		return "/" + p
+	}
+	return p
+}
+
+// remoteChildPath joins parent/name for SFTP (always absolute).
+func remoteChildPath(parent, name string) string {
+	return remoteAbsPath(path.Join(parent, name))
+}
+
+// sftpEntryIsDir reports whether e is a directory at full, matching ListDir:
+// follow symlink/junction targets so Windows reparse points count as folders.
+func sftpEntryIsDir(c *sftp.Client, e os.FileInfo, full string) bool {
+	if e.Mode()&os.ModeSymlink != 0 {
+		st, err := c.Stat(full)
+		return err == nil && st.IsDir()
+	}
+	if e.IsDir() {
+		return true
+	}
+	// Some Windows OpenSSH builds omit type bits on ReadDir; Stat is authoritative.
+	// Only probe zero-size non-regular names to avoid doubling RTTs on every file.
+	if !sftpDirProbeCandidate(e) {
+		return false
+	}
+	st, err := c.Stat(full)
+	return err == nil && st.IsDir()
+}
+
+func sftpDirProbeCandidate(e os.FileInfo) bool {
+	// Do not use IsRegular(): omitted type bits look regular, which is the
+	// Windows OpenSSH case we still need to Stat.
+	if e.IsDir() || e.Mode()&os.ModeSymlink != 0 {
+		return false
+	}
+	return e.Size() == 0
 }
 
 // remoteDirSizeCtx sums a remote tree. An unreadable subdirectory contributes 0
 // and sets denied instead of aborting: on a Windows host most of the tree is
 // unreadable, and aborting made every top-level child disappear from the result.
+// Nested symlinks are not followed (loop risk); junctions already resolved at
+// the parent listing are walked as normal directories after Stat.
 // ponytail: serial — one SFTP round-trip per directory. If deep trees feel slow,
 // the upgrade is a bounded worker pool over the child directories.
 func remoteDirSizeCtx(ctx context.Context, c *sftp.Client, root string) (total int64, denied bool, err error) {
@@ -468,11 +521,13 @@ func remoteDirSizeCtx(ctx context.Context, c *sftp.Client, root string) (total i
 		if err := ctx.Err(); err != nil {
 			return 0, denied, err
 		}
+		child := remoteChildPath(root, e.Name())
+		// Skip pure symlinks inside the tree (do not follow). Still count
+		// real directories, including ones that only Stat can identify.
 		if e.Mode()&os.ModeSymlink != 0 {
 			continue
 		}
-		child := path.Join(root, e.Name())
-		if e.IsDir() {
+		if sftpEntryIsDir(c, e, child) {
 			sub, subDenied, err := remoteDirSizeCtx(ctx, c, child)
 			if err != nil {
 				return 0, denied, err

@@ -22,6 +22,31 @@ test.describe("file operations", () => {
     await page.getByTestId("pane-left").click();
   });
 
+  test("creates a folder when pressing Enter in the dialog", async ({ page }) => {
+    const name = `folder-enter-${Date.now()}`;
+    await page.getByTestId("btn-mkdir").click();
+    await expect(page.getByTestId("dialog-mkdir")).toBeVisible();
+    const input = page.getByTestId("input-mkdir-name").locator("input");
+    await input.fill(name);
+    await input.press("Enter");
+    await expect(page.getByTestId("dialog-mkdir")).toBeHidden({ timeout: 10_000 });
+    await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
+    await expectRowVisible(page, "left", name);
+    expect(fs.existsSync(path.join(LEFT_DIR, name))).toBeTruthy();
+  });
+
+  test("creates a file when pressing Enter in the dialog", async ({ page }) => {
+    const name = `file-enter-${Date.now()}.txt`;
+    await page.getByTestId("btn-mkfile").click();
+    await expect(page.getByTestId("dialog-mkfile")).toBeVisible();
+    const input = page.getByTestId("input-mkfile-name").locator("input");
+    await input.fill(name);
+    await input.press("Enter");
+    await expect(page.getByTestId("dialog-mkfile")).toBeHidden({ timeout: 10_000 });
+    await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
+    await expectRowVisible(page, "left", name);
+  });
+
   test("creates a folder with mkdir", async ({ page }) => {
     const name = `folder-${Date.now()}`;
     await confirmMkdir(page, name);
@@ -151,6 +176,22 @@ test.describe("file operations", () => {
     await expect(page.getByTestId("dialog-archive")).toBeVisible();
     await page.getByTestId("input-archive-name").locator("input").fill(`bundle-${Date.now()}`);
     await page.getByTestId("btn-archive-confirm").click();
+    await expect(page.getByTestId("snackbar")).toContainText("Archive created", {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("dialog-archive")).toBeHidden();
+  });
+
+  test("archives when pressing Enter in the dialog", async ({ page }) => {
+    const name = `to-zip-enter-${Date.now()}.txt`;
+    fs.writeFileSync(path.join(LEFT_DIR, name), "zipme");
+    await refresh(page);
+    await selectRow(page, "left", name);
+    await page.getByTestId("btn-archive").click();
+    await expect(page.getByTestId("dialog-archive")).toBeVisible();
+    const input = page.getByTestId("input-archive-name").locator("input");
+    await input.fill(`bundle-enter-${Date.now()}`);
+    await input.press("Enter");
     await expect(page.getByTestId("snackbar")).toContainText("Archive created", {
       timeout: 15_000,
     });

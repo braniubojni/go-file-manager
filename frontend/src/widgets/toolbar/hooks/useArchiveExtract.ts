@@ -52,6 +52,7 @@ export const useArchiveExtract = ({
   };
 
   const confirmArchive = async () => {
+    if (!archive.open || archive.busy) return;
     if (!realSelection.length || !activePath) return;
     const sources = [...realSelection];
     const { format, encrypt, password: pwd } = archive;
@@ -78,6 +79,7 @@ export const useArchiveExtract = ({
   };
 
   const confirmExtract = async () => {
+    if (!extract.open || extract.busy) return;
     if (!realSelection.length || !activePath) return;
     const sources = [...realSelection];
     const password = extract.password;

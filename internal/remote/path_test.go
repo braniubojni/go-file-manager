@@ -55,3 +55,22 @@ func TestParseLocationAndParent(t *testing.T) {
 		t.Fatal("IsRemote")
 	}
 }
+
+func TestRemoteAbsAndChildPath(t *testing.T) {
+	t.Parallel()
+	if got := remoteAbsPath(""); got != "/" {
+		t.Fatalf("empty: %q", got)
+	}
+	if got := remoteAbsPath("C:/Users"); got != "/C:/Users" {
+		t.Fatalf("drive: %q", got)
+	}
+	if got := remoteAbsPath("/C:/Users"); got != "/C:/Users" {
+		t.Fatalf("already abs: %q", got)
+	}
+	if got := remoteChildPath("/C:/Users", "Desktop"); got != "/C:/Users/Desktop" {
+		t.Fatalf("child: %q", got)
+	}
+	if got := remoteChildPath("C:/Users", "Desktop"); got != "/C:/Users/Desktop" {
+		t.Fatalf("child no slash: %q", got)
+	}
+}

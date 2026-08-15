@@ -63,6 +63,9 @@ export const parentOfPath = (path: string): string => {
 export const isNestedInSelf = (paths: string[], dest: string): boolean =>
   paths.some((p) => p === dest || dest.startsWith(p + '/') || dest.startsWith(p + '\\'));
 
+export const sameDirPath = (a: string, b: string): boolean =>
+  a.replace(/[/\\]+$/, '') === b.replace(/[/\\]+$/, '');
+
 export const allSameParentAsDest = (paths: string[], dest: string): boolean => {
   const destNorm = dest.replace(/\/+$/, '');
   return paths.every((p) => {
@@ -141,12 +144,25 @@ export const shortenPath = (path: string, max = SHORTEN_MAX): string => {
   return `${prefix}${lead}${['…', ...tail].join(sep)}`;
 };
 
-/** First row whose display name starts with the typed buffer (type-ahead). */
-export const findTypeAheadPath = (rows: FileTableRow[], buffer: string): string | null => {
+/**
+ * First row whose display name starts with the typed buffer (type-ahead).
+ * When `fromPath` is set and already matches the buffer, returns the *next*
+ * match after that row (wraps), so repeated same-letter presses cycle.
+ */
+export const findTypeAheadPath = (
+  rows: FileTableRow[],
+  buffer: string,
+  fromPath?: string | null,
+): string | null => {
   if (!buffer) return null;
   const q = buffer.toLowerCase();
-  const hit = rows.find((r) => r.name !== '..' && r.displayName.toLowerCase().startsWith(q));
-  return hit?.path ?? null;
+  const matches = rows.filter((r) => r.name !== '..' && r.displayName.toLowerCase().startsWith(q));
+  if (!matches.length) return null;
+  if (!fromPath) return matches[0].path;
+
+  const curIdx = matches.findIndex((r) => r.path === fromPath);
+  if (curIdx < 0) return matches[0].path;
+  return matches[(curIdx + 1) % matches.length].path;
 };
 
 /** A bare character key that should feed type-ahead (not a shortcut). */
@@ -157,16 +173,51 @@ export const isTypeAheadKey = (e: {
   altKey: boolean;
 }): boolean => e.key.length === 1 && e.key !== ' ' && !e.ctrlKey && !e.metaKey && !e.altKey;
 
+/** Coerce Wails/JSON map values (number | numeric string | bigint) into a plain Record. */
 export const mapChildSizes = (
-  map: { [key: string]: number | undefined } | null | undefined,
+  map: { [key: string]: number | string | undefined } | null | undefined,
 ): Record<string, number> => {
   const sizes: Record<string, number> = {};
-  if (map) {
-    for (const [k, v] of Object.entries(map)) {
-      if (typeof v === 'number') sizes[k] = v;
+  if (!map) return sizes;
+  for (const [k, v] of Object.entries(map)) {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      sizes[k] = v;
+      continue;
+    }
+    if (typeof v === 'string' && v.trim() !== '') {
+      const n = Number(v);
+      if (Number.isFinite(n)) sizes[k] = n;
+      continue;
+    }
+    // bigint (some bridges) — use loose check so we don't need ES2020 lib target
+    if (typeof v === 'bigint') {
+      sizes[k] = Number(v);
     }
   }
   return sizes;
+};
+
+/**
+ * Look up a calculated folder size for a row. Prefers exact path match (ListDir
+ * key), then suffix/basename match when bridges or path normalization drift.
+ */
+export const lookupFolderSize = (
+  folderSizes: Record<string, number> | undefined,
+  path: string,
+  name?: string,
+): number | undefined => {
+  if (!folderSizes) return undefined;
+  const direct = folderSizes[path];
+  if (direct != null) return direct;
+  const base = name || path.split(/[/\\]/).filter(Boolean).pop() || '';
+  if (!base) return undefined;
+  if (folderSizes[base] != null) return folderSizes[base];
+  const slashSuffix = `/${base}`;
+  const bslashSuffix = `\\${base}`;
+  for (const [k, v] of Object.entries(folderSizes)) {
+    if (k.endsWith(slashSuffix) || k.endsWith(bslashSuffix) || k === base) return v;
+  }
+  return undefined;
 };
 
 export const displayName = (e: FileEntry, showExtensions: boolean): string => {
@@ -177,7 +228,10 @@ export const displayName = (e: FileEntry, showExtensions: boolean): string => {
 };
 
 export const sizeValue = (e: FileEntry, folderSizes?: Record<string, number>): number => {
-  if (e.isDir && folderSizes && folderSizes[e.path] != null) return folderSizes[e.path];
+  if (e.isDir) {
+    const n = lookupFolderSize(folderSizes, e.path, e.name);
+    if (n != null) return n;
+  }
   return e.size;
 };
 

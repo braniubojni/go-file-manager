@@ -1,13 +1,6 @@
 import { GridRow } from '@mui/x-data-grid/components';
 import type { GridSlotProps } from '@mui/x-data-grid/models';
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  type RefCallback,
-} from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, type RefCallback } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { dropModeForDrag, setDropValidity } from '../../features/dnd/dragState';
 import type { PaneId } from '../../entities/file/types';
@@ -24,6 +17,8 @@ export const FILE_ROW_ITEM = 'FILE_ROWS';
 
 interface FileRowContextValue {
   paneId: PaneId;
+  /** Current directory of this pane (fallthrough target when not on a folder row). */
+  panePath: string;
   selected: string[];
   onDropPaths: FileTableProps['onDropPaths'];
 }
@@ -32,6 +27,10 @@ const FileRowContext = createContext<FileRowContextValue | null>(null);
 export const FileRowProvider = FileRowContext.Provider;
 
 const isParentRow = (name: string): boolean => name === '..';
+
+/** Whether dropping `paths` into `destDir` is allowed (pane or folder target). */
+const canDropInto = (paths: string[], destDir: string): boolean =>
+  Boolean(destDir) && !isNestedInSelf(paths, destDir) && !allSameParentAsDest(paths, destDir);
 
 /** Wails OS file-drop targets (no badge — drop handling only). */
 const applyOsDropAttrs = (
@@ -58,6 +57,7 @@ export const FileGridRow = (props: GridSlotProps['row']) => {
   const row = props.row as FileTableRow;
   const elRef = useRef<HTMLDivElement | null>(null);
   const isFolderDrop = Boolean(row.isDir && !isParentRow(row.name));
+  const panePath = ctx?.panePath ?? '';
 
   const [{ isDragging }, dragRef] = useDrag(
     () => ({
@@ -84,23 +84,27 @@ export const FileGridRow = (props: GridSlotProps['row']) => {
   >(
     () => ({
       accept: FILE_ROW_ITEM,
-      canDrop: (item) =>
-        isFolderDrop &&
-        !isNestedInSelf(item.paths, row.path) &&
-        !allSameParentAsDest(item.paths, row.path),
+      // Only folder rows *consume* the drop. File rows reject so the pane
+      // fallthrough target receives it — but hover feedback must still
+      // reflect that fallthrough (remote→local onto a file row is valid).
+      canDrop: (item) => isFolderDrop && canDropInto(item.paths, row.path),
+      hover: (item, monitor) => {
+        if (!monitor.isOver({ shallow: true })) return;
+        if (isFolderDrop) {
+          setDropValidity(canDropInto(item.paths, row.path));
+        } else {
+          setDropValidity(canDropInto(item.paths, panePath));
+        }
+      },
       drop: (item) => ctx!.onDropPaths(item.paths, row.path, item.sourcePane, dropModeForDrag()),
       collect: (monitor) => ({
         hovered: monitor.isOver({ shallow: true }),
         canDrop: monitor.canDrop(),
       }),
     }),
-    [ctx, row, isFolderDrop],
+    [ctx, row, isFolderDrop, panePath],
   );
   const isOver = hovered && canDrop;
-
-  useEffect(() => {
-    if (hovered) setDropValidity(canDrop);
-  }, [hovered, canDrop]);
 
   useLayoutEffect(() => {
     applyOsDropAttrs(elRef.current, {

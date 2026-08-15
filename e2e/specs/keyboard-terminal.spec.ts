@@ -77,6 +77,22 @@ test.describe("keyboard navigation and terminal", () => {
     await expect(page.getByTestId("status-selected")).toContainText("Selected: 1");
   });
 
+  test("clicking a pane terminal activates that pane", async ({ page }) => {
+    await page.getByTestId("btn-terminal-toggle-left").click();
+    await page.getByTestId("btn-terminal-toggle-right").click();
+    await expect(page.getByTestId("terminal-left")).toBeVisible();
+    await expect(page.getByTestId("terminal-right")).toBeVisible();
+
+    await fileGrid(page, "left").click();
+    await expect(page.getByTestId("status-active-pane")).toContainText("left");
+
+    await page.getByTestId("terminal-right").click();
+    await expect(page.getByTestId("status-active-pane")).toContainText("right");
+
+    await page.getByTestId("terminal-left").click();
+    await expect(page.getByTestId("status-active-pane")).toContainText("left");
+  });
+
   test("terminal resize handle is present when open", async ({ page }) => {
     await page.getByTestId("btn-terminal-toggle-left").click();
     await expect(page.getByTestId("terminal-left")).toBeVisible();

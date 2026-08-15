@@ -7,7 +7,12 @@ export type DragPayload = {
   primary: { name: string; isDir: boolean };
 };
 
-export type FileTableRow = FileEntry & { id: string; displayName: string };
+export type FileTableRow = FileEntry & {
+  id: string;
+  displayName: string;
+  /** Recursive size from "Calculate folder sizes" when available. */
+  folderSizeBytes?: number;
+};
 
 export type FilePaneProps = {
   id: PaneId;

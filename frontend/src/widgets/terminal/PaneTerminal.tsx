@@ -12,7 +12,7 @@ import { darkTheme, lightTheme } from './themes';
 import type { PaneTerminalProps } from './types';
 import '@xterm/xterm/css/xterm.css';
 
-export const PaneTerminal: FC<PaneTerminalProps> = ({ paneId, cwd, height }) => {
+export const PaneTerminal: FC<PaneTerminalProps> = ({ paneId, cwd, height, onActivate }) => {
   const muiTheme = useTheme();
   const mode = muiTheme.palette.mode;
   const xtermTheme = useMemo(() => (mode === 'dark' ? darkTheme : lightTheme), [mode]);
@@ -24,6 +24,7 @@ export const PaneTerminal: FC<PaneTerminalProps> = ({ paneId, cwd, height }) => 
   const onResizeStart = (e: ReactMouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    onActivate();
     dragRef.current = { startY: e.clientY, startH: height };
 
     const onMove = (ev: MouseEvent) => {
@@ -49,7 +50,12 @@ export const PaneTerminal: FC<PaneTerminalProps> = ({ paneId, cwd, height }) => 
   };
 
   return (
-    <Box data-testid={`terminal-${paneId}`} sx={terminalRootSx(height, bg)}>
+    <Box
+      data-testid={`terminal-${paneId}`}
+      sx={terminalRootSx(height, bg)}
+      onMouseDownCapture={onActivate}
+      onFocusCapture={onActivate}
+    >
       <Box
         data-testid={`terminal-resize-${paneId}`}
         onMouseDown={onResizeStart}

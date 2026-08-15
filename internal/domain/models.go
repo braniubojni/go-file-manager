@@ -226,6 +226,7 @@ type SSHConfigHost struct {
 	User          string   `json:"user"`
 	Port          int      `json:"port"`
 	IdentityFiles []string `json:"identityFiles"`
+	ConfigPath    string   `json:"configPath,omitempty"` // absolute path of the file this entry was read from
 }
 
 // RemoteRecent is a recently visited remote directory path.

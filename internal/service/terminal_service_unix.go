@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/creack/pty"
@@ -14,8 +15,10 @@ import (
 
 // localPTY is a local login shell running under a PTY.
 type localPTY struct {
-	cmd  *exec.Cmd
-	ptmx *os.File
+	cmd       *exec.Cmd
+	ptmx      *os.File
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // spawnLocalPTY starts a login shell in a PTY at cwd (cwd may be empty).
@@ -95,12 +98,14 @@ func (l *localPTY) Resize(cols, rows int) error {
 }
 
 func (l *localPTY) Close() error {
-	err := l.ptmx.Close()
-	if l.cmd.Process != nil {
-		_ = l.cmd.Process.Signal(syscall.SIGHUP)
-		_ = l.cmd.Process.Kill()
-	}
-	return err
+	l.closeOnce.Do(func() {
+		l.closeErr = l.ptmx.Close()
+		if l.cmd.Process != nil {
+			_ = l.cmd.Process.Signal(syscall.SIGHUP)
+			_ = l.cmd.Process.Kill()
+		}
+	})
+	return l.closeErr
 }
 
 func (l *localPTY) ExitCode() int {

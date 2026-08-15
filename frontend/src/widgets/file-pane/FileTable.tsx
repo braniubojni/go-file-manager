@@ -44,7 +44,12 @@ export const FileTable: FC<FileTableProps> = (props) => {
         )
       ) : (
         <FileRowProvider
-          value={{ paneId: t.paneId, selected: t.selected, onDropPaths: t.onDropPaths }}
+          value={{
+            paneId: t.paneId,
+            panePath: props.panePath,
+            selected: t.selected,
+            onDropPaths: t.onDropPaths,
+          }}
         >
           <DataGrid
             apiRef={t.apiRef}

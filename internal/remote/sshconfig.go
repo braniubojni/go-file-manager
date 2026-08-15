@@ -102,6 +102,7 @@ func SpecFromSSHConfigHost(h domain.SSHConfigHost) Spec {
 		Port:          port,
 		IdentityFiles: append([]string(nil), h.IdentityFiles...),
 		ConfigAlias:   h.Alias,
+		ConfigFile:    strings.TrimSpace(h.ConfigPath),
 	}
 }
 
@@ -213,6 +214,7 @@ func ParseSSHConfigFile(configPath string) ([]domain.SSHConfigHost, error) {
 		if cur.User == "" {
 			cur.User = currentUser
 		}
+		cur.ConfigPath = configPath
 		hosts = append(hosts, *cur)
 		cur = nil
 	}

@@ -85,7 +85,9 @@ export const useFileOpDialogs = ({
   };
 
   const confirmDelete = () => {
+    if (!del.confirmOpen) return;
     const paths = del.paths.length ? del.paths : realSelection;
+    if (!paths.length) return;
     dispatchDelete({ type: 'close_confirm' });
     ops.del.mutate(paths, {
       // Empty batch id = nothing restorable (remote, or cross-volume): no Undo.
@@ -118,7 +120,9 @@ export const useFileOpDialogs = ({
   };
 
   const confirmMkdir = () => {
+    if (!mkdir.open) return;
     const name = mkdir.name.trim();
+    if (!name) return;
     dispatchMkdir({ type: 'close' });
     ops.mkdir.mutate(
       { parent: activePath, name },
@@ -134,7 +138,9 @@ export const useFileOpDialogs = ({
   };
 
   const confirmMkfile = () => {
+    if (!mkfile.open) return;
     const name = mkfile.name.trim();
+    if (!name) return;
     dispatchMkfile({ type: 'close' });
     ops.mkfile.mutate(
       { parent: activePath, name },
@@ -149,8 +155,10 @@ export const useFileOpDialogs = ({
   };
 
   const confirmRename = () => {
+    if (!rename.open) return;
     const newName = rename.name.trim();
     const oldPath = realSelection[0];
+    if (!newName || !oldPath) return;
     dispatchRename({ type: 'close' });
     ops.rename.mutate(
       { oldPath, newName },

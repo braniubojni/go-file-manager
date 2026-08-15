@@ -82,6 +82,8 @@ export type SSHConfigHost = {
   user: string;
   port: number;
   identityFiles: string[];
+  /** Absolute path of the config file this entry was loaded from (for ssh -F). */
+  configPath?: string;
 };
 
 /** Recently visited remote directory (mirrors domain.RemoteRecent). */

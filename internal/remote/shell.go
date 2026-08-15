@@ -12,9 +12,11 @@ import (
 
 // ShellSession is one interactive PTY shell (native SSH session or system ssh -tt).
 type ShellSession struct {
-	session *ssh.Session // native path
-	cmd     *exec.Cmd    // OpenSSH path
-	stdin   io.WriteCloser
+	session   *ssh.Session // native path
+	cmd       *exec.Cmd    // OpenSSH path
+	stdin     io.WriteCloser
+	closeOnce sync.Once
+	closeErr  error
 }
 
 // OpenShell starts an interactive shell on the session's host, with a PTY sized
@@ -37,9 +39,10 @@ func (m *Manager) OpenShell(vpath string, cols, rows int) (*ShellSession, io.Rea
 		rows = 24
 	}
 
-	// System OpenSSH SFTP sessions have no *ssh.Client — spawn interactive ssh.
+	// System OpenSSH SFTP sessions have no *ssh.Client — spawn interactive ssh
+	// with the same auth (password/askpass, identities, -F) as the SFTP session.
 	if s.client == nil {
-		return openShellOpenSSH(s.Spec, loc.RemotePath, cols, rows)
+		return openShellOpenSSH(s.Spec, s.password, loc.RemotePath, cols, rows)
 	}
 
 	sess, err := s.client.NewSession()
@@ -94,20 +97,15 @@ func (m *Manager) OpenShell(vpath string, cols, rows int) (*ShellSession, io.Rea
 	return &ShellSession{session: sess, stdin: stdin}, pr, nil
 }
 
-func openShellOpenSSH(spec Spec, remotePath string, cols, rows int) (*ShellSession, io.Reader, error) {
+func openShellOpenSSH(spec Spec, password, remotePath string, cols, rows int) (*ShellSession, io.Reader, error) {
 	sshPath, err := exec.LookPath("ssh")
 	if err != nil {
 		return nil, nil, fmt.Errorf("openssh not found for remote shell: %w", err)
 	}
-	target, extra := openSSHTarget(spec)
-	args := append(append([]string{}, extra...),
-		"-tt",
-		"-o", "ConnectTimeout=20",
-		"-o", "BatchMode=yes",
-		target,
-	)
+	target, args := openSSHBaseArgs(spec, password)
+	args = append(args, "-tt", target)
 	cmd := exec.Command(sshPath, args...)
-	cmd.Env = openSSHEnv("")
+	cmd.Env = openSSHEnv(password)
 	// Best-effort initial size via env (not all ssh builds honor this).
 	cmd.Env = append(cmd.Env, "COLUMNS="+strconv.Itoa(cols), "LINES="+strconv.Itoa(rows))
 
@@ -126,6 +124,8 @@ func openShellOpenSSH(spec Spec, remotePath string, cols, rows int) (*ShellSessi
 	if err := cmd.Start(); err != nil {
 		return nil, nil, fmt.Errorf("start ssh shell: %w", err)
 	}
+	// Wait is owned by this reaper — Close only signals kill (same as SFTP).
+	go func() { _ = cmd.Wait() }()
 	if remotePath != "" && remotePath != "/" {
 		// Windows OpenSSH may ignore unix cd; best-effort.
 		_, _ = fmt.Fprintf(stdin, "cd %q\n", remotePath)
@@ -165,17 +165,20 @@ func (sh *ShellSession) Resize(cols, rows int) error {
 	return nil
 }
 
-// Close ends the shell session.
+// Close ends the shell session. Safe to call more than once (Start/Stop race).
 func (sh *ShellSession) Close() error {
-	if sh.session != nil {
-		return sh.session.Close()
-	}
-	if sh.stdin != nil {
-		_ = sh.stdin.Close()
-	}
-	if sh.cmd != nil && sh.cmd.Process != nil {
-		_ = sh.cmd.Process.Kill()
-		_, _ = sh.cmd.Process.Wait()
-	}
-	return nil
+	sh.closeOnce.Do(func() {
+		if sh.session != nil {
+			sh.closeErr = sh.session.Close()
+			return
+		}
+		if sh.stdin != nil {
+			_ = sh.stdin.Close()
+		}
+		if sh.cmd != nil && sh.cmd.Process != nil {
+			// Wait is owned by openShellOpenSSH's reaper goroutine.
+			_ = sh.cmd.Process.Kill()
+		}
+	})
+	return sh.closeErr
 }

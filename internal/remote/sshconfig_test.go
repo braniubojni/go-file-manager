@@ -219,12 +219,16 @@ func TestSpecFromSSHConfigHost(t *testing.T) {
 	s := SpecFromSSHConfigHost(domain.SSHConfigHost{
 		Alias: "pahestain", HostName: "100.97.100.94", User: "mfmso", Port: 22,
 		IdentityFiles: []string{"/tmp/key"},
+		ConfigPath:    "/home/u/.ssh/config",
 	})
 	if s.User != "mfmso" || s.Host != "100.97.100.94" || s.ConfigAlias != "pahestain" {
 		t.Fatalf("got %+v", s)
 	}
 	if len(s.IdentityFiles) != 1 || s.IdentityFiles[0] != "/tmp/key" {
 		t.Fatalf("identity: %+v", s.IdentityFiles)
+	}
+	if s.ConfigFile != "/home/u/.ssh/config" {
+		t.Fatalf("config file: %q", s.ConfigFile)
 	}
 }
 
