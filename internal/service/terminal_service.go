@@ -41,6 +41,9 @@ func NewTerminalService(remoteMgr *remote.Manager) *TerminalService {
 }
 
 // SetApp injects the application for event emission (call after application.New).
+// Backend wiring only — not part of the frontend IPC surface.
+//
+//wails:ignore
 func (t *TerminalService) SetApp(app *application.App) {
 	t.app = app
 }

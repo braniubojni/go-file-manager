@@ -57,3 +57,24 @@ func TestReplaceAllInPaths(t *testing.T) {
 		t.Fatalf("files=%d reps=%d", files, reps)
 	}
 }
+
+func TestReplaceAllInPathsSkipsMissingBinaryOversize(t *testing.T) {
+	root := t.TempDir()
+	good := filepath.Join(root, "good.txt")
+	missing := filepath.Join(root, "gone.txt")
+	bin := filepath.Join(root, "bin.dat")
+	_ = os.WriteFile(good, []byte("foo\n"), 0o644)
+	_ = os.WriteFile(bin, []byte{0x00, 0xff, 'f', 'o', 'o'}, 0o644)
+
+	files, reps, err := ReplaceAllInPaths([]string{good, missing, bin}, "foo", "bar", true)
+	if err != nil {
+		t.Fatalf("expected skip of missing/binary, got err: %v", err)
+	}
+	if files != 1 || reps != 1 {
+		t.Fatalf("files=%d reps=%d", files, reps)
+	}
+	data, _ := os.ReadFile(good)
+	if string(data) != "bar\n" {
+		t.Fatalf("good file not replaced: %q", data)
+	}
+}

@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -61,6 +62,7 @@ func ReplaceAllInFile(path, find, replace string, caseSensitive bool) (int, erro
 }
 
 // ReplaceAllInPaths replaces find in each path once (all occurrences per file).
+// Missing, binary, and oversize files are skipped; other errors abort the batch.
 func ReplaceAllInPaths(paths []string, find, replace string, caseSensitive bool) (filesChanged, replacements int, err error) {
 	seen := make(map[string]struct{}, len(paths))
 	for _, p := range paths {
@@ -74,8 +76,7 @@ func ReplaceAllInPaths(paths []string, find, replace string, caseSensitive bool)
 		seen[abs] = struct{}{}
 		n, rerr := ReplaceAllInFile(abs, find, replace, caseSensitive)
 		if rerr != nil {
-			// skip missing / binary
-			if os.IsNotExist(rerr) {
+			if isSkippableReplaceError(rerr) {
 				continue
 			}
 			return filesChanged, replacements, rerr
@@ -86,6 +87,17 @@ func ReplaceAllInPaths(paths []string, find, replace string, caseSensitive bool)
 		}
 	}
 	return filesChanged, replacements, nil
+}
+
+// isSkippableReplaceError reports errors that should not abort a multi-file replace.
+func isSkippableReplaceError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrNotFound) || errors.Is(err, ErrBinary) || errors.Is(err, ErrTooLarge) {
+		return true
+	}
+	return os.IsNotExist(err)
 }
 
 func matchAt(body string, col int, find string, caseSensitive bool) (int, bool) {

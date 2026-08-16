@@ -26,17 +26,24 @@ export const includeIsOnlyRoot = (include: string, root: string): boolean => {
     .every((p) => p === rootNorm || p === root);
 };
 
+/**
+ * Split lineText for match highlighting.
+ * start/end are 0-based UTF-8 byte offsets into LineText (see ContentSearchHit),
+ * not JS string (UTF-16 code unit) indices.
+ */
 export const highlightLine = (
   text: string,
   start: number,
   end: number,
 ): { before: string; mid: string; after: string } => {
-  const s = Math.max(0, Math.min(start, text.length));
-  const e = Math.max(s, Math.min(end, text.length));
+  const bytes = new TextEncoder().encode(text);
+  const s = Math.max(0, Math.min(start, bytes.length));
+  const e = Math.max(s, Math.min(end, bytes.length));
+  const decoder = new TextDecoder();
   return {
-    before: text.slice(0, s),
-    mid: text.slice(s, e),
-    after: text.slice(e),
+    before: decoder.decode(bytes.subarray(0, s)),
+    mid: decoder.decode(bytes.subarray(s, e)),
+    after: decoder.decode(bytes.subarray(e)),
   };
 };
 

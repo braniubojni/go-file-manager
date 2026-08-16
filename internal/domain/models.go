@@ -119,10 +119,10 @@ type ContentSearchHit struct {
 	Path       string `json:"path"`
 	RelPath    string `json:"relPath"`
 	Line       int    `json:"line"`       // 1-based
-	Column     int    `json:"column"`     // 1-based start of match
-	LineText   string `json:"lineText"`   // single line preview
-	MatchStart int    `json:"matchStart"` // 0-based rune/byte index in LineText
-	MatchEnd   int    `json:"matchEnd"`   // exclusive
+	Column     int    `json:"column"`     // 1-based byte index of match on the full line
+	LineText   string `json:"lineText"`   // windowed single-line preview (may include …)
+	MatchStart int    `json:"matchStart"` // 0-based byte index into LineText
+	MatchEnd   int    `json:"matchEnd"`   // exclusive byte index into LineText
 }
 
 // SearchPrefs is the last Find-in-files dialog state (persisted).
