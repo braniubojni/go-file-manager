@@ -11,10 +11,6 @@
 // @ts-ignore: Unused imports
 import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wailsio/runtime";
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
-
 /**
  * IsRunning reports whether a session exists for the pane.
  */
@@ -27,13 +23,6 @@ export function IsRunning(paneID: string): $CancellablePromise<boolean> {
  */
 export function Resize(paneID: string, cols: number, rows: number): $CancellablePromise<void> {
     return $Call.ByID(3439050986, paneID, cols, rows);
-}
-
-/**
- * SetApp injects the application for event emission (call after application.New).
- */
-export function SetApp(app: application$0.App | null): $CancellablePromise<void> {
-    return $Call.ByID(850735781, app);
 }
 
 /**

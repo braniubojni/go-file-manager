@@ -36,14 +36,16 @@ func CreateFile(parent, name string) (string, error) {
 }
 
 // TooLargeError is the shared "won't open" message for oversized files.
+// Wraps ErrTooLarge so callers can use errors.Is.
 func TooLargeError() error {
-	return fmt.Errorf("file too large for built-in editor (max %d bytes)", MaxTextFileBytes)
+	return fmt.Errorf("%w (max %d bytes)", ErrTooLarge, MaxTextFileBytes)
 }
 
 // EncodingError is the shared "not text" message. The frontend matches on it to
 // hand the file to the OS default app, so keep it distinct from ErrExecutable.
+// Wraps ErrBinary so callers can use errors.Is.
 func EncodingError(path string) error {
-	return fmt.Errorf("binary or unsupported encoding: %s", path)
+	return fmt.Errorf("%w: %s", ErrBinary, path)
 }
 
 // ReadTextFile reads a local text file for the built-in editor.

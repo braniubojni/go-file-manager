@@ -18,6 +18,10 @@ var (
 	ErrNotFound    = errors.New("path not found")
 	ErrExists      = errors.New("destination already exists")
 	ErrSamePath    = errors.New("source and destination are the same")
+	// ErrBinary is returned when a path is not valid UTF-8 text.
+	ErrBinary = errors.New("binary or unsupported encoding")
+	// ErrTooLarge is returned when a file exceeds MaxTextFileBytes.
+	ErrTooLarge = errors.New("file too large for built-in editor")
 )
 
 // Resolve returns a cleaned absolute path.

@@ -281,14 +281,15 @@ func scanFileContent(path, rel, needle string, caseSensitive bool, remaining int
 				}
 				end = matchEnd
 			}
+			lineText, ms, me := windowLinePreview(line, matchStart, matchEnd, 240)
 			hits = append(hits, domain.ContentSearchHit{
 				Path:       path,
 				RelPath:    rel,
 				Line:       lineNo,
-				Column:     matchStart + 1,
-				LineText:   trimPreview(line, 240),
-				MatchStart: matchStart,
-				MatchEnd:   matchEnd,
+				Column:     matchStart + 1, // full-line column for replace/open
+				LineText:   lineText,
+				MatchStart: ms,
+				MatchEnd:   me,
 			})
 			remaining--
 			from = end
@@ -345,16 +346,94 @@ func indexFold(s, needleLower string, from int) (start, end int) {
 	return -1, -1
 }
 
-func trimPreview(s string, max int) string {
-	if len(s) <= max {
-		return s
+// windowLinePreview returns a ≤max-byte window of line that includes the match,
+// with MatchStart/MatchEnd adjusted to be indices into the returned preview.
+// Column in ContentSearchHit remains based on the full line; only LineText is windowed.
+func windowLinePreview(line string, matchStart, matchEnd, max int) (preview string, ms, me int) {
+	if max <= 0 {
+		max = 240
 	}
-	// cut on rune boundary
-	if max <= 1 {
-		return s[:max]
+	if matchStart < 0 {
+		matchStart = 0
 	}
-	for max > 0 && !utf8.ValidString(s[:max]) {
-		max--
+	if matchEnd < matchStart {
+		matchEnd = matchStart
 	}
-	return s[:max] + "…"
+	if matchEnd > len(line) {
+		matchEnd = len(line)
+	}
+	if matchStart > len(line) {
+		matchStart = len(line)
+	}
+	if len(line) <= max {
+		return line, matchStart, matchEnd
+	}
+
+	// Prefer ~80 bytes of context before the match.
+	startIdx := matchStart - 80
+	if startIdx < 0 {
+		startIdx = 0
+	}
+	endIdx := startIdx + max
+	if endIdx > len(line) {
+		endIdx = len(line)
+		if endIdx-startIdx > max {
+			startIdx = endIdx - max
+		}
+	}
+	// Keep the match inside the window when possible.
+	if matchEnd > endIdx {
+		endIdx = matchEnd
+		if endIdx > len(line) {
+			endIdx = len(line)
+		}
+		startIdx = endIdx - max
+		if startIdx < 0 {
+			startIdx = 0
+		}
+	}
+	if matchStart < startIdx {
+		startIdx = matchStart
+		endIdx = startIdx + max
+		if endIdx > len(line) {
+			endIdx = len(line)
+		}
+	}
+
+	// Align window edges to UTF-8 rune boundaries.
+	for startIdx > 0 && (line[startIdx]&0xC0) == 0x80 {
+		startIdx--
+	}
+	for endIdx < len(line) && endIdx > 0 && (line[endIdx]&0xC0) == 0x80 {
+		endIdx--
+	}
+	if endIdx < startIdx {
+		endIdx = startIdx
+	}
+
+	core := line[startIdx:endIdx]
+	prefix := ""
+	suffix := ""
+	if startIdx > 0 {
+		prefix = "…"
+	}
+	if endIdx < len(line) {
+		suffix = "…"
+	}
+	preview = prefix + core + suffix
+	ms = matchStart - startIdx + len(prefix)
+	me = matchEnd - startIdx + len(prefix)
+	if ms < 0 {
+		ms = 0
+	}
+	if me < ms {
+		me = ms
+	}
+	if me > len(preview) {
+		me = len(preview)
+	}
+	if ms > len(preview) {
+		ms = len(preview)
+	}
+	return preview, ms, me
 }

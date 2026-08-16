@@ -88,6 +88,57 @@ func TestSearchContentCancel(t *testing.T) {
 	}
 }
 
+func TestWindowLinePreviewAlignsMatchIndices(t *testing.T) {
+	// Long line with match far past 240 bytes.
+	prefix := strings.Repeat("a", 300)
+	needle := "NEEDLE"
+	suffix := strings.Repeat("b", 50)
+	line := prefix + needle + suffix
+	matchStart := len(prefix)
+	matchEnd := matchStart + len(needle)
+
+	preview, ms, me := windowLinePreview(line, matchStart, matchEnd, 240)
+	if len(preview) > 240+2*len("…") {
+		t.Fatalf("preview too long: %d", len(preview))
+	}
+	if ms < 0 || me > len(preview) || me < ms {
+		t.Fatalf("bad indices ms=%d me=%d len=%d", ms, me, len(preview))
+	}
+	if preview[ms:me] != needle {
+		t.Fatalf("got %q want %q (preview=%q)", preview[ms:me], needle, preview)
+	}
+	if !strings.HasPrefix(preview, "…") {
+		t.Fatalf("expected leading ellipsis for windowed line, got %q", preview)
+	}
+}
+
+func TestSearchContentLongLineMatchIndices(t *testing.T) {
+	root := t.TempDir()
+	line := strings.Repeat("x", 300) + "findme" + strings.Repeat("y", 20) + "\n"
+	_ = os.WriteFile(filepath.Join(root, "long.txt"), []byte(line), 0o644)
+
+	var hits []domain.ContentSearchHit
+	_, err := SearchContent(context.Background(), root, "findme", "", "", false, true, 10, ContentSearchCallbacks{
+		OnHit: func(h domain.ContentSearchHit) { hits = append(hits, h) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 {
+		t.Fatalf("want 1 hit, got %#v", hits)
+	}
+	h := hits[0]
+	if h.Column != 301 {
+		t.Fatalf("Column should be full-line 1-based index, got %d", h.Column)
+	}
+	if h.MatchStart < 0 || h.MatchEnd > len(h.LineText) {
+		t.Fatalf("indices out of LineText: %#v", h)
+	}
+	if h.LineText[h.MatchStart:h.MatchEnd] != "findme" {
+		t.Fatalf("LineText[%d:%d]=%q want findme (LineText=%q)", h.MatchStart, h.MatchEnd, h.LineText[h.MatchStart:h.MatchEnd], h.LineText)
+	}
+}
+
 func TestSearchContentPermissionDenied(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("chmod semantics differ on windows")

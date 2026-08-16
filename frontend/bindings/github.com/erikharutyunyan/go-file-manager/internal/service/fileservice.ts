@@ -13,9 +13,6 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as domain$0 from "../domain/models.js";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
-import * as application$0 from "../../../../wailsapp/wails/v3/pkg/application/models.js";
 
 /**
  * Archive packs sources into destPath using format (zip, tar.gz, …).
@@ -180,13 +177,6 @@ export function RestoreDeleted(batchID: string): $CancellablePromise<void> {
  */
 export function SearchTree(root: string, query: string, showHidden: boolean, limit: number): $CancellablePromise<domain$0.SearchHit[] | null> {
     return $Call.ByID(3279656272, root, query, showHidden, limit);
-}
-
-/**
- * SetApp injects the application for search event emission (call after application.New).
- */
-export function SetApp(app: application$0.App | null): $CancellablePromise<void> {
-    return $Call.ByID(4031634559, app);
 }
 
 /**

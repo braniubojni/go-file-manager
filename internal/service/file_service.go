@@ -36,6 +36,9 @@ func (s *FileService) PurgeTrash() error {
 }
 
 // SetApp injects the application for search event emission (call after application.New).
+// Backend wiring only — not part of the frontend IPC surface.
+//
+//wails:ignore
 func (s *FileService) SetApp(app *application.App) {
 	s.app = app
 }
