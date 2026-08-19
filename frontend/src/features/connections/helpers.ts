@@ -121,7 +121,7 @@ export const resolveRemoteWorkdirInput = (homePath: string, input: string): stri
 };
 
 /** Bracket IPv6 literals for URL authority (rfc3986); leave hostnames/IPv4 alone. */
-export const formatSMBHostForURL = (host: string): string => {
+const formatSMBHostForURL = (host: string): string => {
   const h = host.trim();
   if (!h) return h;
   if (h.startsWith('[') && h.endsWith(']')) return h;

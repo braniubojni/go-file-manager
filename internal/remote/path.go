@@ -45,13 +45,6 @@ func (s Spec) scheme() string {
 // IsSMB reports whether this spec targets SMB.
 func (s Spec) IsSMB() bool { return s.scheme() == "smb" }
 
-func (s Spec) defaultPort() int {
-	if s.IsSMB() {
-		return 445
-	}
-	return 22
-}
-
 // SessionKey returns user@host:port for SSH, or smb:user@host:port for SMB.
 func (s Spec) SessionKey() string {
 	if s.IsSMB() {
