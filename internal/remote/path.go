@@ -66,6 +66,7 @@ func (s Spec) RootPath() string {
 }
 
 // JoinPath builds scheme://user@host:port/remotePath (remotePath must be absolute).
+// Host authority uses net.JoinHostPort so IPv6 literals are bracketed.
 func (s Spec) JoinPath(remotePath string) string {
 	p := remotePath
 	if p == "" {
@@ -77,11 +78,11 @@ func (s Spec) JoinPath(remotePath string) string {
 	for strings.Contains(p, "//") {
 		p = strings.ReplaceAll(p, "//", "/")
 	}
-	userhost := s.Host
+	authority := net.JoinHostPort(s.Host, strconv.Itoa(s.Port))
 	if s.User != "" {
-		userhost = s.User + "@" + s.Host
+		authority = s.User + "@" + authority
 	}
-	return fmt.Sprintf("%s://%s:%d%s", s.scheme(), userhost, s.Port, p)
+	return fmt.Sprintf("%s://%s%s", s.scheme(), authority, p)
 }
 
 // ParseSpec parses "ssh user@host", "user@host:22", an SSH config Host alias,

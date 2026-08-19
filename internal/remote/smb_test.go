@@ -2,6 +2,7 @@ package remote
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -9,23 +10,53 @@ import (
 
 func TestNTLMAttemptsOrder(t *testing.T) {
 	t.Parallel()
-	// No credentials → guest first (Finder-like anonymous browse)
+	// Helper with empty user (Connect never does this — resolveSMBUser runs first):
+	// Guest-only tries.
 	anon := ntlmAttempts("", "", "")
 	if len(anon) < 1 || anon[0].source != "guest" {
-		t.Fatalf("anon: guest first expected: %+v", anon)
+		t.Fatalf("empty resolved user: guest first expected: %+v", anon)
 	}
-	// Explicit user (no password) → account first, then guest fallback
-	withUser := ntlmAttempts("erik", "", "")
-	if len(withUser) < 3 || withUser[0].source != "account" {
-		t.Fatalf("with user: account first expected: %+v", withUser)
+	// Connect(empty form user) → resolveSMBUser → OS login → account first, Guest fallback.
+	withOS := ntlmAttempts("erik", "", "")
+	if len(withOS) < 3 || withOS[0].source != "account" {
+		t.Fatalf("OS/resolved user: account first expected: %+v", withOS)
 	}
-	if withUser[len(withUser)-1].source != "guest-workgroup" && withUser[len(withUser)-1].source != "guest" {
-		t.Fatalf("with user: guest fallback expected at end: %+v", withUser)
+	if withOS[len(withOS)-1].source != "guest-workgroup" && withOS[len(withOS)-1].source != "guest" {
+		t.Fatalf("OS/resolved user: guest fallback expected at end: %+v", withOS)
 	}
 	// Explicit user + password → account first
 	withPass := ntlmAttempts("erik", "CORP", "secret")
 	if len(withPass) < 2 || withPass[0].source != "account" || withPass[0].pass != "secret" {
 		t.Fatalf("with pass: account first expected: %+v", withPass)
+	}
+	// resolveSMBUser guest fallback → Guest-only (no duplicate account try)
+	guestOnly := ntlmAttempts("Guest", "", "")
+	if len(guestOnly) < 1 || guestOnly[0].source != "guest" {
+		t.Fatalf("Guest user: guest first expected: %+v", guestOnly)
+	}
+	for _, tr := range guestOnly {
+		if tr.source == "account" {
+			t.Fatalf("Guest user must not add account try: %+v", guestOnly)
+		}
+	}
+}
+
+func TestSMBDestExists(t *testing.T) {
+	t.Parallel()
+	if !smbDestExists(os.ErrExist) {
+		t.Fatal("os.ErrExist")
+	}
+	if !smbDestExists(fmt.Errorf("rename: %w", os.ErrExist)) {
+		t.Fatal("wrapped ErrExist")
+	}
+	if !smbDestExists(fmt.Errorf("STATUS_OBJECT_NAME_COLLISION: The object name already exists.")) {
+		t.Fatal("collision message")
+	}
+	if smbDestExists(fmt.Errorf("access denied")) {
+		t.Fatal("permission should not look like dest exists")
+	}
+	if smbDestExists(nil) {
+		t.Fatal("nil")
 	}
 }
 

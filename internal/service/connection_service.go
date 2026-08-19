@@ -282,7 +282,9 @@ func systemMountResult(spec remote.Spec, vols []string, profileID, defaultWD str
 	for _, p := range vols {
 		shares = append(shares, domain.SMBShare{Name: filepath.Base(p), LocalPath: p})
 	}
-	root := vols[0]
+	// Keep RootPath/HomePath as smb:// virtual root so “Remember as default” and
+	// session lookups stay remote-shaped; local mount paths live on Shares[].LocalPath.
+	root := spec.RootPath()
 	return domain.ConnectResult{
 		RootPath:       root,
 		HomePath:       root,

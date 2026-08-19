@@ -148,3 +148,25 @@ func TestRemoteAbsAndChildPath(t *testing.T) {
 		t.Fatalf("child no slash: %q", got)
 	}
 }
+
+func TestSMBJoinPathIPv6(t *testing.T) {
+	t.Parallel()
+	s, err := ParseSpec("smb://alice@[::1]:445/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Host != "::1" || s.Port != 445 {
+		t.Fatalf("spec: %+v", s)
+	}
+	root := s.RootPath()
+	if root != "smb://alice@[::1]:445/" {
+		t.Fatalf("root: %q", root)
+	}
+	loc, err := ParseLocation(root + "Share/a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loc.Host != "::1" || loc.ShareName() != "Share" {
+		t.Fatalf("roundtrip: %+v", loc)
+	}
+}

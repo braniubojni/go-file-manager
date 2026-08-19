@@ -26,7 +26,6 @@ type smbSession struct {
 	ntlmUser   string
 	ntlmDomain string
 	client     *smb2.Session
-	password   string
 	mounts     map[string]*smb2.Share
 }
 
@@ -107,7 +106,6 @@ func (m *SMBManager) Connect(spec Spec, password string) error {
 			ntlmUser:   try.user,
 			ntlmDomain: try.domain,
 			client:     client,
-			password:   try.pass,
 			mounts:     make(map[string]*smb2.Share),
 		}
 		return nil
@@ -122,11 +120,11 @@ type ntlmTry struct {
 	user, pass, domain, source string
 }
 
-// ntlmAttempts builds the NTLM try list. When explicit credentials (user or
-// password) are provided, try the typed account first so that servers allowing
-// guest logon don't silently swallow the real credentials. Fall back to Guest
-// only as a last resort. When no credentials are given (empty user, empty
-// password), try Guest first (Finder-like anonymous browse).
+// ntlmAttempts builds the NTLM try list from the *resolved* user (after
+// resolveSMBUser). Connect never passes a raw empty username: empty form user
+// becomes the OS login (or "Guest" if that fails), so account tries run before
+// Guest. This helper itself: non-Guest user → account first, then Guest fallback;
+// user empty or already "Guest" → Guest-only (anonymous browse).
 func ntlmAttempts(user, domain, password string) []ntlmTry {
 	var out []ntlmTry
 	add := func(t ntlmTry) {
@@ -138,9 +136,8 @@ func ntlmAttempts(user, domain, password string) []ntlmTry {
 		out = append(out, t)
 	}
 	hasAccount := user != "" && !strings.EqualFold(user, "Guest")
-	hasCredentials := hasAccount || password != ""
 
-	if hasCredentials && hasAccount {
+	if hasAccount {
 		add(ntlmTry{user: user, pass: password, domain: domain, source: "account"})
 		if domain == "" {
 			add(ntlmTry{user: user, pass: password, domain: "WORKGROUP", source: "account-workgroup"})

@@ -181,10 +181,19 @@ func (m *SMBManager) WriteTextFile(vpath, content string) error {
 		return err
 	}
 	if err := fs.Rename(tmp, rel); err != nil {
-		_ = fs.Remove(rel)
-		if err2 := fs.Rename(tmp, rel); err2 != nil {
+		// Some servers reject overwrite rename; only then remove dest and retry.
+		// Do not delete the original on unrelated rename failures (data loss).
+		if !smbDestExists(err) {
 			_ = fs.Remove(tmp)
 			return err
+		}
+		if rmErr := fs.Remove(rel); rmErr != nil {
+			_ = fs.Remove(tmp)
+			return err
+		}
+		if err2 := fs.Rename(tmp, rel); err2 != nil {
+			_ = fs.Remove(tmp)
+			return err2
 		}
 	}
 	return nil
@@ -441,4 +450,18 @@ func smbNotExist(err error) bool {
 	return strings.Contains(msg, "not exist") ||
 		strings.Contains(msg, "no such file") ||
 		strings.Contains(msg, "object name not found")
+}
+
+// smbDestExists reports rename/create failure because the destination already exists.
+func smbDestExists(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, os.ErrExist) || os.IsExist(err) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "already exists") ||
+		strings.Contains(msg, "object name collision") ||
+		strings.Contains(msg, "file exists")
 }

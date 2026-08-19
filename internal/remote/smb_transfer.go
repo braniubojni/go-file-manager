@@ -161,7 +161,7 @@ func (m *SMBManager) MoveWithin(sources []string, destDir string) error {
 		dest := path.Join(smbRel(dloc), base)
 		if err := sfs.Rename(smbRel(sloc), dest); err != nil {
 			if err2 := smbCopyRemote(sfs, smbRel(sloc), dest); err2 != nil {
-				return err
+				return err2
 			}
 			if err2 := sfs.RemoveAll(smbRel(sloc)); err2 != nil {
 				return err2

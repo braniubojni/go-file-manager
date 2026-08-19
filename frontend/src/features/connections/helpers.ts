@@ -8,13 +8,24 @@ export const isRemotePath = (p?: string | null): boolean =>
 export const isSMBPath = (p?: string | null): boolean => Boolean(p && /^smb:\/\//i.test(p.trim()));
 
 export const sessionKeyFromPath = (path: string): string | null => {
-  const smb = path.match(/^smb:\/\/(?:([^@/]*)@)?([^/:]+)(?::(\d+))?(?:\/|$)/i);
-  if (smb) {
-    return `smb:${smb[1] ?? ''}@${smb[2]}:${smb[3] || '445'}`;
+  const raw = path.trim();
+  if (!isRemotePath(raw)) return null;
+  try {
+    const u = new URL(raw);
+    const scheme = u.protocol.replace(/:$/, '').toLowerCase();
+    if (scheme !== 'ssh' && scheme !== 'smb') return null;
+    // JS URL.hostname keeps IPv6 brackets; Go url.Hostname / Spec.Host do not.
+    let host = u.hostname;
+    if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+    if (!host) return null;
+    const user = decodeURIComponent(u.username || '');
+    if (scheme === 'ssh' && !user) return null;
+    const port = u.port || (scheme === 'smb' ? '445' : '22');
+    if (scheme === 'smb') return `smb:${user}@${host}:${port}`;
+    return `${user}@${host}:${port}`;
+  } catch {
+    return null;
   }
-  const m = path.match(/^ssh:\/\/([^@/]+)@([^/:]+)(?::(\d+))?(?:\/|$)/i);
-  if (!m) return null;
-  return `${m[1]}@${m[2]}:${m[3] || '22'}`;
 };
 
 export const sessionKeyFromProfile = (p: {
@@ -109,8 +120,18 @@ export const resolveRemoteWorkdirInput = (homePath: string, input: string): stri
   return `${origin}${homeAbs}/${raw}`.replace(/([^:]\/)\/+/g, '$1');
 };
 
+/** Bracket IPv6 literals for URL authority (rfc3986); leave hostnames/IPv4 alone. */
+export const formatSMBHostForURL = (host: string): string => {
+  const h = host.trim();
+  if (!h) return h;
+  if (h.startsWith('[') && h.endsWith(']')) return h;
+  // Two or more colons ⇒ IPv6 (or IPv4-mapped); single colon is host:port, already split.
+  if ((h.match(/:/g) ?? []).length >= 2) return `[${h}]`;
+  return h;
+};
+
 export const buildSMBSpec = (host: string, user: string, domain: string, port: number): string => {
-  const h = normalizeSMBHost(host);
+  const h = formatSMBHostForURL(normalizeSMBHost(host));
   const u = user.trim();
   const d = domain.trim();
   const p = port > 0 ? port : 445;
