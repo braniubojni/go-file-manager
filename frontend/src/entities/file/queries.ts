@@ -5,6 +5,7 @@ import {
   GitService,
   SettingsService,
 } from '../../shared/api/bindings';
+import { isRemotePath } from '../../features/connections/helpers';
 import type { AppSettings, GitDirStatus, PaneTabsState, ThemePreference } from './types';
 import { defaultSettings } from './types';
 
@@ -132,7 +133,7 @@ export const useSearchTree = (
       const rows = await FileService.SearchTree(root!, query, showHidden, 80);
       return rows ?? [];
     },
-    enabled: Boolean(enabled && root && !root.startsWith('ssh://')),
+    enabled: Boolean(enabled && root && !isRemotePath(root)),
     staleTime: 2_000,
   });
 };
@@ -150,7 +151,7 @@ export const useDirListing = (path: string | undefined, showHidden: boolean) => 
 
 /** Git working-tree status for one local directory (parallel to ListDir). */
 export const useGitDirStatus = (path: string | undefined, enabled: boolean) => {
-  const remote = Boolean(path?.startsWith('ssh://'));
+  const remote = isRemotePath(path);
   return useQuery({
     queryKey: queryKeys.gitStatus(path ?? ''),
     queryFn: async (): Promise<GitDirStatus> => {

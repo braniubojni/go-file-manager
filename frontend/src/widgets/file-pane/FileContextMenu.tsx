@@ -15,6 +15,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import type { FC, ReactNode } from 'react';
+import { isRemotePath } from '../../features/connections/helpers';
 import { useContextMenuStore } from '../../features/file-ops/contextMenuStore';
 import { useFileOpsStore } from '../../features/file-ops/fileOpsStore';
 import type { FileOpsAction } from '../../features/file-ops/types';
@@ -46,7 +47,7 @@ export const FileContextMenu: FC = () => {
   const otherPane = usePaneStore((s) => s.otherPane);
   const show = useSnack((s) => s.show);
 
-  const remote = (entry?.path ?? panePath).startsWith('ssh://');
+  const remote = isRemotePath(entry?.path ?? panePath);
   const isDir = entry?.isDir ?? false;
 
   const act = (fn: () => void) => () => {

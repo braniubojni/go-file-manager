@@ -23,6 +23,7 @@ import {
   useSettings,
 } from '../../entities/file/queries';
 import type { FileEntry, PaneId } from '../../entities/file/types';
+import { isRemotePath } from '../../features/connections/helpers';
 import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
 import { useContextMenuStore } from '../../features/file-ops/contextMenuStore';
 import { useFolderSizeStore } from '../../features/folder-size/folderSizeStore';
@@ -173,7 +174,7 @@ export const useFilePane = (id: PaneId) => {
     }
     // Remote files are fine: ReadTextFile/WriteTextFile dispatch over SFTP.
     // FileService.Open (the "open in OS" path) is the local-only one.
-    if (settings?.useBuiltInEditor !== false || entry.path.startsWith('ssh://')) {
+    if (settings?.useBuiltInEditor !== false || isRemotePath(entry.path)) {
       openWorkspace(parentDirOf(entry.path), entry.path);
       return;
     }

@@ -3,6 +3,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import { useCallback, useEffect, useState, type FC } from 'react';
 import { useSettings } from '../../entities/file/queries';
+import { isRemotePath } from '../../features/connections/helpers';
 import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
 import { usePaneStore } from '../../features/pane/paneStore';
 import { FileService, SettingsService } from '../../shared/api/bindings';
@@ -228,7 +229,7 @@ export const SearchDialog: FC<Props> = ({ open, onClose }) => {
           ) : null}
         </Box>
         <SearchResultsList
-          remote={root.startsWith('ssh://')}
+          remote={isRemotePath(root)}
           searching={searching}
           results={results}
           index={index}

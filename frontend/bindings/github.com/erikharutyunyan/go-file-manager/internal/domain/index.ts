@@ -14,6 +14,7 @@ export type {
     PaneTabs,
     RemoteRecent,
     ReplaceAllResult,
+    SMBShare,
     SSHConfigHost,
     SearchHit,
     SearchPrefs,

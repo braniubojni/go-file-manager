@@ -1,3 +1,9 @@
+export type SMBShare = {
+  name: string;
+  hidden: boolean;
+  localPath?: string;
+};
+
 export type AddConnectionState = {
   open: boolean;
   spec: string;
@@ -8,7 +14,7 @@ export type AddConnectionState = {
   error: string;
   /** When re-prompting password for an existing profile connect */
   profileId: string;
-  mode: 'add' | 'password' | 'ssh_config' | 'workdir';
+  mode: 'add' | 'add_smb' | 'smb_confirm' | 'password' | 'ssh_config' | 'workdir' | 'smb_shares';
   // ssh_config mode
   sshConfigPath: string;
   sshConfigHosts: SSHConfigHost[];
@@ -22,16 +28,36 @@ export type AddConnectionState = {
   workdirCustom: string;
   workdirRemember: boolean;
   workdirProfileId: string;
+  // SMB add + share picker
+  smbHost: string;
+  smbUser: string;
+  smbDomain: string;
+  smbPort: string;
+  shares: SMBShare[];
+  shareChosen: string;
+  showHiddenShares: boolean;
+  smbRootPath: string;
 };
 
 export type AddConnectionAction =
   | { type: 'open_add' }
+  | { type: 'open_add_smb' }
+  | { type: 'open_smb_confirm' }
+  | { type: 'back_smb_form' }
   | { type: 'open_password'; profileId: string; label?: string }
   | { type: 'open_ssh_config' }
   | {
       type: 'open_workdir';
       paths: RemoteRecent[];
       home: string;
+      sessionKey: string;
+      chosen?: string;
+      profileId?: string;
+    }
+  | {
+      type: 'open_smb_shares';
+      shares: SMBShare[];
+      rootPath: string;
       sessionKey: string;
       chosen?: string;
       profileId?: string;
@@ -50,7 +76,13 @@ export type AddConnectionAction =
   | { type: 'set_workdir_chosen'; path: string }
   | { type: 'set_workdir_custom'; path: string }
   | { type: 'set_workdir_remember'; remember: boolean }
-  | { type: 'remove_workdir_path'; path: string };
+  | { type: 'remove_workdir_path'; path: string }
+  | { type: 'set_smb_host'; host: string }
+  | { type: 'set_smb_user'; user: string }
+  | { type: 'set_smb_domain'; domain: string }
+  | { type: 'set_smb_port'; port: string }
+  | { type: 'set_share_chosen'; name: string }
+  | { type: 'set_show_hidden_shares'; show: boolean };
 
 /** Saved remote connection profile (from backend). */
 export type ConnectionProfile = {
@@ -63,6 +95,7 @@ export type ConnectionProfile = {
   configAlias?: string;
   identityFiles?: string[];
   defaultWorkDir?: string;
+  domain?: string;
 };
 
 /** Live remote session (from backend). */

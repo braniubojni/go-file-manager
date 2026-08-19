@@ -1,5 +1,6 @@
 import { Events } from '@wailsio/runtime';
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { isRemotePath } from '../../../features/connections/helpers';
 import { FileService, SettingsService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
@@ -43,7 +44,7 @@ export const useSearchSession = (open: boolean, root: string, showHidden: boolea
   }, []);
 
   const runSearch = useCallback(async () => {
-    if (root.startsWith('ssh://')) {
+    if (isRemotePath(root)) {
       show('Search is not available on remote connections yet', 'error');
       return;
     }

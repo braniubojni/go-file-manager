@@ -8,6 +8,7 @@ import Tabs from '@mui/material/Tabs';
 import Tooltip from '@mui/material/Tooltip';
 import type { FC } from 'react';
 import type { PaneId } from '../../entities/file/types';
+import { isRemotePath } from '../../features/connections/helpers';
 import type { PaneTab } from '../../features/pane/paneStore';
 import { tabLabel } from './helpers';
 import {
@@ -59,7 +60,7 @@ export const PaneTabs: FC<Props> = ({
           }}
           label={
             <Box sx={tabLabelRowSx}>
-              {tab.path.startsWith('ssh://') && <CloudIcon sx={tabCloudIconSx} />}
+              {isRemotePath(tab.path) && <CloudIcon sx={tabCloudIconSx} />}
               <span title={tab.path}>{tabLabel(tab.path)}</span>
               {tabs.length > 1 && (
                 <IconButton

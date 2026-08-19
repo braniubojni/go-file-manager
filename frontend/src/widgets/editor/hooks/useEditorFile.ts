@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { isRemotePath } from '../../../features/connections/helpers';
 import { useEditorStore } from '../../../features/editor/editorStore';
 import { FileService, SettingsService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
@@ -48,7 +49,7 @@ export const useEditorFile = () => {
         // The editor is text-only. Anything else it cannot decode (PDFs, images,
         // documents) goes to the OS default app instead of a dead-end error.
         // Remote files have no local copy to hand over, so they keep the error.
-        if (BINARY_RE.test(msg) && !filePath.startsWith('ssh://')) {
+        if (BINARY_RE.test(msg) && !isRemotePath(filePath)) {
           setLoadError('Binary file — opened in your default app.');
           void SettingsService.OpenInOS(filePath).catch((openErr) =>
             show(errMessage(openErr), 'error'),

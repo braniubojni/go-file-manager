@@ -5,6 +5,7 @@ import type { GridSortModel } from '@mui/x-data-grid';
 import type { KeyboardEvent, ReactElement } from 'react';
 import { createElement } from 'react';
 import type { FileEntry, PaneId } from '../../entities/file/types';
+import { isRemotePath, parentOfVirtualPath } from '../../features/connections/helpers';
 import { useFolderSizeStore } from '../../features/folder-size/folderSizeStore';
 import type { PaneJobKind } from '../../features/jobs/types';
 import { usePaneStore } from '../../features/pane/paneStore';
@@ -17,7 +18,7 @@ import { FileTableRow } from './types';
  * new/close tab, go-to, keyboard). Kept as one function so they can't drift. */
 export const enterPaneTab = (id: PaneId, path: string): void => {
   useFolderSizeStore.getState().clear(id);
-  if (path.startsWith('ssh://') && useTerminalStore.getState().isOpen(id)) {
+  if (isRemotePath(path) && useTerminalStore.getState().isOpen(id)) {
     useTerminalStore.getState().toggle(id);
   }
 };
@@ -43,17 +44,10 @@ export const jobKindIcon = (kind: PaneJobKind): ReactElement => {
   }
 };
 
-/** Parent directory for local or ssh:// paths. */
+/** Parent directory for local or remote virtual paths. */
 export const parentOfPath = (path: string): string => {
-  if (path.startsWith('ssh://')) {
-    const m = path.match(/^(ssh:\/\/[^/]+)(\/.*)?$/);
-    if (m) {
-      const base = m[1];
-      const p = m[2] || '/';
-      const parent = p.replace(/\/+$/, '').split('/').slice(0, -1).join('/') || '/';
-      return `${base}${parent === '/' ? '/' : parent}`;
-    }
-  }
+  const virtual = parentOfVirtualPath(path);
+  if (virtual) return virtual;
   const parent = path.replace(/\/+$/, '').split(/[/\\]/).slice(0, -1).join('/') || '/';
   const fixed =
     path.startsWith('/') && !parent.startsWith('/') ? `/${parent}`.replace(/\/+/g, '/') : parent;
@@ -74,11 +68,11 @@ export const allSameParentAsDest = (paths: string[], dest: string): boolean => {
   });
 };
 
-/** Short tab label: basename, "host:/basename" for ssh://, or "/" for a root. */
+/** Short tab label: basename, "host:/basename" for remotes, or "/" for a root. */
 export const tabLabel = (path: string): string => {
   if (!path) return '';
-  if (path.startsWith('ssh://')) {
-    const m = path.match(/^ssh:\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?(\/.*)?$/);
+  if (isRemotePath(path)) {
+    const m = path.match(/^(?:ssh|smb):\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?(\/.*)?$/i);
     const host = m?.[1] ?? 'ssh';
     const rest = (m?.[2] ?? '/').replace(/\/+$/, '');
     const base = rest.split('/').filter(Boolean).pop();
@@ -121,7 +115,7 @@ const SHORTEN_MAX = 48;
 
 /**
  * Middle-ellipsis a path for display: keeps the first and last two segments,
- * and for `ssh://` drops the scheme and a default `:22` so the host stays
+ * and for remotes drops the scheme and a default `:22`/`:445` so the host stays
  * readable. Returns the input unchanged when it already fits.
  * ponytail: no `$HOME` -> `~` collapse; that needs an async GetHomeDir lookup.
  */
@@ -129,9 +123,9 @@ export const shortenPath = (path: string, max = SHORTEN_MAX): string => {
   if (!path || path.length <= max) return path;
   let prefix = '';
   let rest = path;
-  const m = path.match(/^ssh:\/\/([^/]+)(\/.*)?$/i);
+  const m = path.match(/^(?:ssh|smb):\/\/([^/]+)(\/.*)?$/i);
   if (m) {
-    prefix = `${m[1].replace(/:22$/, '')}:`;
+    prefix = `${m[1].replace(/:22$/, '').replace(/:445$/, '')}:`;
     rest = m[2] ?? '/';
   }
   const sep = rest.includes('\\') && !rest.includes('/') ? '\\' : '/';

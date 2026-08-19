@@ -7,6 +7,7 @@ import (
 
 	"github.com/erikharutyunyan/go-file-manager/internal/config"
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
+	"github.com/erikharutyunyan/go-file-manager/internal/remote"
 	"github.com/erikharutyunyan/go-file-manager/internal/service"
 	"github.com/erikharutyunyan/go-file-manager/internal/storage"
 	"github.com/erikharutyunyan/go-file-manager/internal/version"
@@ -31,14 +32,15 @@ func main() {
 	}
 
 	remoteMgr := service.NewRemoteManager(db)
-	fileSvc := service.NewFileService(remoteMgr, filepath.Join(cfgStore.Dir(), "trash"))
+	smbMgr := remote.NewSMBManager()
+	fileSvc := service.NewFileService(remoteMgr, smbMgr, filepath.Join(cfgStore.Dir(), "trash"))
 	if err := fileSvc.PurgeTrash(); err != nil {
 		log.Printf("purge trash: %v", err)
 	}
 	settingsSvc := service.NewSettingsService(db, cfgStore)
 	bookmarkSvc := service.NewBookmarkService(db)
 	termSvc := service.NewTerminalService(remoteMgr)
-	connSvc := service.NewConnectionService(db, remoteMgr)
+	connSvc := service.NewConnectionService(db, remoteMgr, smbMgr)
 	updateSvc := service.NewUpdateService()
 	gitSvc := service.NewGitService()
 

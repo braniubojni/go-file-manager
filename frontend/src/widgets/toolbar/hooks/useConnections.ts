@@ -10,16 +10,22 @@ import {
 } from '../../../features/connections/connectRequestStore';
 import { ensureSessionThenNavigate } from '../../../features/connections/navigate';
 import {
+  buildSMBSpec,
   isAuthErrorMessage,
+  isLocalNetworkErrorMessage,
+  isSMBPath,
   resolveRemoteWorkdirInput,
 } from '../../../features/connections/helpers';
 import type {
   ActiveSession,
   ConnectionProfile,
   RemoteRecent,
+  SMBShare,
   SSHConfigHost,
 } from '../../../features/connections/types';
 import { usePaneStore } from '../../../features/pane/paneStore';
+import { smbAuthFailMessage } from '../../../features/connections/smbCopy';
+import { parseSMBForm, smbShareError } from '../../../features/connections/smbValidate';
 import { ConnectionService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
@@ -31,6 +37,8 @@ type ConnectRes = {
   key: string;
   profileId?: string;
   defaultWorkDir?: string;
+  shares?: SMBShare[] | null;
+  localMount?: boolean;
 };
 
 export const useConnections = () => {
@@ -55,6 +63,7 @@ export const useConnections = () => {
   const sessions = sessionsQ.data ?? [];
   const sessionKeys = new Set(sessions.map((s) => s.key));
   const sshProfiles = profiles.filter((p) => p.protocol === 'ssh' || !p.protocol);
+  const smbProfiles = profiles.filter((p) => p.protocol === 'smb');
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['connections'] });
@@ -62,8 +71,53 @@ export const useConnections = () => {
     void qc.invalidateQueries({ queryKey: ['gitStatus'] });
   };
 
-  /** Always offer workdir picker after connect (home + recents + saved default). */
+  const landConnected = (path: string) => {
+    enterPaneTab(activePane, path);
+    navigate(activePane, path);
+    refresh();
+    show('Connected', 'success');
+    dispatch({ type: 'close' });
+    setAnchor(null);
+  };
+
+  /** After SSH: workdir picker. After SMB: share picker (skip if default share saved). */
   const afterConnect = async (res: ConnectRes) => {
+    if (res.localMount) {
+      const locals = (res.shares ?? [])
+        .map((s) => s.localPath)
+        .filter((p): p is string => Boolean(p));
+      if (locals.length === 1) {
+        landConnected(locals[0]);
+        return;
+      }
+      if (locals.length > 1) {
+        dispatch({
+          type: 'open_smb_shares',
+          shares: res.shares ?? [],
+          rootPath: res.rootPath,
+          sessionKey: res.key,
+          profileId: res.profileId,
+        });
+        return;
+      }
+      landConnected(res.rootPath);
+      return;
+    }
+    if (isSMBPath(res.rootPath) || (res.shares && res.shares.length > 0)) {
+      if (res.defaultWorkDir) {
+        void ConnectionService.AddRecentPath(res.defaultWorkDir);
+        landConnected(res.defaultWorkDir);
+        return;
+      }
+      dispatch({
+        type: 'open_smb_shares',
+        shares: res.shares ?? [],
+        rootPath: res.rootPath,
+        sessionKey: res.key,
+        profileId: res.profileId,
+      });
+      return;
+    }
     const homePath = res.homePath || res.rootPath;
     const recents = ((await ConnectionService.GetRecentPaths(res.key).catch(() => null)) ??
       []) as RemoteRecent[];
@@ -98,12 +152,30 @@ export const useConnections = () => {
         // non-fatal
       }
     }
-    enterPaneTab(activePane, path);
-    navigate(activePane, path);
-    refresh();
-    show('Connected', 'success');
-    dispatch({ type: 'close' });
-    setAnchor(null);
+    landConnected(path);
+  };
+
+  const confirmSMBShare = async () => {
+    const name = dialog.shareChosen.trim();
+    const shareErr = smbShareError(name);
+    if (shareErr) {
+      dispatch({ type: 'set_error', error: shareErr });
+      return;
+    }
+    const picked = dialog.shares.find((s) => s.name === name);
+    const root = dialog.smbRootPath.replace(/\/+$/, '');
+    const virtualPath = `${root}/${name}/`;
+    const navPath = picked?.localPath || virtualPath;
+    void ConnectionService.AddRecentPath(navPath);
+    if (dialog.workdirRemember && dialog.workdirProfileId) {
+      try {
+        await ConnectionService.SetProfileDefaultWorkDir(dialog.workdirProfileId, virtualPath);
+        void qc.invalidateQueries({ queryKey: ['connections', 'profiles'] });
+      } catch {
+        // non-fatal
+      }
+    }
+    landConnected(navPath);
   };
 
   const connectProfile = async (id: string, password = '') => {
@@ -244,6 +316,32 @@ export const useConnections = () => {
       await confirmWorkdir();
       return;
     }
+    if (dialog.mode === 'smb_shares') {
+      await confirmSMBShare();
+      return;
+    }
+    if (dialog.mode === 'add_smb') {
+      const parsed = parseSMBForm({
+        host: dialog.smbHost,
+        user: dialog.smbUser,
+        domain: dialog.smbDomain,
+        port: dialog.smbPort,
+      });
+      if (!parsed.ok) {
+        dispatch({
+          type: 'set_error',
+          error:
+            parsed.errors.host ||
+            parsed.errors.port ||
+            parsed.errors.user ||
+            parsed.errors.domain ||
+            'Fix the highlighted fields before connecting',
+        });
+        return;
+      }
+      dispatch({ type: 'open_smb_confirm' });
+      return;
+    }
     dispatch({ type: 'set_busy', busy: true });
     try {
       if (dialog.mode === 'password' && pendingConnect) {
@@ -258,6 +356,43 @@ export const useConnections = () => {
       }
       if (dialog.mode === 'password' && dialog.profileId) {
         await connectProfile(dialog.profileId, dialog.password);
+        return;
+      }
+      if (dialog.mode === 'smb_confirm') {
+        const parsed = parseSMBForm({
+          host: dialog.smbHost,
+          user: dialog.smbUser,
+          domain: dialog.smbDomain,
+          port: dialog.smbPort,
+        });
+        if (!parsed.ok) {
+          dispatch({ type: 'set_error', error: 'Fix the connection fields first' });
+          return;
+        }
+        const spec = buildSMBSpec(parsed.host, parsed.user, parsed.domain, parsed.port);
+        try {
+          const res = await ConnectionService.ConnectSpec(spec, dialog.password, dialog.save);
+          await afterConnect(res);
+        } catch (e) {
+          const msg = errMessage(e);
+          if (/canceled|cancelled/i.test(msg)) {
+            dispatch({ type: 'set_error', error: 'Connection canceled' });
+            return;
+          }
+          if (isLocalNetworkErrorMessage(msg)) {
+            dispatch({ type: 'set_error', error: msg });
+            return;
+          }
+          if (isAuthErrorMessage(msg)) {
+            dispatch({ type: 'back_smb_form' });
+            dispatch({
+              type: 'set_error',
+              error: smbAuthFailMessage(),
+            });
+            return;
+          }
+          throw e;
+        }
         return;
       }
       // mode === 'add'
@@ -294,6 +429,7 @@ export const useConnections = () => {
     dialog,
     dispatch,
     sshProfiles,
+    smbProfiles,
     sessionKeys,
     onMenuConnect,
     onDisconnect,

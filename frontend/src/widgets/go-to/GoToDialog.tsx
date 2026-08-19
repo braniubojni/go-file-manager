@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 import { useEffect, useMemo, useState, type FC, type KeyboardEvent } from 'react';
 import { useSearchTree, useSettings } from '../../entities/file/queries';
 import type { SearchHit } from '../../entities/file/types';
+import { isRemotePath } from '../../features/connections/helpers';
 import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
 import { usePaneStore } from '../../features/pane/paneStore';
 import { FileService } from '../../shared/api/bindings';
@@ -106,7 +107,7 @@ export const GoToDialog: FC<Props> = ({ open, onClose }) => {
           sx={{ px: 1.5, pt: 1.5, pb: 1 }}
         />
         <Box sx={listSx}>
-          {path?.startsWith('ssh://') ? (
+          {isRemotePath(path) ? (
             <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1 }}>
               Go-to is not available on remote connections yet
             </Typography>

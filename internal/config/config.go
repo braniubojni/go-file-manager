@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -368,6 +369,42 @@ func OpenPrivacySettings() error {
 		// Linux: no standard privacy pane; open system privacy settings manually for your distribution.
 		return fmt.Errorf("open system privacy settings manually for your distribution")
 	}
+}
+
+// OpenLocalNetworkSettings opens the OS network / firewall UI when possible.
+func OpenLocalNetworkSettings() error {
+	switch runtime.GOOS {
+	case "darwin":
+		if err := runDetached("open", "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork"); err == nil {
+			return nil
+		}
+		return runDetached("open", "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension")
+	case "windows":
+		if err := runDetached("cmd", "/c", "start", "", "ms-settings:network-status"); err == nil {
+			return nil
+		}
+		return runDetached("control", "firewall.cpl")
+	default:
+		return openLinuxNetworkSettings()
+	}
+}
+
+func openLinuxNetworkSettings() error {
+	candidates := [][]string{
+		{"gnome-control-center", "network"},
+		{"firewall-config"},
+		{"nm-connection-editor"},
+		{"systemsettings", "kcm_networkmanagement"},
+	}
+	for _, c := range candidates {
+		if _, err := exec.LookPath(c[0]); err != nil {
+			continue
+		}
+		if err := runDetached(c[0], c[1:]...); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("could not open a network settings app; allow outbound TCP 445 (smb) in ufw/firewalld and retry")
 }
 
 func openPath(path string, reveal bool) error {
