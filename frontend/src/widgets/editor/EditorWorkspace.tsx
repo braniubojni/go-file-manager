@@ -6,6 +6,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useState, type FC } from 'react';
+import { isRemotePath } from '../../features/connections/helpers';
 import { useEditorStore } from '../../features/editor/editorStore';
 import { CodeMirrorPane } from './CodeMirrorPane';
 import { DiffMergePane } from './DiffMergePane';
@@ -32,7 +33,7 @@ export const EditorWorkspace: FC = () => {
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [pendingMode, setPendingMode] = useState<'diff' | null>(null);
 
-  const remote = Boolean(filePath?.startsWith('ssh://'));
+  const remote = isRemotePath(filePath);
 
   const requestClose = () => {
     if (mode === 'edit' && dirty) {

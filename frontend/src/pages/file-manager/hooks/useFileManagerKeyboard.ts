@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { usePatchSettings, useSettings, useShortcutDefs } from '../../../entities/file/queries';
+import { isRemotePath } from '../../../features/connections/helpers';
 import { useEditorStore } from '../../../features/editor/editorStore';
 import { useFileOpsStore } from '../../../features/file-ops/fileOpsStore';
 import { useGoToStore } from '../../../features/go-to/goToStore';
@@ -33,7 +34,7 @@ export const useFileManagerKeyboard = () => {
       if (!editorOpen && findMatchingAction(e, map) === 'goTo') {
         e.preventDefault();
         const path = usePaneStore.getState().getPath(usePaneStore.getState().activePane);
-        if (path.startsWith('ssh://')) return;
+        if (isRemotePath(path)) return;
         openGoTo();
         return;
       }
@@ -42,7 +43,7 @@ export const useFileManagerKeyboard = () => {
       if (findMatchingAction(e, map) === 'openSearch') {
         e.preventDefault();
         const path = usePaneStore.getState().getPath(usePaneStore.getState().activePane);
-        if (path.startsWith('ssh://')) return;
+        if (isRemotePath(path)) return;
         openSearch();
         return;
       }

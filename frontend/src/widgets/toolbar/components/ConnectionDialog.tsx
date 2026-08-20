@@ -19,15 +19,28 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { usePathCompletions } from '../../../entities/file/queries';
-import { resolveRemoteWorkdirInput } from '../../../features/connections/helpers';
+import {
+  isLocalNetworkErrorMessage,
+  resolveRemoteWorkdirInput,
+} from '../../../features/connections/helpers';
+import { smbNetworkSettingsLabel } from '../../../features/connections/smbCopy';
+import { smbShareError } from '../../../features/connections/smbValidate';
+import { FileService } from '../../../shared/api/bindings';
+import { errMessage } from '../../../shared/lib/format';
+import { useSnack } from '../../../shared/ui/SnackbarHost';
 import { handleDialogEnter, handleDialogFormSubmit } from '../../../shared/lib/dialogSubmit';
 import type { ConnectionDialogProps } from '../types';
+import { SMBConnectFields, smbFormFromDialog } from './SMBConnectFields';
+import { SMBSharePicker } from './SMBSharePicker';
 
 const DIALOG_TITLES: Record<string, string> = {
   add: 'Add SSH connection',
-  password: 'SSH password',
+  add_smb: 'Add SMB connection',
+  password: 'Password',
   ssh_config: 'Connect from SSH config',
   workdir: 'Choose working directory',
+  smb_shares: 'Choose a share',
+  smb_confirm: 'Connect to Server',
 };
 
 export const ConnectionDialog: FC<ConnectionDialogProps> = ({
@@ -42,9 +55,19 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
   const workdirPartial = resolveRemoteWorkdirInput(dialog.workdirHome, dialog.workdirCustom) ?? '';
   const workdirCompletions = usePathCompletions(workdirPartial, workdirCustomOpen);
   const workdirOptions = workdirCompletions.data ?? [];
+  const show = useSnack((s) => s.show);
+  const localNetError = isLocalNetworkErrorMessage(dialog.error);
+  const smbForm = smbFormFromDialog(dialog);
+  const shareInvalid = Boolean(smbShareError(dialog.shareChosen));
+  const connectDisabled =
+    dialog.busy ||
+    (dialog.mode === 'add_smb' && !smbForm.ok) ||
+    (dialog.mode === 'smb_shares' && shareInvalid);
 
   const submit = () => {
     if (dialog.busy) return;
+    if (dialog.mode === 'add_smb' && !smbForm.ok) return;
+    if (dialog.mode === 'smb_shares' && shareInvalid) return;
     // Password prompt (including ssh_config after an auth failure) must connect,
     // not reload the host list.
     if (dialog.askPassword || dialog.mode === 'password') {
@@ -68,8 +91,24 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
       maxWidth="xs"
     >
       <form onSubmit={(e) => handleDialogFormSubmit(e, submit)}>
-        <DialogTitle>{DIALOG_TITLES[dialog.mode] ?? 'SSH'}</DialogTitle>
+        <DialogTitle>{DIALOG_TITLES[dialog.mode] ?? 'Remote'}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
+          {dialog.mode === 'add_smb' && (
+            <SMBConnectFields
+              dialog={dialog}
+              dispatch={dispatch}
+              onSubmit={submit}
+              errors={smbForm.errors}
+            />
+          )}
+          {dialog.mode === 'smb_shares' && <SMBSharePicker dialog={dialog} dispatch={dispatch} />}
+          {dialog.mode === 'smb_confirm' && (
+            <Typography variant="body2" sx={{ mt: 1 }} data-testid="smb-confirm-copy">
+              You are attempting to connect to the server “{smbForm.host || dialog.smbHost}”. Click
+              Connect to continue. On a Mac this may also open Finder’s volume picker if guest
+              access is not enough.
+            </Typography>
+          )}
           {/* ── mode: add ─────────────────────────────────────────────────── */}
           {dialog.mode === 'add' && (
             <>
@@ -258,7 +297,7 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
                       autoFocus
                       label="Remote path"
                       placeholder="/home/user/project"
-                      helperText="Absolute path on the remote, or ssh://…"
+                      helperText="Absolute path on the remote, or ssh:// / smb://…"
                       onKeyDown={(e) => handleDialogEnter(e, submit)}
                       data-testid="input-workdir-custom"
                     />
@@ -282,30 +321,49 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
           )}
 
           {/* ── password / key passphrase prompt ─────────────────────────── */}
-          {(dialog.askPassword || dialog.mode === 'password') && dialog.mode !== 'workdir' && (
-            <TextField
-              autoFocus={dialog.mode === 'password' || dialog.askPassword}
-              type="password"
-              label="Password or key passphrase"
-              value={dialog.password}
-              onChange={(e) => dispatch({ type: 'set_password', password: e.target.value })}
-              onKeyDown={(e) => handleDialogEnter(e, submit)}
-              data-testid="input-conn-password"
-              fullWidth
-              disabled={dialog.busy}
-              helperText={
-                dialog.mode === 'password'
-                  ? `Auth for ${dialog.spec || 'SSH'} (server password or encrypted key passphrase)`
-                  : 'Public key auth failed — try passphrase, password, or set IdentityFile in ~/.ssh/config'
-              }
-              sx={{ mt: 1 }}
-            />
-          )}
+          {(dialog.askPassword || dialog.mode === 'password') &&
+            dialog.mode !== 'workdir' &&
+            dialog.mode !== 'smb_shares' &&
+            dialog.mode !== 'add_smb' && (
+              <TextField
+                autoFocus={dialog.mode === 'password' || dialog.askPassword}
+                type="password"
+                label="Password or key passphrase"
+                value={dialog.password}
+                onChange={(e) => dispatch({ type: 'set_password', password: e.target.value })}
+                onKeyDown={(e) => handleDialogEnter(e, submit)}
+                data-testid="input-conn-password"
+                fullWidth
+                disabled={dialog.busy}
+                helperText={
+                  dialog.mode === 'password'
+                    ? `Auth for ${dialog.spec || 'SSH'} (server password or encrypted key passphrase)`
+                    : 'Public key auth failed — try passphrase, password, or set IdentityFile in ~/.ssh/config'
+                }
+                sx={{ mt: 1 }}
+              />
+            )}
 
           {dialog.error && (
-            <Typography color="error" variant="body2" data-testid="conn-error">
-              {dialog.error}
-            </Typography>
+            <>
+              <Typography color="error" variant="body2" data-testid="conn-error">
+                {dialog.error}
+              </Typography>
+              {localNetError && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  data-testid="btn-open-local-network"
+                  onClick={() => {
+                    void FileService.OpenLocalNetworkSettings().catch((e) =>
+                      show(errMessage(e), 'error'),
+                    );
+                  }}
+                >
+                  {smbNetworkSettingsLabel()}
+                </Button>
+              )}
+            </>
           )}
         </DialogContent>
 
@@ -318,9 +376,13 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
               data-testid="btn-conn-connect"
               type="submit"
               variant="contained"
-              disabled={dialog.busy}
+              disabled={connectDisabled}
             >
-              {dialog.mode === 'workdir' ? 'Open' : dialog.busy ? 'Connecting…' : 'Connect'}
+              {dialog.mode === 'workdir' || dialog.mode === 'smb_shares'
+                ? 'Open'
+                : dialog.busy
+                  ? 'Connecting…'
+                  : 'Connect'}
             </Button>
           )}
         </DialogActions>

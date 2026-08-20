@@ -12,6 +12,7 @@ import {
 import { FileService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
+import { isRemotePath } from '../../../features/connections/helpers';
 import { isPermissionError } from '../helpers';
 import type { FileOpDialogsArgs } from '../types';
 
@@ -113,7 +114,7 @@ export const useFileOpDialogs = ({
   };
 
   const onMkdir = () => {
-    if (activePath.startsWith('ssh://')) {
+    if (isRemotePath(activePath)) {
       return show('Not available on remote connections yet', 'warning');
     }
     dispatchMkdir({ type: 'open', name: 'New Folder' });
@@ -131,7 +132,7 @@ export const useFileOpDialogs = ({
   };
 
   const onMkfile = () => {
-    if (activePath.startsWith('ssh://')) {
+    if (isRemotePath(activePath)) {
       return show('Not available on remote connections yet', 'warning');
     }
     dispatchMkfile({ type: 'open', name: 'untitled.txt' });

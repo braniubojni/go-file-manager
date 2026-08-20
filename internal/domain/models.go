@@ -187,17 +187,25 @@ type ShortcutDef struct {
 	Binding     string `json:"binding"`
 }
 
-// ConnectionProfile is a saved remote connection (SSH now; FTP/SFTP later).
+// ConnectionProfile is a saved remote connection (SSH or SMB).
 type ConnectionProfile struct {
 	ID             string   `json:"id"`
-	Protocol       string   `json:"protocol"` // "ssh", future: "ftp", "sftp"
+	Protocol       string   `json:"protocol"` // "ssh" or "smb"
 	User           string   `json:"user"`
 	Host           string   `json:"host"`
 	Port           int      `json:"port"`
 	Label          string   `json:"label"`                    // display name; default user@host
 	ConfigAlias    string   `json:"configAlias,omitempty"`    // ~/.ssh/config Host alias (re-resolved on connect)
 	IdentityFiles  []string `json:"identityFiles,omitempty"`  // private key paths (also re-merged from config)
-	DefaultWorkDir string   `json:"defaultWorkDir,omitempty"` // preferred ssh:// start path
+	DefaultWorkDir string   `json:"defaultWorkDir,omitempty"` // preferred start path
+	Domain         string   `json:"domain,omitempty"`         // SMB NTLM domain
+}
+
+// SMBShare is one share exported by an SMB host.
+type SMBShare struct {
+	Name      string `json:"name"`
+	Hidden    bool   `json:"hidden"`
+	LocalPath string `json:"localPath,omitempty"` // set when the OS mounted the volume
 }
 
 // ActiveSession is a live remote connection for UI.
@@ -212,11 +220,13 @@ type ActiveSession struct {
 
 // ConnectResult is returned after a successful SSH dial.
 type ConnectResult struct {
-	RootPath       string `json:"rootPath"`
-	HomePath       string `json:"homePath"`                 // remote home or root
-	Key            string `json:"key"`                      // session key user@host:port
-	ProfileID      string `json:"profileId,omitempty"`      // saved profile id when known
-	DefaultWorkDir string `json:"defaultWorkDir,omitempty"` // profile default start path if set
+	RootPath       string     `json:"rootPath"`
+	HomePath       string     `json:"homePath"`                 // remote home or root
+	Key            string     `json:"key"`                      // session key user@host:port
+	ProfileID      string     `json:"profileId,omitempty"`      // saved profile id when known
+	DefaultWorkDir string     `json:"defaultWorkDir,omitempty"` // profile default start path if set
+	Shares         []SMBShare `json:"shares,omitempty"`         // SMB share list after connect
+	LocalMount     bool       `json:"localMount,omitempty"`     // OS/Finder mounted; paths are local
 }
 
 // SSHConfigHost is a host entry from an OpenSSH client config file.

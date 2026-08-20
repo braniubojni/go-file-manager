@@ -96,3 +96,4 @@ cd e2e && npx playwright test specs/bookmarks.spec.ts   # single spec
 
 - Tabs: open in `todo.features.md`.
 - Remote SSH: prefer **system OpenSSH** (`ssh -s host sftp`) for connect (VS Code parity); fallback Go crypto; local↔remote copy/move; workdir picker.
+- Remote SMB: in-app `smb://` via `cloudsoda/go-smb2` (NTLM); Finder-style share picker; not an OS volume.

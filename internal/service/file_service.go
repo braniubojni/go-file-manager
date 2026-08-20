@@ -22,12 +22,45 @@ type FileService struct {
 	jobs   sync.Map // jobID -> *jobHandle
 	jobSeq atomic.Uint64
 	remote *remote.Manager
+	smb    *remote.SMBManager
 	trash  *filesystem.Trash
 	app    *application.App
 }
 
-func NewFileService(remoteMgr *remote.Manager, trashDir string) *FileService {
-	return &FileService{remote: remoteMgr, trash: filesystem.NewTrash(trashDir)}
+type remoteBackend interface {
+	ListDir(path string, showHidden bool) ([]domain.FileEntry, error)
+	ListPathCompletions(partial string) ([]string, error)
+	Exists(path string) (bool, error)
+	CopyWithin(sources []string, destDir string) error
+	MoveWithin(sources []string, destDir string) error
+	Download(sources []string, destDir string) error
+	Upload(sources []string, destDir string) error
+	Delete(paths []string) error
+	Rename(oldPath, newName string) (string, error)
+	Mkdir(parent, name string) (string, error)
+	ReadTextFile(path string) (string, error)
+	WriteTextFile(path, content string) error
+	DirChildSizesCtx(ctx context.Context, dir string) (domain.DirSizes, error)
+}
+
+func NewFileService(remoteMgr *remote.Manager, smbMgr *remote.SMBManager, trashDir string) *FileService {
+	return &FileService{remote: remoteMgr, smb: smbMgr, trash: filesystem.NewTrash(trashDir)}
+}
+
+func (s *FileService) backendFor(path string) (remoteBackend, error) {
+	if remote.IsSMB(path) {
+		if s.smb == nil {
+			return nil, fmt.Errorf("remote not available")
+		}
+		return s.smb, nil
+	}
+	if remote.IsRemote(path) {
+		if s.remote == nil {
+			return nil, fmt.Errorf("remote not available")
+		}
+		return s.remote, nil
+	}
+	return nil, fmt.Errorf("not a remote path")
 }
 
 // PurgeTrash drops undo batches older than TrashMaxAge (called at startup).
@@ -96,20 +129,22 @@ func (s *FileService) FinishJob(jobID string) error {
 
 func (s *FileService) ListDir(path string, showHidden bool) ([]domain.FileEntry, error) {
 	if remote.IsRemote(path) {
-		if s.remote == nil {
-			return nil, fmt.Errorf("remote not available")
+		be, err := s.backendFor(path)
+		if err != nil {
+			return nil, err
 		}
-		return s.remote.ListDir(path, showHidden)
+		return be.ListDir(path, showHidden)
 	}
 	return filesystem.ListDir(path, showHidden)
 }
 
 func (s *FileService) ListPathCompletions(partial string) ([]string, error) {
 	if remote.IsRemote(partial) {
-		if s.remote == nil {
-			return nil, fmt.Errorf("remote not available")
+		be, err := s.backendFor(partial)
+		if err != nil {
+			return nil, err
 		}
-		return s.remote.ListPathCompletions(partial)
+		return be.ListPathCompletions(partial)
 	}
 	return filesystem.ListPathCompletions(partial)
 }
@@ -120,10 +155,11 @@ func (s *FileService) GetHomeDir() (string, error) {
 
 func (s *FileService) Exists(path string) (bool, error) {
 	if remote.IsRemote(path) {
-		if s.remote == nil {
-			return false, fmt.Errorf("remote not available")
+		be, err := s.backendFor(path)
+		if err != nil {
+			return false, err
 		}
-		return s.remote.Exists(path)
+		return be.Exists(path)
 	}
 	return filesystem.Exists(path)
 }
@@ -137,20 +173,23 @@ func (s *FileService) Copy(sources []string, destDir string) error {
 	case transferLocal:
 		return filesystem.Copy(sources, destDir)
 	case transferRemoteWithin:
-		if s.remote == nil {
-			return fmt.Errorf("remote not available")
+		be, err := s.backendFor(destDir)
+		if err != nil {
+			return err
 		}
-		return s.remote.CopyWithin(sources, destDir)
+		return be.CopyWithin(sources, destDir)
 	case transferDownload:
-		if s.remote == nil {
-			return fmt.Errorf("remote not available")
+		be, err := s.backendFor(sources[0])
+		if err != nil {
+			return err
 		}
-		return s.remote.Download(sources, destDir)
+		return be.Download(sources, destDir)
 	case transferUpload:
-		if s.remote == nil {
-			return fmt.Errorf("remote not available")
+		be, err := s.backendFor(destDir)
+		if err != nil {
+			return err
 		}
-		return s.remote.Upload(sources, destDir)
+		return be.Upload(sources, destDir)
 	default:
 		return fmt.Errorf("unsupported copy")
 	}
@@ -165,23 +204,26 @@ func (s *FileService) Move(sources []string, destDir string) error {
 	case transferLocal:
 		return filesystem.Move(sources, destDir)
 	case transferRemoteWithin:
-		if s.remote == nil {
-			return fmt.Errorf("remote not available")
-		}
-		return s.remote.MoveWithin(sources, destDir)
-	case transferDownload:
-		if s.remote == nil {
-			return fmt.Errorf("remote not available")
-		}
-		if err := s.remote.Download(sources, destDir); err != nil {
+		be, err := s.backendFor(destDir)
+		if err != nil {
 			return err
 		}
-		return s.remote.Delete(sources)
-	case transferUpload:
-		if s.remote == nil {
-			return fmt.Errorf("remote not available")
+		return be.MoveWithin(sources, destDir)
+	case transferDownload:
+		be, err := s.backendFor(sources[0])
+		if err != nil {
+			return err
 		}
-		if err := s.remote.Upload(sources, destDir); err != nil {
+		if err := be.Download(sources, destDir); err != nil {
+			return err
+		}
+		return be.Delete(sources)
+	case transferUpload:
+		be, err := s.backendFor(destDir)
+		if err != nil {
+			return err
+		}
+		if err := be.Upload(sources, destDir); err != nil {
 			return err
 		}
 		return filesystem.Delete(sources)
@@ -209,6 +251,14 @@ func transferKind(sources []string, destDir string) (xferKind, error) {
 		return 0, fmt.Errorf("mixed local/remote selection is not supported")
 	}
 	destRemote := remote.IsRemote(destDir)
+	if srcRemote && destRemote {
+		scheme := remote.SchemeOf(destDir)
+		for _, src := range sources {
+			if remote.SchemeOf(src) != scheme {
+				return 0, fmt.Errorf("cross-protocol copy not supported")
+			}
+		}
+	}
 	switch {
 	case !srcRemote && !destRemote:
 		return transferLocal, nil
@@ -231,7 +281,17 @@ func (s *FileService) Delete(paths []string) (string, error) {
 		if !allRemote(paths) {
 			return "", fmt.Errorf("mixed local/remote delete not supported")
 		}
-		return "", s.remote.Delete(paths)
+		scheme := remote.SchemeOf(paths[0])
+		for _, p := range paths {
+			if remote.SchemeOf(p) != scheme {
+				return "", fmt.Errorf("cross-protocol delete not supported")
+			}
+		}
+		be, err := s.backendFor(paths[0])
+		if err != nil {
+			return "", err
+		}
+		return "", be.Delete(paths)
 	}
 	return s.trash.MoveToTrash(paths)
 }
@@ -243,14 +303,22 @@ func (s *FileService) RestoreDeleted(batchID string) error {
 
 func (s *FileService) Rename(oldPath, newName string) (string, error) {
 	if remote.IsRemote(oldPath) {
-		return s.remote.Rename(oldPath, newName)
+		be, err := s.backendFor(oldPath)
+		if err != nil {
+			return "", err
+		}
+		return be.Rename(oldPath, newName)
 	}
 	return filesystem.Rename(oldPath, newName)
 }
 
 func (s *FileService) Mkdir(parent, name string) (string, error) {
 	if remote.IsRemote(parent) {
-		return s.remote.Mkdir(parent, name)
+		be, err := s.backendFor(parent)
+		if err != nil {
+			return "", err
+		}
+		return be.Mkdir(parent, name)
 	}
 	return filesystem.Mkdir(parent, name)
 }
@@ -266,10 +334,11 @@ func (s *FileService) CreateFile(parent, name string) (string, error) {
 // ReadTextFile reads a text file for the built-in editor (local or remote).
 func (s *FileService) ReadTextFile(path string) (string, error) {
 	if remote.IsRemote(path) {
-		if s.remote == nil {
-			return "", fmt.Errorf("remote not available")
+		be, err := s.backendFor(path)
+		if err != nil {
+			return "", err
 		}
-		return s.remote.ReadTextFile(path)
+		return be.ReadTextFile(path)
 	}
 	return filesystem.ReadTextFile(path)
 }
@@ -277,10 +346,11 @@ func (s *FileService) ReadTextFile(path string) (string, error) {
 // WriteTextFile writes a text file from the built-in editor (local or remote).
 func (s *FileService) WriteTextFile(path, content string) error {
 	if remote.IsRemote(path) {
-		if s.remote == nil {
-			return fmt.Errorf("remote not available")
+		be, err := s.backendFor(path)
+		if err != nil {
+			return err
 		}
-		return s.remote.WriteTextFile(path, content)
+		return be.WriteTextFile(path, content)
 	}
 	return filesystem.WriteTextFile(path, content)
 }
@@ -411,6 +481,11 @@ func (s *FileService) OpenPrivacySettings() error {
 	return config.OpenPrivacySettings()
 }
 
+// OpenLocalNetworkSettings opens OS Local Network / firewall settings when possible.
+func (s *FileService) OpenLocalNetworkSettings() error {
+	return config.OpenLocalNetworkSettings()
+}
+
 // Open opens a path with the OS default application.
 func (s *FileService) Open(path string) error {
 	if remote.IsRemote(path) {
@@ -425,10 +500,11 @@ func (s *FileService) Open(path string) error {
 func (s *FileService) DirChildSizes(jobID string, dir string) (domain.DirSizes, error) {
 	defer func() { _ = s.FinishJob(jobID) }()
 	if remote.IsRemote(dir) {
-		if s.remote == nil {
-			return domain.DirSizes{}, fmt.Errorf("remote not available")
+		be, err := s.backendFor(dir)
+		if err != nil {
+			return domain.DirSizes{}, err
 		}
-		return s.remote.DirChildSizesCtx(s.jobCtx(jobID), dir)
+		return be.DirChildSizesCtx(s.jobCtx(jobID), dir)
 	}
 	return filesystem.DirChildSizesCtx(s.jobCtx(jobID), dir)
 }

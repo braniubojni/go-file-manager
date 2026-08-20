@@ -6,7 +6,12 @@ import { useSnack } from '../../shared/ui/SnackbarHost';
 import { enterPaneTab } from '../../widgets/file-pane/helpers';
 import { usePaneStore } from '../pane/paneStore';
 import { useConnectRequestStore } from './connectRequestStore';
-import { isAuthErrorMessage, sessionKeyFromPath } from './helpers';
+import {
+  isAuthErrorMessage,
+  isRemotePath,
+  sessionKeyFromPath,
+  sessionKeyFromProfile,
+} from './helpers';
 import type { ActiveSession, ConnectionProfile } from './types';
 
 const land = (paneId: PaneId, path: string): void => {
@@ -24,7 +29,7 @@ const land = (paneId: PaneId, path: string): void => {
  */
 export const ensureSessionThenNavigate = async (paneId: PaneId, path: string): Promise<void> => {
   if (!path) return;
-  if (!path.startsWith('ssh://')) {
+  if (!isRemotePath(path)) {
     land(paneId, path);
     return;
   }
@@ -42,7 +47,7 @@ export const ensureSessionThenNavigate = async (paneId: PaneId, path: string): P
     const sessions = ((await ConnectionService.ListSessions()) ?? []) as ActiveSession[];
     if (!sessions.some((s) => s.key === key)) {
       const profiles = ((await ConnectionService.ListProfiles()) ?? []) as ConnectionProfile[];
-      const profile = profiles.find((p) => `${p.user}@${p.host}:${p.port}` === key);
+      const profile = profiles.find((p) => sessionKeyFromProfile(p) === key);
       try {
         if (profile) await ConnectionService.ConnectProfile(profile.id, '');
         else await ConnectionService.ConnectSpec(key, '', false);

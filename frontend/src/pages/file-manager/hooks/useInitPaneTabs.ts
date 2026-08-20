@@ -1,16 +1,17 @@
 import { useEffect } from 'react';
 import { useHomeDir, usePaneTabs } from '../../../entities/file/queries';
 import { usePaneStore, type PaneTab } from '../../../features/pane/paneStore';
+import { isRemotePath } from '../../../features/connections/helpers';
 import { FileService } from '../../../shared/api/bindings';
 
 let tabSeq = 0;
 const makeTab = (path: string): PaneTab => ({ id: `boot${++tabSeq}`, path, back: [], forward: [] });
 
-/** Validate one saved tab path. ssh:// tabs are restored dormant (no dial),
+/** Validate one saved tab path. Remote tabs are restored dormant (no dial),
  * so they always pass — connecting is a manual action via the cloud menu. */
 const isValidTab = async (path: string): Promise<boolean> => {
   if (!path) return false;
-  if (path.startsWith('ssh://')) return true;
+  if (isRemotePath(path)) return true;
   try {
     return await FileService.Exists(path);
   } catch {

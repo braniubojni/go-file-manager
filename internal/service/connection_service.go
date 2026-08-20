@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,15 +15,16 @@ import (
 const kvConnections = "connections"
 const kvHostKeys = "ssh_host_keys"
 
-// ConnectionService manages remote connection profiles and SSH sessions.
+// ConnectionService manages remote connection profiles and SSH/SMB sessions.
 type ConnectionService struct {
 	db      *storage.DB
 	manager *remote.Manager
+	smb     *remote.SMBManager
 }
 
-// NewConnectionService creates the service. manager may be shared with FileService.
-func NewConnectionService(db *storage.DB, manager *remote.Manager) *ConnectionService {
-	return &ConnectionService{db: db, manager: manager}
+// NewConnectionService creates the service. managers may be shared with FileService.
+func NewConnectionService(db *storage.DB, manager *remote.Manager, smb *remote.SMBManager) *ConnectionService {
+	return &ConnectionService{db: db, manager: manager, smb: smb}
 }
 
 // ListProfiles returns saved connection profiles.
@@ -35,6 +37,9 @@ func (s *ConnectionService) AddProfile(spec string) (domain.ConnectionProfile, e
 	parsed, err := remote.ParseSpec(spec)
 	if err != nil {
 		return domain.ConnectionProfile{}, err
+	}
+	if parsed.IsSMB() {
+		return s.upsertSMBProfile(parsed)
 	}
 	parsed = remote.EnrichSpec(parsed)
 	list, err := s.loadProfiles()
@@ -77,7 +82,7 @@ func (s *ConnectionService) SetProfileDefaultWorkDir(profileID, vpath string) er
 		return fmt.Errorf("profile id required")
 	}
 	if !remote.IsRemote(vpath) {
-		return fmt.Errorf("default workdir must be a remote ssh:// path")
+		return fmt.Errorf("default workdir must be a remote ssh:// or smb:// path")
 	}
 	list, err := s.loadProfiles()
 	if err != nil {
@@ -114,7 +119,23 @@ func (s *ConnectionService) ConnectProfile(id string, password string) (domain.C
 	if prof == nil {
 		return domain.ConnectResult{}, fmt.Errorf("profile not found")
 	}
-	if prof.Protocol != "ssh" {
+	if prof.Protocol == "smb" {
+		spec := remote.Spec{
+			Scheme: "smb",
+			User:   prof.User,
+			Host:   prof.Host,
+			Port:   prof.Port,
+			Domain: prof.Domain,
+		}
+		res, err := s.connectSMB(spec, password, false)
+		if err != nil {
+			return domain.ConnectResult{}, err
+		}
+		res.ProfileID = prof.ID
+		res.DefaultWorkDir = prof.DefaultWorkDir
+		return res, nil
+	}
+	if prof.Protocol != "ssh" && prof.Protocol != "" {
 		return domain.ConnectResult{}, fmt.Errorf("protocol %s not implemented yet", prof.Protocol)
 	}
 	spec := remote.Spec{
@@ -155,6 +176,9 @@ func (s *ConnectionService) ConnectSpec(specStr string, password string, save bo
 	if err != nil {
 		return domain.ConnectResult{}, err
 	}
+	if parsed.IsSMB() {
+		return s.connectSMB(parsed, password, save)
+	}
 	parsed = remote.EnrichSpec(parsed)
 	var profileID string
 	if save {
@@ -179,12 +203,22 @@ func (s *ConnectionService) ConnectSpec(specStr string, password string, save bo
 
 // Disconnect closes the session for key or virtual path.
 func (s *ConnectionService) Disconnect(keyOrPath string) error {
-	return s.manager.Disconnect(keyOrPath)
+	err := s.manager.Disconnect(keyOrPath)
+	if s.smb != nil {
+		if err2 := s.smb.Disconnect(keyOrPath); err2 != nil && err == nil {
+			err = err2
+		}
+	}
+	return err
 }
 
-// ListSessions returns live SSH sessions.
+// ListSessions returns live SSH and SMB sessions.
 func (s *ConnectionService) ListSessions() []domain.ActiveSession {
-	return s.manager.ListSessions()
+	out := s.manager.ListSessions()
+	if s.smb != nil {
+		out = append(out, s.smb.ListSessions()...)
+	}
+	return out
 }
 
 // ParseSpec validates a connection string (for the Add dialog).
@@ -193,8 +227,128 @@ func (s *ConnectionService) ParseSpec(spec string) (domain.ConnectionProfile, er
 	if err != nil {
 		return domain.ConnectionProfile{}, err
 	}
+	if parsed.IsSMB() {
+		return profileFromSMBSpec(parsed), nil
+	}
 	parsed = remote.EnrichSpec(parsed)
 	return profileFromSpec(parsed, ""), nil
+}
+
+func (s *ConnectionService) connectSMB(spec remote.Spec, password string, save bool) (domain.ConnectResult, error) {
+	if s.smb == nil {
+		return domain.ConnectResult{}, fmt.Errorf("remote not available")
+	}
+	spec.Scheme = "smb"
+	if spec.Port <= 0 {
+		spec.Port = 445
+	}
+	var profileID, defaultWD string
+	if save {
+		p, err := s.upsertSMBProfile(spec)
+		if err != nil {
+			return domain.ConnectResult{}, err
+		}
+		profileID = p.ID
+		defaultWD = p.DefaultWorkDir
+	}
+	if err := s.smb.Connect(spec, password); err != nil {
+		if remote.IsSMBAuthError(err) {
+			vols, merr := remote.SystemMountSMB(spec.Host)
+			if merr == nil && len(vols) > 0 {
+				return systemMountResult(spec, vols, profileID, defaultWD), nil
+			}
+			if merr != nil && !strings.Contains(merr.Error(), "not available") {
+				return domain.ConnectResult{}, merr
+			}
+		}
+		return domain.ConnectResult{}, err
+	}
+	shares, err := s.smb.ListShares(spec.SessionKey(), true)
+	if err != nil {
+		shares = nil
+	}
+	return domain.ConnectResult{
+		RootPath:       spec.RootPath(),
+		HomePath:       spec.RootPath(),
+		Key:            spec.SessionKey(),
+		ProfileID:      profileID,
+		DefaultWorkDir: defaultWD,
+		Shares:         shares,
+	}, nil
+}
+
+func systemMountResult(spec remote.Spec, vols []string, profileID, defaultWD string) domain.ConnectResult {
+	shares := make([]domain.SMBShare, 0, len(vols))
+	for _, p := range vols {
+		shares = append(shares, domain.SMBShare{Name: filepath.Base(p), LocalPath: p})
+	}
+	// Keep RootPath/HomePath as smb:// virtual root so “Remember as default” and
+	// session lookups stay remote-shaped; local mount paths live on Shares[].LocalPath.
+	root := spec.RootPath()
+	return domain.ConnectResult{
+		RootPath:       root,
+		HomePath:       root,
+		Key:            spec.SessionKey(),
+		ProfileID:      profileID,
+		DefaultWorkDir: defaultWD,
+		Shares:         shares,
+		LocalMount:     true,
+	}
+}
+
+func (s *ConnectionService) upsertSMBProfile(spec remote.Spec) (domain.ConnectionProfile, error) {
+	list, err := s.loadProfiles()
+	if err != nil {
+		return domain.ConnectionProfile{}, err
+	}
+	key := spec.SessionKey()
+	for i, p := range list {
+		if p.Protocol != "smb" {
+			continue
+		}
+		cand := remote.Spec{Scheme: "smb", User: p.User, Host: p.Host, Port: p.Port}
+		if cand.Port <= 0 {
+			cand.Port = 445
+		}
+		if cand.SessionKey() == key {
+			if spec.Domain != "" {
+				list[i].Domain = spec.Domain
+			}
+			if err := s.saveProfiles(list); err != nil {
+				return domain.ConnectionProfile{}, err
+			}
+			return list[i], nil
+		}
+	}
+	p := profileFromSMBSpec(spec)
+	list = append(list, p)
+	if err := s.saveProfiles(list); err != nil {
+		return domain.ConnectionProfile{}, err
+	}
+	return p, nil
+}
+
+func profileFromSMBSpec(spec remote.Spec) domain.ConnectionProfile {
+	label := spec.Host
+	if spec.User != "" {
+		label = spec.User + "@" + spec.Host
+	}
+	if spec.Port != 445 && spec.Port != 0 {
+		label = fmt.Sprintf("%s:%d", label, spec.Port)
+	}
+	port := spec.Port
+	if port <= 0 {
+		port = 445
+	}
+	return domain.ConnectionProfile{
+		ID:       fmt.Sprintf("conn-%d", time.Now().UnixNano()),
+		Protocol: "smb",
+		User:     spec.User,
+		Host:     spec.Host,
+		Port:     port,
+		Label:    label,
+		Domain:   spec.Domain,
+	}
 }
 
 func (s *ConnectionService) connectSpec(spec remote.Spec, password string) (domain.ConnectResult, error) {

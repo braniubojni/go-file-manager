@@ -56,16 +56,26 @@ export interface ConnectResult {
      * profile default start path if set
      */
     "defaultWorkDir"?: string;
+
+    /**
+     * SMB share list after connect
+     */
+    "shares"?: SMBShare[] | null;
+
+    /**
+     * OS/Finder mounted; paths are local
+     */
+    "localMount"?: boolean;
 }
 
 /**
- * ConnectionProfile is a saved remote connection (SSH now; FTP/SFTP later).
+ * ConnectionProfile is a saved remote connection (SSH or SMB).
  */
 export interface ConnectionProfile {
     "id": string;
 
     /**
-     * "ssh", future: "ftp", "sftp"
+     * "ssh" or "smb"
      */
     "protocol": string;
     "user": string;
@@ -88,9 +98,14 @@ export interface ConnectionProfile {
     "identityFiles"?: string[] | null;
 
     /**
-     * preferred ssh:// start path
+     * preferred start path
      */
     "defaultWorkDir"?: string;
+
+    /**
+     * SMB NTLM domain
+     */
+    "domain"?: string;
 }
 
 /**
@@ -209,6 +224,19 @@ export interface RemoteRecent {
 export interface ReplaceAllResult {
     "filesChanged": number;
     "replacements": number;
+}
+
+/**
+ * SMBShare is one share exported by an SMB host.
+ */
+export interface SMBShare {
+    "name": string;
+    "hidden": boolean;
+
+    /**
+     * set when the OS mounted the volume
+     */
+    "localPath"?: string;
 }
 
 /**

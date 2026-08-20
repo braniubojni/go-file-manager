@@ -23,6 +23,14 @@ export const initialAddConnectionState: AddConnectionState = {
   workdirCustom: '',
   workdirRemember: true,
   workdirProfileId: '',
+  smbHost: '',
+  smbUser: '',
+  smbDomain: '',
+  smbPort: '445',
+  shares: [],
+  shareChosen: '',
+  showHiddenShares: false,
+  smbRootPath: '',
 };
 
 export const addConnectionReducer = (
@@ -31,12 +39,13 @@ export const addConnectionReducer = (
 ): AddConnectionState => {
   switch (action.type) {
     case 'open_add':
-      return {
-        ...initialAddConnectionState,
-        open: true,
-        mode: 'add',
-        save: true,
-      };
+      return { ...initialAddConnectionState, open: true, mode: 'add', save: true };
+    case 'open_add_smb':
+      return { ...initialAddConnectionState, open: true, mode: 'add_smb', save: true };
+    case 'open_smb_confirm':
+      return { ...state, mode: 'smb_confirm', error: '', busy: false };
+    case 'back_smb_form':
+      return { ...state, mode: 'add_smb', busy: false };
     case 'open_password':
       return {
         ...initialAddConnectionState,
@@ -52,7 +61,6 @@ export const addConnectionReducer = (
         open: true,
         mode: 'ssh_config',
         save: true,
-        // sshConfigPath is set via set_ssh_config_path after DefaultSSHConfigPaths() resolves
         sshConfigPath: '',
       };
     case 'open_workdir': {
@@ -68,6 +76,24 @@ export const addConnectionReducer = (
         workdirSessionKey: action.sessionKey,
         workdirChosen: chosen,
         workdirCustom: '',
+        workdirRemember: Boolean(action.profileId),
+        workdirProfileId: action.profileId ?? '',
+      };
+    }
+    case 'open_smb_shares': {
+      const visible = action.shares.filter((s) => !s.hidden);
+      const chosen = action.chosen || visible[0]?.name || action.shares[0]?.name || '';
+      return {
+        ...state,
+        open: true,
+        mode: 'smb_shares',
+        busy: false,
+        error: '',
+        shares: action.shares,
+        shareChosen: chosen,
+        showHiddenShares: false,
+        smbRootPath: action.rootPath,
+        workdirSessionKey: action.sessionKey,
         workdirRemember: Boolean(action.profileId),
         workdirProfileId: action.profileId ?? '',
       };
@@ -107,6 +133,18 @@ export const addConnectionReducer = (
       };
     case 'set_workdir_remember':
       return { ...state, workdirRemember: action.remember };
+    case 'set_smb_host':
+      return { ...state, smbHost: action.host, error: '' };
+    case 'set_smb_user':
+      return { ...state, smbUser: action.user, error: '' };
+    case 'set_smb_domain':
+      return { ...state, smbDomain: action.domain, error: '' };
+    case 'set_smb_port':
+      return { ...state, smbPort: action.port, error: '' };
+    case 'set_share_chosen':
+      return { ...state, shareChosen: action.name };
+    case 'set_show_hidden_shares':
+      return { ...state, showHiddenShares: action.show };
     default:
       return state;
   }

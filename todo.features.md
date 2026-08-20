@@ -4,11 +4,6 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 
 ## Bugs
 
-- [x] Dialog `Connect from SSH config` picker of config gives back an error of `openssh sftp: ssh: connect to host 192.168.0.5 port 22: Operation timed out (error receiving version packet from server: server unexpectedly closed connection: unexpected EOF)` — fixed: use `ssh dest -s sftp`, honor config file via `-F`, stop double-timeout native fallback on connection errors, surface errors in dialog; if host is truly unreachable, timeout still expected
-- [x] Dialog `Create folder` when I click `Enter` dialog does not close — form submit + Enter handler
-- [x] Good when I click on letter scroll goes to file/folder but when I continue to press the same letter scroll and highlight does not go to the next file/folder — type-ahead cycles same letter
-- [x] UI/UX issue when I am tring to drag and drop from remote server to local(cursor shows that I am not allowed to do it, meanwhile it did) — drop validity mirrors pane fallthrough
-
 ## Core file-manager gaps (Double Commander parity)
 
 - [ ] Archive support: browse zip/tar as virtual folder, extract/compress via context menu
@@ -26,8 +21,15 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 
 ## Remote/SFTP
 
-- [ ] SMB support
-- [ ] Title of SSH can be changed to SSH/SFTP cuz we support both protocols at this moment not just SSH
+- [x] SMB support — in-app `smb://` browse, Finder-style share picker (`cloudsoda/go-smb2`)
+- [x] Title of SSH can be changed to SSH/SFTP cuz we support both protocols at this moment not just SSH
+- [ ] FTP support
+- [ ] SMB Kerberos / ticket auth (NTLM only in V1)
+- [ ] OS-level SMB mount (Finder `/Volumes`, Linux cifs, Windows `net use`)
+- [ ] Copy/move between SSH and SMB in one step
+- [ ] Persist remote passwords (SSH/SMB) in OS keychain
+- [ ] SMB discovery / Bonjour browse for nearby shares
+- [ ] Create-empty-file / archive / search on remote (SSH and SMB)
 - [ ] Saved connection profiles (host/user/key) in SQLite alongside bookmarks
 - [ ] SSH key auth UI (not just password) — pick key file, agent forwarding
 - [ ] Remote tab reconnect on drop, connection status indicator per pane

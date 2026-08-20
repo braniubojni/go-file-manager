@@ -127,6 +127,13 @@ export function Open(path: string): $CancellablePromise<void> {
 }
 
 /**
+ * OpenLocalNetworkSettings opens OS Local Network / firewall settings when possible.
+ */
+export function OpenLocalNetworkSettings(): $CancellablePromise<void> {
+    return $Call.ByID(2911533994);
+}
+
+/**
  * OpenPrivacySettings opens OS privacy / full-disk access settings when possible.
  */
 export function OpenPrivacySettings(): $CancellablePromise<void> {

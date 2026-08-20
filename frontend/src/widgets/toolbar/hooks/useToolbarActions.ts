@@ -4,6 +4,7 @@ import { useSetTheme, useSettings } from '../../../entities/file/queries';
 import type { ThemePreference } from '../../../entities/file/types';
 import { parentDirOf, useEditorStore } from '../../../features/editor/editorStore';
 import { useGoToStore } from '../../../features/go-to/goToStore';
+import { isRemotePath } from '../../../features/connections/helpers';
 import { usePaneStore } from '../../../features/pane/paneStore';
 import { useDialogStore } from '../../../features/ui/dialogStore';
 import { FileService } from '../../../shared/api/bindings';
@@ -99,7 +100,7 @@ export const useToolbarActions = () => {
       return;
     }
     const path = realSelection[0];
-    if (path.startsWith('ssh://')) {
+    if (isRemotePath(path)) {
       openWorkspace(parentDirOf(path), path);
       return;
     }
@@ -116,7 +117,7 @@ export const useToolbarActions = () => {
       return;
     }
     const path = realSelection[0];
-    if (path.startsWith('ssh://')) {
+    if (isRemotePath(path)) {
       show('Git diff is not available on remote connections', 'warning');
       return;
     }
@@ -125,7 +126,7 @@ export const useToolbarActions = () => {
 
   const onGoTo = () => {
     if (editorOpen) return;
-    if (activePath.startsWith('ssh://')) {
+    if (isRemotePath(activePath)) {
       show('Go-to is not available on remote connections yet', 'warning');
       return;
     }

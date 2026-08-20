@@ -1,4 +1,5 @@
 import type { PaneId } from '../../entities/file/types';
+import { parentOfVirtualPath } from '../../features/connections/helpers';
 import type { FileOpsAction } from '../../features/file-ops/types';
 import { newJobId, usePaneJobStore } from '../../features/jobs/paneJobStore';
 import { FileService } from '../../shared/api/bindings';
@@ -16,16 +17,10 @@ export const isPermissionError = (msg: string): boolean => {
 
 // --- paths ---
 
-/** Parent directory for local or ssh:// virtual paths. */
+/** Parent directory for local or remote virtual paths. */
 export const parentPath = (activePath: string): string => {
-  if (activePath.startsWith('ssh://')) {
-    const m = activePath.match(/^(ssh:\/\/[^/]+)(\/.*)?$/);
-    if (!m) return activePath;
-    const base = m[1];
-    const p = m[2] || '/';
-    const parent = p.replace(/\/+$/, '').split('/').slice(0, -1).join('/') || '/';
-    return `${base}${parent === '/' ? '/' : parent}`;
-  }
+  const virtual = parentOfVirtualPath(activePath);
+  if (virtual) return virtual;
   const parent = activePath.replace(/\/+$/, '').split(/[/\\]/).slice(0, -1).join('/') || '/';
   const fixed =
     activePath.startsWith('/') && !parent.startsWith('/')

@@ -9,7 +9,7 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 | `domain`     | Shared models (settings, files, bookmarks)                       |
 | `filesystem` | Local FS: list/copy/move/delete, archive/extract, search, text R/W, dir sizes |
 | `gitstatus`  | Upward-only repo root + one scoped `git status` (no disk-wide `.git` walk)   |
-| `remote`     | SSH location parse + sftp ops (`path.go`, `ssh.go`)                           |
+| `remote`     | SSH/SFTP + SMB (`path.go`, `ssh.go`, `smb.go`)                                |
 | `storage`    | SQLite bookmarks + crypto helpers                                             |
 | `config`     | Config dir, open files in OS (`open_unix` / `open_windows`)                   |
 | `service`    | Wails-bound services (thin orchestration over packages above)                 |
@@ -22,14 +22,14 @@ Registered in `main.go`:
 - `FileService` — FS + remote + jobs cancel
 - `SettingsService` — JSON settings/shortcuts + pane paths
 - `BookmarkService` — SQLite
-- `ConnectionService` — SSH profiles/sessions
+- `ConnectionService` — SSH/SMB profiles/sessions
 - `TerminalService` — PTY per pane (`_unix` / `_windows`); holds `*application.App` for events
 - `UpdateService` — thin façade over `app.Updater` (CheckAndInstall / GetVersion / OpenReleases)
 - `GitService` — `StatusForDir` (cached root + porcelain; local only)
 
 ## Remote paths
 
-- Virtual paths: `ssh://user@host:port/remote/path` (see `remote.ParseLocation`).
+- Virtual paths: `ssh://user@host:port/remote/path` or `smb://user@host:port/Share/path` (see `remote.ParseLocation`).
 - `Location` **embeds** `Spec` → use `loc.JoinPath(...)`, not `loc.Spec.JoinPath` (staticcheck QF1008).
 
 ## Lint / style
