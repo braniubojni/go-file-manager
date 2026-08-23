@@ -114,7 +114,7 @@ func findDesktopFile(id string) string {
 
 func openWithPicker(path string) error {
 	if _, err := exec.LookPath("mimeopen"); err != nil {
-		return fmt.Errorf("no application picker (install mimeopen / perl-file-mimeinfo")
+		return fmt.Errorf("no application picker (install mimeopen / perl-file-mimeinfo)")
 	}
 	cmd, args := linuxPickerCmd(path)
 	return runDetached(cmd, args...)
