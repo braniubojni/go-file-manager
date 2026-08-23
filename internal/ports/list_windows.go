@@ -30,3 +30,11 @@ func processNames() map[int]string {
 	}
 	return parseTasklistCSV(string(out))
 }
+
+func attachProcessNames(list []domain.PortListener, names map[int]string) {
+	for i := range list {
+		if n, ok := names[list[i].PID]; ok {
+			list[i].Process = n
+		}
+	}
+}

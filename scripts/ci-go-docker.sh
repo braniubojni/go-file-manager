@@ -60,5 +60,9 @@ go vet ./...
 echo "== go test ./internal/... =="
 go test ./internal/...
 
+echo "== golangci-lint =="
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b /usr/local/bin v2.12.2
+golangci-lint run --timeout=3m
+
 echo "OK: Go CI steps passed"
 '

@@ -32,7 +32,7 @@ Parent: root `AGENTS.md`.
 ```bash
 task ci:go
 # = bash scripts/ci-go-docker.sh
-# ubuntu:24.04 + install Go from go.mod + GTK4 stack + same steps
+# ubuntu:24.04 + install Go from go.mod + GTK4 stack + same steps (incl. golangci-lint v2.12.2)
 ```
 
 **Not** a full CI mirror: `wails-cross` alone (GTK 4.8 / GtkFileDialog errors).

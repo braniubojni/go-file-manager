@@ -114,14 +114,6 @@ func parseTasklistCSV(s string) map[int]string {
 	return out
 }
 
-func attachProcessNames(list []domain.PortListener, names map[int]string) {
-	for i := range list {
-		if n, ok := names[list[i].PID]; ok {
-			list[i].Process = n
-		}
-	}
-}
-
 // Dedup keeps one row per port+PID, sorted by port then PID.
 func Dedup(in []domain.PortListener) []domain.PortListener {
 	type key struct{ port, pid int }
