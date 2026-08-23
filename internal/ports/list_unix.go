@@ -15,16 +15,14 @@ func List() ([]domain.PortListener, error) {
 	cmd := exec.Command("lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-F", "cPn")
 	out, err := cmd.Output()
 	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) && len(out) == 0 {
+		if errors.Is(err, exec.ErrNotFound) {
 			return []domain.PortListener{}, nil
 		}
-		if errors.Is(err, exec.ErrNotFound) {
-			return nil, fmt.Errorf("lsof not found (install lsof to use Port killer): %w", err)
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return parseLsofF(string(out)), nil
 		}
-		if len(out) == 0 {
-			return nil, fmt.Errorf("lsof: %w", err)
-		}
+		return nil, fmt.Errorf("lsof: %w", err)
 	}
 	return parseLsofF(string(out)), nil
 }

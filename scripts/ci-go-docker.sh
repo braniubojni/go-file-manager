@@ -21,7 +21,7 @@ set -euo pipefail
 echo "== apt: go build deps + Wails GTK4 stack =="
 apt-get update -qq
 apt-get install -y -qq ca-certificates curl git build-essential pkg-config \
-  libgtk-4-dev libwebkitgtk-6.0-dev >/dev/null
+  libgtk-4-dev libwebkitgtk-6.0-dev lsof >/dev/null
 
 echo "== install Go ${GO_VERSION} =="
 ARCH=$(dpkg --print-architecture)
