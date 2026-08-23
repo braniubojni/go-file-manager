@@ -10,6 +10,7 @@ import { useDialogStore } from '../../features/ui/dialogStore';
 import { useAutoUpdateCheck } from '../../features/updates/hooks/useAutoUpdateCheck';
 import { FileContextMenu } from '../../widgets/file-pane/FileContextMenu';
 import { FilePane } from '../../widgets/file-pane/FilePane';
+import { CommandPaletteHost } from '../../widgets/command-palette/CommandPaletteHost';
 import { GoToHost } from '../../widgets/go-to/GoToHost';
 import { AppMenuBar } from '../../widgets/menu/AppMenuBar';
 import { SearchHost } from '../../widgets/search/SearchHost';
@@ -89,6 +90,7 @@ export const FileManagerPage: FC = () => {
       )}
       {!editorOpen && <StatusBar />}
       <GoToHost />
+      <CommandPaletteHost />
       <SearchHost />
 
       <Suspense fallback={null}>

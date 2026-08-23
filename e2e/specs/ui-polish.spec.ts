@@ -78,4 +78,21 @@ test.describe("ui polish", () => {
       }
     }
   });
+
+  test("command palette opens with Mod+K and runs delete", async ({ page }) => {
+    await selectRow(page, "left", "note.txt");
+    const palette = page.getByTestId("dialog-command-palette");
+    const pathInput = page.getByTestId("path-input-left").locator("input");
+    await pathInput.click();
+    await page.keyboard.press("Meta+k");
+    if (!(await palette.isVisible())) {
+      await page.keyboard.press("Control+k");
+    }
+    await expect(palette).toBeVisible();
+    await page.getByTestId("input-command-palette").locator("input").fill("delete");
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("dialog-delete")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("dialog-delete")).toBeHidden();
+  });
 });

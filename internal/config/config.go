@@ -97,6 +97,7 @@ func DefaultShortcuts() map[string]string {
 		"goForward":        "Mod+]",
 		"openSettings":     "Mod+,",
 		"openShortcuts":    "Mod+/",
+		"commandPalette":   "Mod+K",
 		"toggleHidden":     "Mod+H",
 		"toggleExtensions": "Mod+E",
 		// Ctrl+` (same physical key as Ctrl+~ on many layouts); not Cmd on macOS.
@@ -131,6 +132,7 @@ func ShortcutCatalog() []domain.ShortcutDef {
 		{"goForward", "Forward", "Navigate forward in the active pane history (also mouse forward button)"},
 		{"openSettings", "Settings", "Open the settings dialog"},
 		{"openShortcuts", "Keyboard shortcuts", "Open the keyboard shortcuts dialog"},
+		{"commandPalette", "Command palette", "Search and run commands (Mod+K)"},
 		{"toggleHidden", "Toggle hidden files", "Show or hide dotfiles"},
 		{"toggleExtensions", "Toggle extensions", "Show or hide file extensions in names"},
 		{"toggleTerminal", "Toggle terminal", "Show or hide the terminal under the active pane (Ctrl+`)"},
