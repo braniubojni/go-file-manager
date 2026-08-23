@@ -106,7 +106,7 @@ func (r *progressReporter) setDest(path string, isDir bool) {
 	r.destSize = 0
 	r.destIsDir = isDir
 	r.lastEmit = time.Now()
-	r.force = false
+	r.force = true
 	r.on(r.eventLocked(""))
 }
 
