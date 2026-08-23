@@ -79,6 +79,14 @@ test.describe("ui polish", () => {
     }
   });
 
+  test("context menu shows Open with for a local file", async ({ page }) => {
+    await page.getByTestId("file-grid-left").getByText("note.txt", { exact: true }).click({
+      button: "right",
+    });
+    await expect(page.getByTestId("file-context-menu")).toBeVisible();
+    await expect(page.getByTestId("ctx-open-with")).toBeVisible();
+  });
+
   test("command palette opens with Mod+K and runs delete", async ({ page }) => {
     await selectRow(page, "left", "note.txt");
     const palette = page.getByTestId("dialog-command-palette");

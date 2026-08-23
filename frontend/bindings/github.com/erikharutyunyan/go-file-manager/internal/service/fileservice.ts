@@ -115,6 +115,13 @@ export function ListDir(path: string, showHidden: boolean): $CancellablePromise<
     return $Call.ByID(299481683, path, showHidden);
 }
 
+/**
+ * ListOpenWithApps returns applications that can open a local file.
+ */
+export function ListOpenWithApps(path: string): $CancellablePromise<domain$0.OpenWithApp[] | null> {
+    return $Call.ByID(1534248348, path);
+}
+
 export function ListPathCompletions(partial: string): $CancellablePromise<string[] | null> {
     return $Call.ByID(1004009986, partial);
 }
@@ -161,6 +168,20 @@ export function OpenLocalNetworkSettings(): $CancellablePromise<void> {
  */
 export function OpenPrivacySettings(): $CancellablePromise<void> {
     return $Call.ByID(3870616985);
+}
+
+/**
+ * OpenWith opens path with the application identified by appID.
+ */
+export function OpenWith(path: string, appID: string): $CancellablePromise<void> {
+    return $Call.ByID(3516877804, path, appID);
+}
+
+/**
+ * OpenWithPicker opens the OS application picker for a local file.
+ */
+export function OpenWithPicker(path: string): $CancellablePromise<void> {
+    return $Call.ByID(769482294, path);
 }
 
 /**

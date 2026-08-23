@@ -581,6 +581,37 @@ func (s *FileService) Open(path string) error {
 	return config.OpenInOS(path)
 }
 
+func rejectRemoteOpenWith(path string) error {
+	if remote.IsRemote(path) {
+		return fmt.Errorf("open with is not supported for remote paths")
+	}
+	return nil
+}
+
+// ListOpenWithApps returns applications that can open a local file.
+func (s *FileService) ListOpenWithApps(path string) ([]domain.OpenWithApp, error) {
+	if err := rejectRemoteOpenWith(path); err != nil {
+		return nil, err
+	}
+	return config.ListOpenWithApps(path)
+}
+
+// OpenWith opens path with the application identified by appID.
+func (s *FileService) OpenWith(path, appID string) error {
+	if err := rejectRemoteOpenWith(path); err != nil {
+		return err
+	}
+	return config.OpenWith(path, appID)
+}
+
+// OpenWithPicker opens the OS application picker for a local file.
+func (s *FileService) OpenWithPicker(path string) error {
+	if err := rejectRemoteOpenWith(path); err != nil {
+		return err
+	}
+	return config.OpenWithPicker(path)
+}
+
 // DirChildSizes returns recursive sizes for immediate child directories, plus
 // the children that could not be fully read (permission denied).
 // jobID from NewJobID enables CancelJob; empty jobID is non-cancellable.

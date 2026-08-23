@@ -16,6 +16,12 @@ type FileEntry struct {
 	Access string `json:"access"`
 }
 
+// OpenWithApp is one OS application that can open a local file.
+type OpenWithApp struct {
+	ID   string `json:"id"` // bundle path, .desktop id, or executable
+	Name string `json:"name"`
+}
+
 // DirSizes is the result of a recursive child-size calculation. Denied lists the
 // child directories the walk could not fully read, so the UI can mark them
 // rather than silently reporting an undercount.

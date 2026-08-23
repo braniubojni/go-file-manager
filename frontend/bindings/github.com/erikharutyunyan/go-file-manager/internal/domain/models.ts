@@ -209,6 +209,17 @@ export interface GridPrefs {
 }
 
 /**
+ * OpenWithApp is one OS application that can open a local file.
+ */
+export interface OpenWithApp {
+    /**
+     * bundle path, .desktop id, or executable
+     */
+    "id": string;
+    "name": string;
+}
+
+/**
  * PaneGridPrefs is one pane's file-grid sort, hidden columns, and column order.
  */
 export interface PaneGridPrefs {

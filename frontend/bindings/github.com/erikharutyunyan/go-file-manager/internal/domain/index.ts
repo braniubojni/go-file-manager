@@ -13,6 +13,7 @@ export type {
     GitFileDiff,
     GitStatusEntry,
     GridPrefs,
+    OpenWithApp,
     PaneGridPrefs,
     PaneTabs,
     RemoteRecent,
