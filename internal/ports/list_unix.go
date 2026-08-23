@@ -19,6 +19,9 @@ func List() ([]domain.PortListener, error) {
 		if errors.As(err, &ee) && len(out) == 0 {
 			return []domain.PortListener{}, nil
 		}
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, fmt.Errorf("lsof not found (install lsof to use Port killer): %w", err)
+		}
 		if len(out) == 0 {
 			return nil, fmt.Errorf("lsof: %w", err)
 		}
