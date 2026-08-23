@@ -12,6 +12,8 @@ export type {
     GitDirStatus,
     GitFileDiff,
     GitStatusEntry,
+    GridPrefs,
+    PaneGridPrefs,
     PaneTabs,
     RemoteRecent,
     ReplaceAllResult,

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useGridApiRef } from '@mui/x-data-grid';
+import { useGridApiRef, type GridColumnVisibilityModel } from '@mui/x-data-grid';
 import type {
   GridColDef,
   GridRowClassNameParams,
@@ -11,7 +11,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   type KeyboardEvent,
   type MouseEvent,
 } from 'react';
@@ -33,6 +32,7 @@ import { useTerminalStore } from '../../features/terminal/terminalStore';
 import { startTransfer } from '../../features/transfers/startTransfer';
 import { useDestRowUpdates } from '../../features/transfers/useDestRowUpdates';
 import { useColumnStore } from '../../features/ui/columnStore';
+import { useGridPrefsStore } from '../../features/ui/gridPrefsStore';
 import { errMessage } from '../../shared/lib/format';
 import { FileService } from '../../shared/api/bindings';
 import { useSnack } from '../../shared/ui/SnackbarHost';
@@ -359,9 +359,36 @@ export const useFileTable = ({
   const showContextMenu = useContextMenuStore((s) => s.show);
   const widths = useColumnStore((s) => s.widths);
   const setWidth = useColumnStore((s) => s.setWidth);
-  const [sortModel, setSortModel] = useState<GridSortModel>([
-    { field: 'displayName', sort: 'asc' },
-  ]);
+  const prefs = useGridPrefsStore((s) => s[paneId]);
+  const setSort = useGridPrefsStore((s) => s.setSort);
+  const setHidden = useGridPrefsStore((s) => s.setHidden);
+  const sortModel = useMemo<GridSortModel>(
+    () => [{ field: prefs.sortField, sort: prefs.sortDir }],
+    [prefs.sortField, prefs.sortDir],
+  );
+  const columnVisibilityModel = useMemo<GridColumnVisibilityModel>(() => {
+    const m: GridColumnVisibilityModel = {};
+    for (const f of prefs.hidden) m[f] = false;
+    return m;
+  }, [prefs.hidden]);
+  const onSortModelChange = useCallback(
+    (model: GridSortModel) => {
+      const s = model[0];
+      setSort(paneId, s?.field || 'displayName', s?.sort === 'desc' ? 'desc' : 'asc');
+    },
+    [paneId, setSort],
+  );
+  const onColumnVisibilityModelChange = useCallback(
+    (model: GridColumnVisibilityModel) => {
+      setHidden(
+        paneId,
+        Object.entries(model)
+          .filter(([, visible]) => visible === false)
+          .map(([field]) => field),
+      );
+    },
+    [paneId, setHidden],
+  );
 
   // Fallback drop target: dropping on empty pane space (not on a folder row)
   // lands in the pane's current directory. Row-level drops are handled by
@@ -430,8 +457,8 @@ export const useFileTable = ({
   const orderedPaths = useMemo(() => rows.map((r) => r.path), [rows]);
 
   const columns = useMemo<GridColDef[]>(
-    () => getColumns(widths, selected, folderSizes, deniedPaths),
-    [widths, folderSizes, selected, deniedPaths],
+    () => getColumns(widths, selected, folderSizes, deniedPaths, prefs.order),
+    [widths, folderSizes, selected, deniedPaths, prefs.order],
   );
 
   const moveFocus = useCallback(
@@ -776,7 +803,9 @@ export const useFileTable = ({
     rows,
     columns,
     sortModel,
-    setSortModel,
+    onSortModelChange,
+    columnVisibilityModel,
+    onColumnVisibilityModelChange,
     getRowClassName,
     onColumnWidthChange,
     onCellKeyDown,

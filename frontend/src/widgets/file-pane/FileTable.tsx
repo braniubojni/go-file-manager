@@ -5,6 +5,7 @@ import { DataGrid } from '@mui/x-data-grid/DataGrid';
 import type { FC } from 'react';
 import { isNotConnectedMessage } from '../../features/connections/helpers';
 import { FileGridRow, FileRowProvider } from './dnd';
+import { FileColumnMenu } from './FileColumnMenu';
 import { useFileTable } from './hooks';
 import { ReconnectNotice } from './ReconnectNotice';
 import { dataGridSx, getBoxWrapperSx } from './styles';
@@ -56,16 +57,21 @@ export const FileTable: FC<FileTableProps> = (props) => {
             rows={t.rows}
             columns={t.columns}
             density="compact"
-            disableColumnMenu
+            disableColumnFilter
             hideFooter
             checkboxSelection={false}
             disableRowSelectionOnClick
             // Row drag/drop lives in FileGridRow (dnd.tsx), backed by react-dnd.
-            slots={{ row: FileGridRow }}
+            slots={{
+              row: FileGridRow,
+              columnMenu: (menuProps) => <FileColumnMenu {...menuProps} paneId={t.paneId} />,
+            }}
             // Free DataGrid only allows single selection — multi-select is custom (CSS + Zustand)
             sortingMode="server"
             sortModel={t.sortModel}
-            onSortModelChange={t.setSortModel}
+            onSortModelChange={t.onSortModelChange}
+            columnVisibilityModel={t.columnVisibilityModel}
+            onColumnVisibilityModelChange={t.onColumnVisibilityModelChange}
             getRowClassName={t.getRowClassName}
             onColumnWidthChange={t.onColumnWidthChange}
             onCellKeyDown={t.onCellKeyDown}

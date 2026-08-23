@@ -146,6 +146,75 @@ func TestPaneTabsRoundTripAndClamp(t *testing.T) {
 	}
 }
 
+func TestGridPrefsDefaultWhenMissing(t *testing.T) {
+	svc := newTestSettingsService(t)
+
+	got, err := svc.GetGridPrefs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDefaultPaneGridPrefs(t, "left", got.Left)
+	assertDefaultPaneGridPrefs(t, "right", got.Right)
+}
+
+func TestGridPrefsRoundTrip(t *testing.T) {
+	svc := newTestSettingsService(t)
+
+	in := domain.GridPrefs{
+		Left: domain.PaneGridPrefs{
+			SortField: "size",
+			SortDir:   "desc",
+			Hidden:    []string{"ext", "displayName", "icon", "access"},
+			Order:     []string{"displayName", "size", "modTime"},
+		},
+		Right: domain.PaneGridPrefs{
+			SortField: "modTime",
+			SortDir:   "asc",
+			Hidden:    []string{"access"},
+			Order:     []string{"icon", "displayName", "ext"},
+		},
+	}
+	if err := svc.SaveGridPrefs(in); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := svc.GetGridPrefs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Left.SortField != "size" || out.Left.SortDir != "desc" {
+		t.Fatalf("left sort: %+v", out.Left)
+	}
+	if len(out.Left.Hidden) != 2 || out.Left.Hidden[0] != "ext" || out.Left.Hidden[1] != "access" {
+		t.Fatalf("left hidden (icon/name stripped): %+v", out.Left.Hidden)
+	}
+	if len(out.Left.Order) != 3 || out.Left.Order[0] != "displayName" {
+		t.Fatalf("left order: %+v", out.Left.Order)
+	}
+	if out.Right.SortField != "modTime" || out.Right.SortDir != "asc" {
+		t.Fatalf("right sort: %+v", out.Right)
+	}
+	if len(out.Right.Hidden) != 1 || out.Right.Hidden[0] != "access" {
+		t.Fatalf("right hidden: %+v", out.Right.Hidden)
+	}
+	if len(out.Right.Order) != 3 || out.Right.Order[2] != "ext" {
+		t.Fatalf("right order: %+v", out.Right.Order)
+	}
+}
+
+func assertDefaultPaneGridPrefs(t *testing.T, side string, p domain.PaneGridPrefs) {
+	t.Helper()
+	if p.SortField != "displayName" || p.SortDir != "asc" {
+		t.Fatalf("%s sort defaults: %+v", side, p)
+	}
+	if len(p.Hidden) != 0 {
+		t.Fatalf("%s hidden want empty, got %+v", side, p.Hidden)
+	}
+	if len(p.Order) != 0 {
+		t.Fatalf("%s order want empty, got %+v", side, p.Order)
+	}
+}
+
 func TestSearchPrefsAndHistory(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("GFM_CONFIG_DIR", dir)

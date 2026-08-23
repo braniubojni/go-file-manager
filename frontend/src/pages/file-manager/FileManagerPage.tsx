@@ -16,8 +16,10 @@ import { SearchHost } from '../../widgets/search/SearchHost';
 import { StatusBar } from '../../widgets/status-bar/StatusBar';
 import { Toolbar } from '../../widgets/toolbar/Toolbar';
 import { useFileManagerKeyboard } from './hooks/useFileManagerKeyboard';
+import { useInitGridPrefs } from './hooks/useInitGridPrefs';
 import { useInitPaneTabs } from './hooks/useInitPaneTabs';
 import { useMouseNavButtons } from './hooks/useMouseNavButtons';
+import { usePersistGridPrefs } from './hooks/usePersistGridPrefs';
 import { usePersistPaneTabs } from './hooks/usePersistPaneTabs';
 import { loadingSx, pageRootSx, panesRowSx } from './styles';
 
@@ -28,8 +30,11 @@ const EditorWorkspace = lazy(() =>
 );
 
 export const FileManagerPage: FC = () => {
-  const ready = useInitPaneTabs();
+  const tabsReady = useInitPaneTabs();
+  const prefsReady = useInitGridPrefs();
+  const ready = tabsReady && prefsReady;
   usePersistPaneTabs(ready);
+  usePersistGridPrefs(prefsReady);
   useFileManagerKeyboard();
   useMouseNavButtons();
   useAutoUpdateCheck(ready);

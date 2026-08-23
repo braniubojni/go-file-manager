@@ -86,6 +86,20 @@ type PaneTabs struct {
 	RightActive int        `json:"rightActive"`
 }
 
+// PaneGridPrefs is one pane's file-grid sort, hidden columns, and column order.
+type PaneGridPrefs struct {
+	SortField string   `json:"sortField"` // default "displayName"
+	SortDir   string   `json:"sortDir"`   // "asc" | "desc"
+	Hidden    []string `json:"hidden"`    // fields hidden; icon+displayName cannot hide
+	Order     []string `json:"order"`     // fields left-to-right; unknown fields appended
+}
+
+// GridPrefs holds independent left/right file-grid column preferences.
+type GridPrefs struct {
+	Left  PaneGridPrefs `json:"left"`
+	Right PaneGridPrefs `json:"right"`
+}
+
 // ThemeMode values for Settings.Theme.
 const (
 	ThemeSystem = "system"

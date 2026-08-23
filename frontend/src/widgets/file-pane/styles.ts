@@ -246,6 +246,7 @@ export const dataGridSx: SxProps<Theme> = {
   height: '100%',
   '& .MuiDataGrid-cell': { py: 0 },
   '& .MuiDataGrid-columnHeader': { fontWeight: 700 },
+  '& .MuiDataGrid-menuIcon': { visibility: 'visible', width: 'auto' },
   '& .MuiDataGrid-cell:focus, & .MuiDataGrid-cell:focus-within': {
     outline: 'none',
   },

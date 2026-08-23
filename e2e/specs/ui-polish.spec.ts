@@ -5,6 +5,7 @@ import {
   doubleClickRow,
   expectRowVisible,
   selectRow,
+  refresh,
   LEFT_DIR,
 } from "../fixtures/app";
 
@@ -39,5 +40,42 @@ test.describe("ui polish", () => {
     await expect(selected).toHaveText(/Selected: 1 \([^)]*(B|KB)\)/);
     await expect(page.getByTestId("status-free")).toBeVisible();
     await expect(page.getByTestId("status-free")).toContainText("Free:");
+  });
+
+  test("hide Type on left via column menu; right still shows it after refresh", async ({
+    page,
+  }) => {
+    const left = page.getByTestId("file-grid-left");
+    const right = page.getByTestId("file-grid-right");
+    const typeHeader = (grid: ReturnType<typeof page.getByTestId>) =>
+      grid.locator('[role="columnheader"][data-field="ext"]');
+
+    await expect(typeHeader(left)).toBeVisible();
+    await expect(typeHeader(right)).toBeVisible();
+
+    try {
+      const header = typeHeader(left);
+      await header.hover();
+      await header.getByRole("button", { name: /menu/i }).click();
+      await page.getByRole("menuitem", { name: "Hide column" }).click();
+
+      await expect(typeHeader(left)).toHaveCount(0);
+      await expect(typeHeader(right)).toBeVisible();
+
+      await refresh(page);
+      await expect(typeHeader(left)).toHaveCount(0);
+      await expect(typeHeader(right)).toBeVisible();
+    } finally {
+      if ((await typeHeader(left).count()) === 0) {
+        const nameHeader = left.locator('[role="columnheader"][data-field="displayName"]');
+        await nameHeader.hover();
+        await nameHeader.getByRole("button", { name: /menu/i }).click();
+        await page.getByRole("menuitem", { name: "Manage columns" }).click();
+        await page.getByRole("checkbox", { name: "Type" }).check();
+        await page.keyboard.press("Escape");
+        await expect(typeHeader(left)).toBeVisible();
+        await page.waitForTimeout(400);
+      }
+    }
   });
 });

@@ -201,6 +201,39 @@ export interface GitStatusEntry {
 }
 
 /**
+ * GridPrefs holds independent left/right file-grid column preferences.
+ */
+export interface GridPrefs {
+    "left": PaneGridPrefs;
+    "right": PaneGridPrefs;
+}
+
+/**
+ * PaneGridPrefs is one pane's file-grid sort, hidden columns, and column order.
+ */
+export interface PaneGridPrefs {
+    /**
+     * default "displayName"
+     */
+    "sortField": string;
+
+    /**
+     * "asc" | "desc"
+     */
+    "sortDir": string;
+
+    /**
+     * fields hidden; icon+displayName cannot hide
+     */
+    "hidden": string[] | null;
+
+    /**
+     * fields left-to-right; unknown fields appended
+     */
+    "order": string[] | null;
+}
+
+/**
  * PaneTabs holds each pane's open tabs and which one is active.
  */
 export interface PaneTabs {
