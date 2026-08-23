@@ -37,6 +37,7 @@ export const PathBar: FC<PathBarProps> = ({
 }) => {
   const highlightedRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const pickingRef = useRef(false);
   const [draft, setDraft] = useState(path);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -56,6 +57,7 @@ export const PathBar: FC<PathBarProps> = ({
   };
 
   const endEdit = () => {
+    pickingRef.current = false;
     setDraft(path);
     setOpen(false);
     highlightedRef.current = null;
@@ -70,6 +72,7 @@ export const PathBar: FC<PathBarProps> = ({
   };
 
   const submit = (value: string) => {
+    pickingRef.current = false;
     const next = normalizeNavPath(value);
     if (next) onNavigate(next);
     setOpen(false);
@@ -148,6 +151,13 @@ export const PathBar: FC<PathBarProps> = ({
             inputValue={draft}
             autoHighlight
             filterOptions={(x) => x}
+            slotProps={{
+              listbox: {
+                onMouseDown: () => {
+                  pickingRef.current = true;
+                },
+              },
+            }}
             onHighlightChange={(_, option) => {
               highlightedRef.current = typeof option === 'string' ? option : null;
             }}
@@ -172,7 +182,7 @@ export const PathBar: FC<PathBarProps> = ({
                   setEditing(true);
                 }}
                 onBlur={() => {
-                  if (open) return;
+                  if (pickingRef.current) return;
                   endEdit();
                 }}
                 onMouseDown={() => onFocusPane()}
