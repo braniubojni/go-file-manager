@@ -28,6 +28,7 @@ export const OpenWithMenu: FC<Props> = ({ path, onDone }) => {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
+    if (pickerOnly) return;
     let cancelled = false;
     void FileService.ListOpenWithApps(path)
       .then((list) => {
