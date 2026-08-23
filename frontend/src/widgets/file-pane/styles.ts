@@ -180,40 +180,41 @@ export const getBoxWrapperSx = (active: boolean, dropActive: boolean): SxProps<T
   },
 });
 
-/**
- * The path input always holds the full path — swapping in a shortened value
- * fights the controlled input and eats keystrokes typed in the same tick.
- * Shortening is instead an overlay (pathOverlaySx) that CSS hides on focus, so
- * editing always sees, and types into, the real value.
- */
-export const pathFieldWrapSx = (shortened: boolean): SxProps<Theme> => ({
+/** Idle breadcrumbs overlay the outlined Autocomplete; clicks pass through empty space. */
+export const pathFieldWrapSx = (editing: boolean): SxProps<Theme> => ({
   position: 'relative',
   flex: 1,
   minWidth: 0,
-  // Blank the input's own text ONLY while an overlay is actually covering it —
-  // a path that needs no shortening renders no overlay, and hiding the input
-  // text there would leave the field looking empty.
-  ...(shortened
+  ...(!editing
     ? {
-        '&:not(:focus-within) input': { color: 'transparent' },
-        '&:focus-within .gfm-path-overlay': { display: 'none' },
+        '& input': { color: 'transparent' },
       }
     : {}),
 });
 
-export const pathOverlaySx: SxProps<Theme> = {
+export const pathCrumbsSx: SxProps<Theme> = {
   position: 'absolute',
   left: 14,
-  right: 14,
-  top: '50%',
-  transform: 'translateY(-50%)',
-  pointerEvents: 'none',
-  whiteSpace: 'nowrap',
+  right: 8,
+  top: 0,
+  bottom: 0,
+  zIndex: 1,
+  display: 'flex',
+  alignItems: 'center',
   overflow: 'hidden',
-  textOverflow: 'ellipsis',
+  pointerEvents: 'none',
   fontFamily: 'ui-monospace, monospace',
   fontSize: 12,
-  color: 'text.primary',
+  '& .MuiBreadcrumbs-ol': { flexWrap: 'nowrap', minWidth: 0 },
+  '& .MuiBreadcrumbs-li': { whiteSpace: 'nowrap' },
+  '& a, & button': { pointerEvents: 'auto' },
+};
+
+export const pathCrumbLastSx: SxProps<Theme> = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 0.25,
+  pointerEvents: 'auto',
 };
 
 export const pathTooltipSlotSx: SxProps<Theme> = {
