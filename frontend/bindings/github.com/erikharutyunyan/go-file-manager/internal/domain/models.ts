@@ -255,6 +255,20 @@ export interface PaneTabs {
 }
 
 /**
+ * PortListener is a local TCP socket in LISTEN state.
+ */
+export interface PortListener {
+    "port": number;
+    "pid": number;
+    "process": string;
+
+    /**
+     * "tcp"
+     */
+    "proto": string;
+}
+
+/**
  * RemoteRecent is a recently visited remote directory path.
  */
 export interface RemoteRecent {

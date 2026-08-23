@@ -9,7 +9,7 @@ src/
   main.tsx, App.tsx
   app/           # Providers, MUI theme (system/dark/light)
   pages/file-manager/   # Shell: panes, keyboard, path persist
-  widgets/       # file-pane, toolbar, editor, terminal, menu, go-to, command-palette, status-bar
+  widgets/       # file-pane, toolbar, editor, terminal, menu, go-to, command-palette, status-bar, port-killer
   features/      # Zustand stores + small dialogs (settings, shortcuts, updates…)
   entities/file/ # TanStack Query hooks + domain TS types
   shared/        # api/bindings re-export, format, shortcuts, ErrorBoundary
@@ -68,3 +68,4 @@ npm run build
 - Template assets: `wails.png`, `react.svg`, Inter font in public, bg-desktop/mobile.
 - Empty feature folders without exports.
 - Unused exports (knip + prefer unexported helpers).
+- Staging `frontend/bindings/**` in agent commits — regenerate locally if needed; the human adds generated files.

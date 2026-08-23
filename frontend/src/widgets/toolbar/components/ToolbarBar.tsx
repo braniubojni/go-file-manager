@@ -21,6 +21,7 @@ import IconButton from '@mui/material/IconButton';
 import MuiToolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
 import type { ThemePreference } from '../../../entities/file/types';
+import { PortKillerMenu } from '../../port-killer/PortKillerMenu';
 import type { ToolbarBarProps } from '../types';
 import { BookmarksSelect } from './BookmarksSelect';
 import { ConnectionsMenu } from './ConnectionsMenu';
@@ -121,6 +122,7 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
             {themeIcon(p.theme)}
           </IconButton>
         </Tooltip>
+        <PortKillerMenu />
         <Tooltip title="Settings">
           <IconButton data-testid="btn-settings" onClick={p.onSettings}>
             <SettingsIcon />

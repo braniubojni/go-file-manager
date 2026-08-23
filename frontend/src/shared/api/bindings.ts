@@ -6,4 +6,5 @@ export {
   ConnectionService,
   UpdateService,
   GitService,
+  PortService,
 } from '../../../bindings/github.com/erikharutyunyan/go-file-manager/internal/service';

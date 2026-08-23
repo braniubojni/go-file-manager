@@ -3,6 +3,7 @@ import {
   BookmarkService,
   FileService,
   GitService,
+  PortService,
   SettingsService,
 } from '../../shared/api/bindings';
 import { isRemotePath } from '../../features/connections/helpers';
@@ -12,6 +13,7 @@ import type {
   GitDirStatus,
   PaneTabsState,
   ThemePreference,
+  PortListener,
   Volume,
 } from './types';
 import { defaultSettings } from './types';
@@ -27,6 +29,7 @@ const queryKeys = {
   pathCompletions: (partial: string) => ['pathCompletions', partial] as const,
   paneTabs: ['paneTabs'] as const,
   volumes: ['volumes'] as const,
+  ports: ['ports'] as const,
   diskUsage: (path: string) => ['diskUsage', path] as const,
 };
 
@@ -151,6 +154,34 @@ export const useVolumes = () => {
   return useQuery({
     queryKey: queryKeys.volumes,
     queryFn: async () => ((await FileService.ListVolumes()) ?? []) as Volume[],
+  });
+};
+
+export const usePorts = (enabled: boolean) => {
+  return useQuery({
+    queryKey: queryKeys.ports,
+    queryFn: async () => ((await PortService.List()) ?? []) as PortListener[],
+    enabled,
+  });
+};
+
+export const useKillPort = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pid: number) => PortService.Kill(pid),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.ports });
+    },
+  });
+};
+
+export const useKillAllPorts = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pids: number[]) => PortService.KillAll(pids),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.ports });
+    },
   });
 };
 

@@ -207,6 +207,14 @@ type TransferProgressPayload struct {
 	DestIsDir   bool   `json:"destIsDir"`
 }
 
+// PortListener is a local TCP socket in LISTEN state.
+type PortListener struct {
+	Port    int    `json:"port"`
+	PID     int    `json:"pid"`
+	Process string `json:"process"`
+	Proto   string `json:"proto"` // "tcp"
+}
+
 // Volume is an OS-mounted drive, network share, or disk image.
 type Volume struct {
 	Path        string `json:"path"`

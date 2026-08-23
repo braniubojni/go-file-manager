@@ -16,6 +16,7 @@ export type {
     OpenWithApp,
     PaneGridPrefs,
     PaneTabs,
+    PortListener,
     RemoteRecent,
     ReplaceAllResult,
     SMBShare,

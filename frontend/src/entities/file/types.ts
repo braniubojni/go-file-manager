@@ -14,6 +14,13 @@ export interface FileEntry {
   access: string;
 }
 
+export interface PortListener {
+  port: number;
+  pid: number;
+  process: string;
+  proto: string;
+}
+
 export interface Volume {
   path: string;
   name: string;

@@ -36,6 +36,7 @@ export const useFileManagerKeyboard = () => {
       // Palette: before isEditableTarget so Mod+K works in the path bar.
       if (matched === 'commandPalette') {
         if (isXtermTarget(e.target)) return;
+        if ((e.target as HTMLElement | null)?.closest?.('[data-testid="popover-ports"]')) return;
         e.preventDefault();
         runShortcutAction('commandPalette', toggles);
         return;

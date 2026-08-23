@@ -1,0 +1,28 @@
+---
+description: Never git add or commit generated files; the human stages those themselves.
+alwaysApply: true
+---
+
+# Do not commit generated code
+
+When committing, **do not** `git add` or include generated trees. The human stages and commits those files.
+
+**Generated (do not stage):**
+
+- `frontend/bindings/**` — Wails TS bindings (`wails3 generate bindings` / `wails3 dev`)
+- Any other Wails/codegen output (do not hand-edit either)
+
+**Do:**
+
+- Commit only source you wrote or edited (`internal/`, `frontend/src/`, tests, docs, etc.).
+- If Go APIs changed, you may run bindings regen so the app builds locally — still **leave bindings unstaged**.
+- After commit, mention leftover generated diffs so they can add them.
+
+```bash
+# ❌ BAD — staging bindings with the feature
+git add frontend/bindings internal/service/file_service.go
+
+# ✅ GOOD — source only
+git add internal/service/file_service.go
+# leave frontend/bindings/** unstaged
+```

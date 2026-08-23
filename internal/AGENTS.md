@@ -9,6 +9,7 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 | `domain`     | Shared models (settings, files, bookmarks)                       |
 | `filesystem` | Local FS: list/copy/move/delete, archive/extract, search, text R/W, dir sizes, `DiskUsage` |
 | `volumes`    | OS mounts list/unmount, DMG attach (darwin), poll watcher                       |
+| `ports`      | Local TCP LISTEN sockets (`lsof`/`netstat`) + force-kill by PID                 |
 | `gitstatus`  | Upward-only repo root + one scoped `git status` (no disk-wide `.git` walk)   |
 | `remote`     | SSH/SFTP + SMB (`path.go`, `ssh.go`, `smb.go`)                                |
 | `storage`    | SQLite bookmarks + crypto helpers                                             |
@@ -27,6 +28,7 @@ Registered in `main.go`:
 - `TerminalService` — PTY per pane (`_unix` / `_windows`); holds `*application.App` for events
 - `UpdateService` — thin façade over `app.Updater` (CheckAndInstall / GetVersion / OpenReleases)
 - `GitService` — `StatusForDir` (cached root + porcelain; local only)
+- `PortService` — list local TCP listeners; `Kill` / `KillAll` by PID
 
 ## Remote paths
 

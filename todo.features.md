@@ -51,6 +51,7 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 
 ## Other
 
+- [x] Port killer — toolbar popover (next to Settings): local TCP listeners, inline kill, tree view, kill all
 - [ ] Trash/recycle bin integration (soft delete, restore) instead of permanent delete
 - [ ] Disk usage treemap view (like WinDirStat) per folder
 - [ ] Plugin/extension points — low priority, only if long-term extensibility actually needed
