@@ -109,7 +109,12 @@ test.describe("file operations", () => {
     fs.writeFileSync(path.join(LEFT_DIR, name), "back");
     await refresh(page);
     await selectRow(page, "left", name);
-    await confirmDelete(page);
+    await fileAction(page, "btn-delete");
+    const deleteDialog = page.getByTestId("dialog-delete");
+    await expect(deleteDialog).toBeVisible();
+    await expect(deleteDialog).not.toContainText("cannot be undone");
+    await page.getByTestId("btn-delete-confirm").click();
+    await expect(deleteDialog).toBeHidden();
     await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
     expect(fs.existsSync(path.join(LEFT_DIR, name))).toBeFalsy();
 

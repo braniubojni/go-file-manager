@@ -200,6 +200,7 @@ export const useFileOpDialogs = ({
     mkfile,
     rename,
     del,
+    remote: isRemotePath(activePath),
     deleteBtnRef,
     dispatchMkdir,
     dispatchMkfile,

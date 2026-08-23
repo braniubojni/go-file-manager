@@ -77,6 +77,7 @@ export const Toolbar: FC = () => {
         del={a.del}
         dispatch={a.dispatchDelete}
         paths={a.realSelection}
+        remote={a.remote}
         deleteBtnRef={a.deleteBtnRef}
         onConfirm={a.confirmDelete}
       />
