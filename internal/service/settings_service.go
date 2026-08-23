@@ -15,6 +15,7 @@ const (
 	kvShortcuts   = "shortcuts"
 	kvTabs        = "tabs"
 	kvSearchPrefs = "search_prefs"
+	kvGridPrefs   = "grid_prefs"
 )
 
 // SettingsService persists app settings and shortcuts in encrypted SQLite (app.db).
@@ -114,6 +115,80 @@ func (s *SettingsService) SavePaneTabs(tabs domain.PaneTabs) error {
 		st.RightPath = tabs.Right[tabs.RightActive].Path
 	}
 	return s.SaveSettings(st)
+}
+
+// GetGridPrefs returns each pane's file-grid sort, visibility, and column order.
+// Missing or invalid blobs yield defaults (Name/asc, nothing hidden, empty order).
+func (s *SettingsService) GetGridPrefs() (domain.GridPrefs, error) {
+	raw, err := s.db.GetKV(kvGridPrefs)
+	if err != nil {
+		return domain.GridPrefs{}, err
+	}
+	if raw == nil {
+		return defaultGridPrefs(), nil
+	}
+	var prefs domain.GridPrefs
+	if err := json.Unmarshal(raw, &prefs); err != nil {
+		return defaultGridPrefs(), nil
+	}
+	prefs.Left = normalizePaneGridPrefs(prefs.Left)
+	prefs.Right = normalizePaneGridPrefs(prefs.Right)
+	return prefs, nil
+}
+
+// SaveGridPrefs persists each pane's file-grid preferences.
+func (s *SettingsService) SaveGridPrefs(prefs domain.GridPrefs) error {
+	prefs.Left = normalizePaneGridPrefs(prefs.Left)
+	prefs.Right = normalizePaneGridPrefs(prefs.Right)
+	data, err := json.Marshal(prefs)
+	if err != nil {
+		return err
+	}
+	return s.db.SetKV(kvGridPrefs, data)
+}
+
+func defaultPaneGridPrefs() domain.PaneGridPrefs {
+	return domain.PaneGridPrefs{
+		SortField: "displayName",
+		SortDir:   "asc",
+		Hidden:    []string{},
+		Order:     []string{},
+	}
+}
+
+func defaultGridPrefs() domain.GridPrefs {
+	return domain.GridPrefs{
+		Left:  defaultPaneGridPrefs(),
+		Right: defaultPaneGridPrefs(),
+	}
+}
+
+func normalizePaneGridPrefs(p domain.PaneGridPrefs) domain.PaneGridPrefs {
+	if p.SortField == "" {
+		p.SortField = "displayName"
+	}
+	if p.SortDir != "desc" {
+		p.SortDir = "asc"
+	}
+	p.Hidden = filterHiddenFields(p.Hidden)
+	if p.Order == nil {
+		p.Order = []string{}
+	}
+	return p
+}
+
+func filterHiddenFields(hidden []string) []string {
+	if len(hidden) == 0 {
+		return []string{}
+	}
+	out := make([]string, 0, len(hidden))
+	for _, f := range hidden {
+		if f == "" || f == "icon" || f == "displayName" {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 func clampIndex(idx, length int) int {

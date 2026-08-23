@@ -27,6 +27,14 @@ export function GetConfigDir(): $CancellablePromise<string> {
 }
 
 /**
+ * GetGridPrefs returns each pane's file-grid sort, visibility, and column order.
+ * Missing or invalid blobs yield defaults (Name/asc, nothing hidden, empty order).
+ */
+export function GetGridPrefs(): $CancellablePromise<domain$0.GridPrefs> {
+    return $Call.ByID(449688525);
+}
+
+/**
  * GetPaneTabs returns each pane's saved tab list. If no tabs blob was ever
  * saved, or a pane's list ended up empty, it falls back to a single tab
  * derived from the legacy Settings.LeftPath/RightPath so existing installs
@@ -76,6 +84,13 @@ export function OpenInOS(path: string): $CancellablePromise<void> {
 
 export function RevealInOS(path: string): $CancellablePromise<void> {
     return $Call.ByID(1818025483, path);
+}
+
+/**
+ * SaveGridPrefs persists each pane's file-grid preferences.
+ */
+export function SaveGridPrefs(prefs: domain$0.GridPrefs): $CancellablePromise<void> {
+    return $Call.ByID(796512464, prefs);
 }
 
 /**

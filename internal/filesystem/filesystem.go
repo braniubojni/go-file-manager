@@ -1,9 +1,9 @@
 package filesystem
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -360,73 +360,12 @@ func Delete(paths []string) error {
 
 // Copy copies sources into destDir (files and directories).
 func Copy(sources []string, destDir string) error {
-	destAbs, err := Resolve(destDir)
-	if err != nil {
-		return err
-	}
-	info, err := os.Stat(destAbs)
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("destination is not a directory: %s", destAbs)
-	}
-
-	for _, src := range sources {
-		srcAbs, err := Resolve(src)
-		if err != nil {
-			return err
-		}
-		if srcAbs == destAbs || strings.HasPrefix(destAbs+string(os.PathSeparator), srcAbs+string(os.PathSeparator)) {
-			// Prevent copying a directory into itself.
-			if isDir(srcAbs) {
-				return fmt.Errorf("cannot copy directory into itself: %s", srcAbs)
-			}
-		}
-		base := filepath.Base(srcAbs)
-		target := UniquePath(filepath.Join(destAbs, base))
-		if err := copyPath(srcAbs, target); err != nil {
-			return err
-		}
-	}
-	return nil
+	return CopyCtx(context.Background(), sources, destDir, nil)
 }
 
 // Move moves sources into destDir.
 func Move(sources []string, destDir string) error {
-	destAbs, err := Resolve(destDir)
-	if err != nil {
-		return err
-	}
-	info, err := os.Stat(destAbs)
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("destination is not a directory: %s", destAbs)
-	}
-
-	for _, src := range sources {
-		srcAbs, err := Resolve(src)
-		if err != nil {
-			return err
-		}
-		if filepath.Dir(srcAbs) == destAbs {
-			return ErrSamePath
-		}
-		base := filepath.Base(srcAbs)
-		target := UniquePath(filepath.Join(destAbs, base))
-		if err := os.Rename(srcAbs, target); err != nil {
-			// Cross-device: fall back to copy + delete.
-			if err := copyPath(srcAbs, target); err != nil {
-				return err
-			}
-			if err := Delete([]string{srcAbs}); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return MoveCtx(context.Background(), sources, destDir, nil)
 }
 
 func isDir(path string) bool {
@@ -449,57 +388,4 @@ func UniquePath(path string) string {
 			return candidate
 		}
 	}
-}
-
-func copyPath(src, dst string) error {
-	info, err := os.Lstat(src)
-	if err != nil {
-		return err
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		target, err := os.Readlink(src)
-		if err != nil {
-			return err
-		}
-		return os.Symlink(target, dst)
-	}
-	if info.IsDir() {
-		return copyDir(src, dst, info.Mode())
-	}
-	return copyFile(src, dst, info.Mode())
-}
-
-func copyDir(src, dst string, mode os.FileMode) error {
-	if err := os.MkdirAll(dst, mode.Perm()); err != nil {
-		return err
-	}
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return err
-	}
-	for _, e := range entries {
-		if err := copyPath(filepath.Join(src, e.Name()), filepath.Join(dst, e.Name())); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func copyFile(src, dst string, mode os.FileMode) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = in.Close() }()
-
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode.Perm())
-	if err != nil {
-		return err
-	}
-	defer func() { _ = out.Close() }()
-
-	if _, err := io.Copy(out, in); err != nil {
-		return err
-	}
-	return out.Close()
 }

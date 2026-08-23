@@ -26,6 +26,7 @@ import { isArchiveExt } from '../../shared/lib/archives';
 import { copyText } from '../../shared/lib/clipboard';
 import { errMessage } from '../../shared/lib/format';
 import { useSnack } from '../../shared/ui/SnackbarHost';
+import { OpenWithMenu } from './OpenWithMenu';
 
 type Item = {
   key: string;
@@ -179,6 +180,9 @@ export const FileContextMenu: FC = () => {
             slotProps={it.danger ? { primary: { color: 'error' } } : undefined}
           />
         </MenuItem>,
+        it.key === 'open' && entry && !isDir && !remote ? (
+          <OpenWithMenu key="open-with" path={entry.path} onDone={close} />
+        ) : null,
       ])}
     </Menu>
   );

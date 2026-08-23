@@ -5,6 +5,7 @@ import * as BookmarkService from "./bookmarkservice.js";
 import * as ConnectionService from "./connectionservice.js";
 import * as FileService from "./fileservice.js";
 import * as GitService from "./gitservice.js";
+import * as PortService from "./portservice.js";
 import * as SettingsService from "./settingsservice.js";
 import * as TerminalService from "./terminalservice.js";
 import * as UpdateService from "./updateservice.js";
@@ -13,6 +14,7 @@ export {
     ConnectionService,
     FileService,
     GitService,
+    PortService,
     SettingsService,
     TerminalService,
     UpdateService

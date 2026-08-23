@@ -66,3 +66,15 @@ func TestShortcutsMerge(t *testing.T) {
 		t.Fatal(store.SettingsPath())
 	}
 }
+
+func TestCommandPaletteShortcut(t *testing.T) {
+	if got := DefaultShortcuts()["commandPalette"]; got != "Mod+K" {
+		t.Fatalf("commandPalette default=%q", got)
+	}
+	for _, d := range ShortcutCatalog() {
+		if d.ID == "commandPalette" {
+			return
+		}
+	}
+	t.Fatal("ShortcutCatalog missing commandPalette")
+}

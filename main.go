@@ -43,6 +43,7 @@ func main() {
 	connSvc := service.NewConnectionService(db, remoteMgr, smbMgr)
 	updateSvc := service.NewUpdateService()
 	gitSvc := service.NewGitService()
+	portSvc := service.NewPortService()
 
 	app := application.New(application.Options{
 		Name:        "Go File Manager",
@@ -55,6 +56,7 @@ func main() {
 			application.NewService(connSvc),
 			application.NewService(updateSvc),
 			application.NewService(gitSvc),
+			application.NewService(portSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

@@ -21,7 +21,7 @@ set -euo pipefail
 echo "== apt: go build deps + Wails GTK4 stack =="
 apt-get update -qq
 apt-get install -y -qq ca-certificates curl git build-essential pkg-config \
-  libgtk-4-dev libwebkitgtk-6.0-dev >/dev/null
+  libgtk-4-dev libwebkitgtk-6.0-dev lsof >/dev/null
 
 echo "== install Go ${GO_VERSION} =="
 ARCH=$(dpkg --print-architecture)
@@ -59,6 +59,10 @@ go vet ./...
 
 echo "== go test ./internal/... =="
 go test ./internal/...
+
+echo "== golangci-lint =="
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b /usr/local/bin v2.12.2
+golangci-lint run --timeout=3m
 
 echo "OK: Go CI steps passed"
 '

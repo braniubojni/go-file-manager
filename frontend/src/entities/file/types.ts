@@ -14,6 +14,29 @@ export interface FileEntry {
   access: string;
 }
 
+export interface PortListener {
+  port: number;
+  pid: number;
+  process: string;
+  proto: string;
+}
+
+export interface Volume {
+  path: string;
+  name: string;
+  kind: string;
+  unmountable: boolean;
+  sourcePath?: string;
+  device?: string;
+}
+
+export interface DiskUsage {
+  path: string;
+  total: number;
+  free: number;
+  used: number;
+}
+
 interface TabState {
   path: string;
 }

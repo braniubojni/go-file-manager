@@ -30,15 +30,23 @@ export function ArchiveExtension(format: string): $CancellablePromise<string> {
     return $Call.ByID(3092024763, format);
 }
 
+export function AttachDiskImage(path: string): $CancellablePromise<string> {
+    return $Call.ByID(1140398445, path);
+}
+
 /**
- * CancelJob cancels a long-running Archive/Extract/DirChildSizes started with NewJobID.
+ * CancelJob cancels a long-running Archive/Extract/DirChildSizes/Copy/Move started with NewJobID.
  */
 export function CancelJob(jobID: string): $CancellablePromise<void> {
     return $Call.ByID(2151147385, jobID);
 }
 
-export function Copy(sources: string[] | null, destDir: string): $CancellablePromise<void> {
-    return $Call.ByID(3419756089, sources, destDir);
+/**
+ * Copy copies sources into destDir.
+ * jobID from NewJobID enables CancelJob and transfer:progress events; empty is fire-and-forget.
+ */
+export function Copy(jobID: string, sources: string[] | null, destDir: string): $CancellablePromise<void> {
+    return $Call.ByID(3419756089, jobID, sources, destDir);
 }
 
 /**
@@ -64,6 +72,13 @@ export function Delete(paths: string[] | null): $CancellablePromise<string> {
  */
 export function DirChildSizes(jobID: string, dir: string): $CancellablePromise<domain$0.DirSizes> {
     return $Call.ByID(4082514371, jobID, dir);
+}
+
+/**
+ * DiskUsage returns volume capacity for a local path.
+ */
+export function DiskUsage(path: string): $CancellablePromise<domain$0.DiskUsage> {
+    return $Call.ByID(1676274460, path);
 }
 
 export function Exists(path: string): $CancellablePromise<boolean> {
@@ -100,16 +115,31 @@ export function ListDir(path: string, showHidden: boolean): $CancellablePromise<
     return $Call.ByID(299481683, path, showHidden);
 }
 
+/**
+ * ListOpenWithApps returns applications that can open a local file.
+ */
+export function ListOpenWithApps(path: string): $CancellablePromise<domain$0.OpenWithApp[] | null> {
+    return $Call.ByID(1534248348, path);
+}
+
 export function ListPathCompletions(partial: string): $CancellablePromise<string[] | null> {
     return $Call.ByID(1004009986, partial);
+}
+
+export function ListVolumes(): $CancellablePromise<domain$0.Volume[] | null> {
+    return $Call.ByID(403434231);
 }
 
 export function Mkdir(parent: string, name: string): $CancellablePromise<string> {
     return $Call.ByID(1882308327, parent, name);
 }
 
-export function Move(sources: string[] | null, destDir: string): $CancellablePromise<void> {
-    return $Call.ByID(113183649, sources, destDir);
+/**
+ * Move moves sources into destDir.
+ * jobID from NewJobID enables CancelJob and transfer:progress events; empty is fire-and-forget.
+ */
+export function Move(jobID: string, sources: string[] | null, destDir: string): $CancellablePromise<void> {
+    return $Call.ByID(113183649, jobID, sources, destDir);
 }
 
 /**
@@ -138,6 +168,20 @@ export function OpenLocalNetworkSettings(): $CancellablePromise<void> {
  */
 export function OpenPrivacySettings(): $CancellablePromise<void> {
     return $Call.ByID(3870616985);
+}
+
+/**
+ * OpenWith opens path with the application identified by appID.
+ */
+export function OpenWith(path: string, appID: string): $CancellablePromise<void> {
+    return $Call.ByID(3516877804, path, appID);
+}
+
+/**
+ * OpenWithPicker opens the OS application picker for a local file.
+ */
+export function OpenWithPicker(path: string): $CancellablePromise<void> {
+    return $Call.ByID(769482294, path);
 }
 
 /**
@@ -193,6 +237,10 @@ export function SearchTree(root: string, query: string, showHidden: boolean, lim
  */
 export function StartSearch(jobID: string, root: string, query: string, mode: string, include: string, exclude: string, caseSensitive: boolean, showHidden: boolean, limit: number): $CancellablePromise<void> {
     return $Call.ByID(2272785060, jobID, root, query, mode, include, exclude, caseSensitive, showHidden, limit);
+}
+
+export function UnmountVolume(path: string): $CancellablePromise<void> {
+    return $Call.ByID(822092322, path);
 }
 
 /**

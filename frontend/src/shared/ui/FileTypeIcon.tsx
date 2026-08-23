@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import AlbumIcon from '@mui/icons-material/Album';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import AudioFileIcon from '@mui/icons-material/AudioFile';
 import CodeIcon from '@mui/icons-material/Code';
@@ -130,6 +131,7 @@ export const FileTypeIcon: FC<{ entry: FileEntry } & SvgIconProps> = ({ entry, .
     case 'webm-video':
       return <VideoFileIcon {...props} color={iconProps.color ?? 'secondary'} />;
     case 'dmg':
+      return <AlbumIcon {...props} color={iconProps.color ?? 'warning'} />;
     case 'iso':
     case 'pkg':
     case 'deb':

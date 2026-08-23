@@ -9,6 +9,7 @@ import {
   initialNameDialogState,
   nameDialogReducer,
 } from '../../../features/file-ops/nameDialogReducer';
+import { startTransfer } from '../../../features/transfers/startTransfer';
 import { FileService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
@@ -56,18 +57,32 @@ export const useFileOpDialogs = ({
 
   const onCopy = () => {
     if (!realSelection.length) return show('Select files to copy', 'warning');
-    ops.copy.mutate(
-      { sources: realSelection, destDir: destPath },
-      { onSuccess: () => onOpSuccess('Copy'), onError: onOpError },
-    );
+    startTransfer({
+      kind: 'copy',
+      sources: realSelection,
+      destDir: destPath,
+      show,
+      onSuccess: () => clearSelection(),
+      onSettled: () => {
+        void qc.invalidateQueries({ queryKey: ['dir'] });
+        void qc.invalidateQueries({ queryKey: ['gitStatus'] });
+      },
+    });
   };
 
   const onMove = () => {
     if (!realSelection.length) return show('Select files to move', 'warning');
-    ops.move.mutate(
-      { sources: realSelection, destDir: destPath },
-      { onSuccess: () => onOpSuccess('Move'), onError: onOpError },
-    );
+    startTransfer({
+      kind: 'move',
+      sources: realSelection,
+      destDir: destPath,
+      show,
+      onSuccess: () => clearSelection(),
+      onSettled: () => {
+        void qc.invalidateQueries({ queryKey: ['dir'] });
+        void qc.invalidateQueries({ queryKey: ['gitStatus'] });
+      },
+    });
   };
 
   const onDelete = () => {
@@ -185,6 +200,7 @@ export const useFileOpDialogs = ({
     mkfile,
     rename,
     del,
+    remote: isRemotePath(activePath),
     deleteBtnRef,
     dispatchMkdir,
     dispatchMkfile,

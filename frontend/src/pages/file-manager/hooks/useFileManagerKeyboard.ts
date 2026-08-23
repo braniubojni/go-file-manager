@@ -1,37 +1,49 @@
 import { useEffect } from 'react';
 import { usePatchSettings, useSettings, useShortcutDefs } from '../../../entities/file/queries';
 import { isRemotePath } from '../../../features/connections/helpers';
+import {
+  runShortcutAction,
+  shortcutToggles,
+} from '../../../features/command-palette/runShortcutAction';
 import { useEditorStore } from '../../../features/editor/editorStore';
-import { useFileOpsStore } from '../../../features/file-ops/fileOpsStore';
 import { useGoToStore } from '../../../features/go-to/goToStore';
 import { usePaneStore } from '../../../features/pane/paneStore';
 import { useSearchStore } from '../../../features/search/searchStore';
 import { useTerminalStore } from '../../../features/terminal/terminalStore';
-import { useDialogStore } from '../../../features/ui/dialogStore';
 import { findMatchingAction, isCtrlBackquote } from '../../../shared/lib/shortcuts';
-import { enterPaneTab, historyNav } from '../../../widgets/file-pane/helpers';
+import { historyNav } from '../../../widgets/file-pane/helpers';
 import { buildShortcutMap, getPaneGrid, isEditableTarget } from '../helpers';
 
+const isXtermTarget = (target: EventTarget | null): boolean =>
+  Boolean((target as HTMLElement | null)?.closest?.('.xterm'));
+
 export const useFileManagerKeyboard = () => {
-  const setActivePane = usePaneStore((s) => s.setActivePane);
   const patchSettings = usePatchSettings();
   const { data: settings } = useSettings();
   const { data: shortcutDefs } = useShortcutDefs();
-  const openSettings = useDialogStore((s) => s.openSettings);
-  const openShortcuts = useDialogStore((s) => s.openShortcuts);
-  const trigger = useFileOpsStore((s) => s.trigger);
-  const toggleTerminal = useTerminalStore((s) => s.toggleActive);
   const openGoTo = useGoToStore((s) => s.openGoTo);
   const openSearch = useSearchStore((s) => s.openSearch);
+  const toggleTerminal = useTerminalStore((s) => s.toggleActive);
 
   useEffect(() => {
     const map = buildShortcutMap(shortcutDefs);
+    const toggles = shortcutToggles(patchSettings, settings);
 
     const onKey = (e: KeyboardEvent) => {
       const editorOpen = useEditorStore.getState().open;
+      const matched = findMatchingAction(e, map);
 
-      // Go-to: Mod+P — disabled while Monaco workspace is open
-      if (!editorOpen && findMatchingAction(e, map) === 'goTo') {
+      // Palette: before isEditableTarget so Mod+K works in the path bar.
+      if (matched === 'commandPalette') {
+        if (isXtermTarget(e.target)) return;
+        if ((e.target as HTMLElement | null)?.closest?.('[data-testid="popover-ports"]')) return;
+        e.preventDefault();
+        runShortcutAction('commandPalette', toggles);
+        return;
+      }
+
+      // Go-to: Mod+P — disabled while the editor workspace is open
+      if (!editorOpen && matched === 'goTo') {
         e.preventDefault();
         const path = usePaneStore.getState().getPath(usePaneStore.getState().activePane);
         if (isRemotePath(path)) return;
@@ -40,7 +52,7 @@ export const useFileManagerKeyboard = () => {
       }
 
       // Find in files: Mod+Shift+F (works with editor open too)
-      if (findMatchingAction(e, map) === 'openSearch') {
+      if (matched === 'openSearch') {
         e.preventDefault();
         const path = usePaneStore.getState().getPath(usePaneStore.getState().activePane);
         if (isRemotePath(path)) return;
@@ -48,7 +60,7 @@ export const useFileManagerKeyboard = () => {
         return;
       }
 
-      if (isCtrlBackquote(e) || findMatchingAction(e, map) === 'toggleTerminal') {
+      if (isCtrlBackquote(e) || matched === 'toggleTerminal') {
         if (editorOpen) return;
         if (isCtrlBackquote(e) || map.toggleTerminal) {
           const action = findMatchingAction(e, map);
@@ -63,16 +75,9 @@ export const useFileManagerKeyboard = () => {
       // While editor open, only allow a few globals (settings/shortcuts/search)
       if (editorOpen) {
         if (isEditableTarget(e.target)) return;
-        const action = findMatchingAction(e, map);
-        if (action === 'openSettings') {
+        if (matched === 'openSettings' || matched === 'openShortcuts' || matched === 'openSearch') {
           e.preventDefault();
-          openSettings();
-        } else if (action === 'openShortcuts') {
-          e.preventDefault();
-          openShortcuts();
-        } else if (action === 'openSearch') {
-          e.preventDefault();
-          openSearch();
+          runShortcutAction(matched, toggles);
         }
         return;
       }
@@ -158,122 +163,12 @@ export const useFileManagerKeyboard = () => {
         }
       }
 
-      const action = findMatchingAction(e, map);
-      if (!action) return;
+      if (!matched) return;
       e.preventDefault();
-
-      switch (action) {
-        case 'refresh':
-          trigger('refresh');
-          break;
-        case 'switchPane':
-          setActivePane(usePaneStore.getState().activePane === 'left' ? 'right' : 'left');
-          break;
-        case 'copy':
-          trigger('copy');
-          break;
-        case 'move':
-          trigger('move');
-          break;
-        case 'delete':
-          trigger('delete');
-          break;
-        case 'rename':
-          trigger('rename');
-          break;
-        case 'mkdir':
-          trigger('mkdir');
-          break;
-        case 'mkfile':
-          trigger('mkfile');
-          break;
-        case 'editFile':
-          trigger('editFile');
-          break;
-        case 'gitDiff':
-          trigger('gitDiff');
-          break;
-        case 'goTo':
-          openGoTo();
-          break;
-        case 'openSearch':
-          openSearch();
-          break;
-        case 'goParent':
-          trigger('goParent');
-          break;
-        case 'goHome':
-          trigger('goHome');
-          break;
-        case 'goBack':
-          historyNav(usePaneStore.getState().activePane, 'back');
-          break;
-        case 'goForward':
-          historyNav(usePaneStore.getState().activePane, 'forward');
-          break;
-        case 'openSettings':
-          openSettings();
-          break;
-        case 'openShortcuts':
-          openShortcuts();
-          break;
-        case 'toggleHidden':
-          patchSettings.mutate({ showHidden: !settings?.showHidden });
-          break;
-        case 'toggleExtensions':
-          patchSettings.mutate({ showExtensions: !settings?.showExtensions });
-          break;
-        case 'toggleTerminal':
-          toggleTerminal(usePaneStore.getState().activePane);
-          break;
-        case 'tabNew': {
-          const s = usePaneStore.getState();
-          const pane = s.activePane;
-          const curPath = s.getPath(pane);
-          enterPaneTab(pane, curPath);
-          s.addTab(pane, curPath);
-          break;
-        }
-        case 'tabClose': {
-          const s = usePaneStore.getState();
-          const pane = s.activePane;
-          const tabs = s.getTabs(pane);
-          const idx = s.getTabIndex(pane);
-          const closingId = tabs[idx]?.id;
-          if (!closingId || tabs.length < 2) break;
-          const nextIdx = Math.min(Math.max(idx - 1, 0), tabs.length - 2);
-          enterPaneTab(pane, tabs.filter((t) => t.id !== closingId)[nextIdx].path);
-          s.closeTab(pane, closingId);
-          break;
-        }
-        case 'tabNext':
-        case 'tabPrev': {
-          const s = usePaneStore.getState();
-          const pane = s.activePane;
-          const tabs = s.getTabs(pane);
-          if (tabs.length < 2) break;
-          const idx = s.getTabIndex(pane);
-          const delta = action === 'tabNext' ? 1 : -1;
-          const nextIdx = (idx + delta + tabs.length) % tabs.length;
-          enterPaneTab(pane, tabs[nextIdx].path);
-          s.selectTab(pane, tabs[nextIdx].id);
-          break;
-        }
-      }
+      runShortcutAction(matched, toggles);
     };
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [
-    shortcutDefs,
-    setActivePane,
-    trigger,
-    openSettings,
-    openShortcuts,
-    patchSettings,
-    settings,
-    toggleTerminal,
-    openGoTo,
-    openSearch,
-  ]);
+  }, [shortcutDefs, patchSettings, settings, toggleTerminal, openGoTo, openSearch]);
 };

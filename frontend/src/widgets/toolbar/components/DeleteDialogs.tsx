@@ -14,6 +14,7 @@ export const DeleteDialogs: FC<DeleteDialogsProps> = ({
   del,
   dispatch,
   paths,
+  remote,
   deleteBtnRef,
   onConfirm,
 }) => {
@@ -32,7 +33,9 @@ export const DeleteDialogs: FC<DeleteDialogsProps> = ({
           <DialogTitle>Delete {listed.length} item(s)?</DialogTitle>
           <DialogContent>
             <Typography variant="body2" color="text.secondary">
-              This cannot be undone.
+              {remote
+                ? 'This cannot be undone.'
+                : 'Items are moved to the app undo trash (kept ~24 hours). Use Undo in the notification to restore.'}
             </Typography>
             <Box component="ul" sx={{ pl: 2, maxHeight: 160, overflow: 'auto' }}>
               {listed.map((p) => (

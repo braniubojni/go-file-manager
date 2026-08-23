@@ -89,12 +89,12 @@ func TestTransferKind(t *testing.T) {
 func TestCopyMoveRemoteNil(t *testing.T) {
 	t.Parallel()
 	s := NewFileService(nil, nil, t.TempDir())
-	if err := s.Copy([]string{"ssh://u@h:22/a"}, "/tmp"); err == nil {
+	if err := s.Copy("", []string{"ssh://u@h:22/a"}, "/tmp"); err == nil {
 		t.Fatal("expected error when remote manager is nil")
 	} else if !strings.Contains(err.Error(), "remote not available") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if err := s.Move([]string{"/tmp/a"}, "ssh://u@h:22/"); err == nil {
+	if err := s.Move("", []string{"/tmp/a"}, "ssh://u@h:22/"); err == nil {
 		t.Fatal("expected error when remote manager is nil")
 	} else if !strings.Contains(err.Error(), "remote not available") {
 		t.Fatalf("unexpected error: %v", err)

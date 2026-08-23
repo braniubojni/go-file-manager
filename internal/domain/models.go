@@ -16,12 +16,26 @@ type FileEntry struct {
 	Access string `json:"access"`
 }
 
+// OpenWithApp is one OS application that can open a local file.
+type OpenWithApp struct {
+	ID   string `json:"id"` // bundle path, .desktop id, or executable
+	Name string `json:"name"`
+}
+
 // DirSizes is the result of a recursive child-size calculation. Denied lists the
 // child directories the walk could not fully read, so the UI can mark them
 // rather than silently reporting an undercount.
 type DirSizes struct {
 	Sizes  map[string]int64 `json:"sizes"`
 	Denied []string         `json:"denied"`
+}
+
+// DiskUsage is capacity of the volume that contains Path.
+type DiskUsage struct {
+	Path  string `json:"path"`
+	Total int64  `json:"total"`
+	Free  int64  `json:"free"` // available to the user (bavail)
+	Used  int64  `json:"used"`
 }
 
 // GitStatusEntry is one child name with a compact git working-tree status.
@@ -76,6 +90,20 @@ type PaneTabs struct {
 	LeftActive  int        `json:"leftActive"`
 	Right       []TabState `json:"right"`
 	RightActive int        `json:"rightActive"`
+}
+
+// PaneGridPrefs is one pane's file-grid sort, hidden columns, and column order.
+type PaneGridPrefs struct {
+	SortField string   `json:"sortField"` // default "displayName"
+	SortDir   string   `json:"sortDir"`   // "asc" | "desc"
+	Hidden    []string `json:"hidden"`    // fields hidden; icon+displayName cannot hide
+	Order     []string `json:"order"`     // fields left-to-right; unknown fields appended
+}
+
+// GridPrefs holds independent left/right file-grid column preferences.
+type GridPrefs struct {
+	Left  PaneGridPrefs `json:"left"`
+	Right PaneGridPrefs `json:"right"`
 }
 
 // ThemeMode values for Settings.Theme.
@@ -163,6 +191,45 @@ type SearchDeniedPayload struct {
 type SearchErrorPayload struct {
 	JobID string `json:"jobId"`
 	Error string `json:"error"`
+}
+
+// TransferProgressPayload is emitted while a copy/move job runs.
+type TransferProgressPayload struct {
+	JobID       string `json:"jobId"`
+	Kind        string `json:"kind"` // copy | move
+	BytesDone   int64  `json:"bytesDone"`
+	BytesTotal  int64  `json:"bytesTotal"`
+	CurrentPath string `json:"currentPath"`
+	Label       string `json:"label"`
+	DestDir     string `json:"destDir"`
+	DestPath    string `json:"destPath,omitempty"`
+	DestSize    int64  `json:"destSize"`
+	DestIsDir   bool   `json:"destIsDir"`
+}
+
+// PortListener is a local TCP socket in LISTEN state.
+type PortListener struct {
+	Port    int    `json:"port"`
+	PID     int    `json:"pid"`
+	Process string `json:"process"`
+	Proto   string `json:"proto"` // "tcp"
+}
+
+// Volume is an OS-mounted drive, network share, or disk image.
+type Volume struct {
+	Path        string `json:"path"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"` // internal | external | network | disk-image
+	Unmountable bool   `json:"unmountable"`
+	SourcePath  string `json:"sourcePath,omitempty"` // .dmg path when known
+	Device      string `json:"device,omitempty"`
+}
+
+// TransferDonePayload is emitted when a copy/move job finishes (success or error).
+type TransferDonePayload struct {
+	JobID string `json:"jobId"`
+	Kind  string `json:"kind"`  // copy | move
+	Error string `json:"error"` // empty on success
 }
 
 // ReplaceAllRequest replaces find with replace across paths (content mode).

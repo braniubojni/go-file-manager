@@ -4,18 +4,23 @@ import { Suspense, lazy, type FC } from 'react';
 import { useExternalFileDrop } from '../../features/dnd/useExternalFileDrop';
 import { useEditorStore } from '../../features/editor/editorStore';
 import { useFileOpsStore } from '../../features/file-ops/fileOpsStore';
+import { useTransferEvents } from '../../features/transfers/useTransferEvents';
+import { useVolumeEvents } from '../../features/volumes/useVolumeEvents';
 import { useDialogStore } from '../../features/ui/dialogStore';
 import { useAutoUpdateCheck } from '../../features/updates/hooks/useAutoUpdateCheck';
 import { FileContextMenu } from '../../widgets/file-pane/FileContextMenu';
 import { FilePane } from '../../widgets/file-pane/FilePane';
+import { CommandPaletteHost } from '../../widgets/command-palette/CommandPaletteHost';
 import { GoToHost } from '../../widgets/go-to/GoToHost';
 import { AppMenuBar } from '../../widgets/menu/AppMenuBar';
 import { SearchHost } from '../../widgets/search/SearchHost';
 import { StatusBar } from '../../widgets/status-bar/StatusBar';
 import { Toolbar } from '../../widgets/toolbar/Toolbar';
 import { useFileManagerKeyboard } from './hooks/useFileManagerKeyboard';
+import { useInitGridPrefs } from './hooks/useInitGridPrefs';
 import { useInitPaneTabs } from './hooks/useInitPaneTabs';
 import { useMouseNavButtons } from './hooks/useMouseNavButtons';
+import { usePersistGridPrefs } from './hooks/usePersistGridPrefs';
 import { usePersistPaneTabs } from './hooks/usePersistPaneTabs';
 import { loadingSx, pageRootSx, panesRowSx } from './styles';
 
@@ -26,12 +31,17 @@ const EditorWorkspace = lazy(() =>
 );
 
 export const FileManagerPage: FC = () => {
-  const ready = useInitPaneTabs();
+  const tabsReady = useInitPaneTabs();
+  const prefsReady = useInitGridPrefs();
+  const ready = tabsReady && prefsReady;
   usePersistPaneTabs(ready);
+  usePersistGridPrefs(prefsReady);
   useFileManagerKeyboard();
   useMouseNavButtons();
   useAutoUpdateCheck(ready);
   useExternalFileDrop(ready);
+  useTransferEvents();
+  useVolumeEvents();
 
   const settingsOpen = useDialogStore((s) => s.settingsOpen);
   const shortcutsOpen = useDialogStore((s) => s.shortcutsOpen);
@@ -80,6 +90,7 @@ export const FileManagerPage: FC = () => {
       )}
       {!editorOpen && <StatusBar />}
       <GoToHost />
+      <CommandPaletteHost />
       <SearchHost />
 
       <Suspense fallback={null}>

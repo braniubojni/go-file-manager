@@ -7,11 +7,16 @@ export type {
     ConnectResult,
     ConnectionProfile,
     DirSizes,
+    DiskUsage,
     FileEntry,
     GitDirStatus,
     GitFileDiff,
     GitStatusEntry,
+    GridPrefs,
+    OpenWithApp,
+    PaneGridPrefs,
     PaneTabs,
+    PortListener,
     RemoteRecent,
     ReplaceAllResult,
     SMBShare,
@@ -20,5 +25,6 @@ export type {
     SearchPrefs,
     Settings,
     ShortcutDef,
-    TabState
+    TabState,
+    Volume
 } from "./models.js";

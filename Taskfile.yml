@@ -310,7 +310,7 @@ tasks:
     summary: Run Go CI steps in Docker (Linux + Wails GTK; mirrors .github/workflows/ci.yml)
     desc: |
       Requires Docker image wails-cross (task setup:docker).
-      Reproduces gofmt, embed stub, go vet, and go test on Linux.
+      Reproduces gofmt, embed stub, go vet, go test, and golangci-lint on Linux.
     cmds:
       - bash ./scripts/ci-go-docker.sh
 
@@ -325,6 +325,7 @@ tasks:
           exit 1
         fi
       - go vet ./...
+      - golangci-lint run --timeout=3m
       - task: frontend:lint
 
   frontend:lint:

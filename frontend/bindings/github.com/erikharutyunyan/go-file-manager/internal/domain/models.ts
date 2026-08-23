@@ -119,6 +119,20 @@ export interface DirSizes {
 }
 
 /**
+ * DiskUsage is capacity of the volume that contains Path.
+ */
+export interface DiskUsage {
+    "path": string;
+    "total": number;
+
+    /**
+     * available to the user (bavail)
+     */
+    "free": number;
+    "used": number;
+}
+
+/**
  * FileEntry is a single directory listing row.
  */
 export interface FileEntry {
@@ -187,6 +201,50 @@ export interface GitStatusEntry {
 }
 
 /**
+ * GridPrefs holds independent left/right file-grid column preferences.
+ */
+export interface GridPrefs {
+    "left": PaneGridPrefs;
+    "right": PaneGridPrefs;
+}
+
+/**
+ * OpenWithApp is one OS application that can open a local file.
+ */
+export interface OpenWithApp {
+    /**
+     * bundle path, .desktop id, or executable
+     */
+    "id": string;
+    "name": string;
+}
+
+/**
+ * PaneGridPrefs is one pane's file-grid sort, hidden columns, and column order.
+ */
+export interface PaneGridPrefs {
+    /**
+     * default "displayName"
+     */
+    "sortField": string;
+
+    /**
+     * "asc" | "desc"
+     */
+    "sortDir": string;
+
+    /**
+     * fields hidden; icon+displayName cannot hide
+     */
+    "hidden": string[] | null;
+
+    /**
+     * fields left-to-right; unknown fields appended
+     */
+    "order": string[] | null;
+}
+
+/**
  * PaneTabs holds each pane's open tabs and which one is active.
  */
 export interface PaneTabs {
@@ -194,6 +252,20 @@ export interface PaneTabs {
     "leftActive": number;
     "right": TabState[] | null;
     "rightActive": number;
+}
+
+/**
+ * PortListener is a local TCP socket in LISTEN state.
+ */
+export interface PortListener {
+    "port": number;
+    "pid": number;
+    "process": string;
+
+    /**
+     * "tcp"
+     */
+    "proto": string;
 }
 
 /**
@@ -322,4 +394,24 @@ export interface ShortcutDef {
  */
 export interface TabState {
     "path": string;
+}
+
+/**
+ * Volume is an OS-mounted drive, network share, or disk image.
+ */
+export interface Volume {
+    "path": string;
+    "name": string;
+
+    /**
+     * internal | external | network | disk-image
+     */
+    "kind": string;
+    "unmountable": boolean;
+
+    /**
+     * .dmg path when known
+     */
+    "sourcePath"?: string;
+    "device"?: string;
 }

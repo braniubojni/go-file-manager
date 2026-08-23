@@ -9,7 +9,7 @@ src/
   main.tsx, App.tsx
   app/           # Providers, MUI theme (system/dark/light)
   pages/file-manager/   # Shell: panes, keyboard, path persist
-  widgets/       # file-pane, toolbar, editor, terminal, menu, go-to, status-bar
+  widgets/       # file-pane, toolbar, editor, terminal, menu, go-to, command-palette, status-bar, port-killer
   features/      # Zustand stores + small dialogs (settings, shortcuts, updates…)
   entities/file/ # TanStack Query hooks + domain TS types
   shared/        # api/bindings re-export, format, shortcuts, ErrorBoundary
@@ -26,13 +26,17 @@ public/          # usually empty; no brand icons here
 | `FC` components                     | class components       |
 | Colocate `styles.ts` / `helpers.ts` | Dump into global utils |
 | Keep files ~100–150 lines           | Mega-components        |
+| Derive in render / event handlers   | `useEffect` for UI state |
 | CodeMirror 6 editor                 | Monaco / workers       |
 
 ## Data flow
 
 - **Server state:** TanStack Query in `entities/file/queries.ts` → `FileService` / settings / bookmarks via `shared/api/bindings`.
-- **UI state:** Zustand — `features/pane`, `editor`, `terminal`, `file-ops`, `jobs`, `updates`, `ui/*`.
+- **UI state:** Zustand — `features/pane`, `editor`, `terminal`, `file-ops`, `jobs`, `updates`, `ui/*` (grid prefs: `gridPrefsStore`, KV via `SettingsService`).
+- **Command palette:** `widgets/command-palette` + `features/command-palette` (Mod+K); runs catalog ids through `runShortcutAction`.
 - **Jobs:** pane-level busy (copy/archive/sizes) → `features/jobs/paneJobStore` + toolbar `runPaneJob`.
+- **Transfers:** status bar + dest-row `apiRef.updateRows` (`useDestRowUpdates`); do not refetch `['dir']` on progress ticks.
+- **Volumes:** `useVolumes` + `useVolumeEvents`; toolbar `DrivesMenu`.
 
 ## Editor
 
@@ -64,3 +68,4 @@ npm run build
 - Template assets: `wails.png`, `react.svg`, Inter font in public, bg-desktop/mobile.
 - Empty feature folders without exports.
 - Unused exports (knip + prefer unexported helpers).
+- Staging `frontend/bindings/**` in agent commits — regenerate locally if needed; the human adds generated files.

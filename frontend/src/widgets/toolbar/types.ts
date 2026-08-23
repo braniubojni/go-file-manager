@@ -80,6 +80,7 @@ export type DeleteDialogsProps = {
   del: DeleteDialogState;
   dispatch: Dispatch<DeleteDialogAction>;
   paths: string[];
+  remote: boolean;
   deleteBtnRef: RefObject<HTMLButtonElement | null>;
   onConfirm: () => void;
 };

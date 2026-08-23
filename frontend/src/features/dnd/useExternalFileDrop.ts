@@ -3,8 +3,6 @@ import { Events } from '@wailsio/runtime';
 import { useEffect } from 'react';
 import type { PaneId } from '../../entities/file/types';
 import { usePaneStore } from '../pane/paneStore';
-import { FileService } from '../../shared/api/bindings';
-import { errMessage } from '../../shared/lib/format';
 import { useSnack } from '../../shared/ui/SnackbarHost';
 import {
   allSameParentAsDest,
@@ -12,6 +10,7 @@ import {
   isNestedInSelf,
   sameDirPath,
 } from '../../widgets/file-pane/helpers';
+import { startTransfer } from '../transfers/startTransfer';
 import { refreshAfterDrop } from './refreshAfterDrop';
 
 type DropTargetPayload = {
@@ -78,10 +77,12 @@ export const useExternalFileDrop = (enabled: boolean): void => {
         return;
       }
 
-      void FileService.Copy(files, dest)
-        .then(() => {
-          show(`Copied ${files.length} item(s)`, 'success');
-          refreshAfterDrop(qc, dest, files);
+      startTransfer({
+        kind: 'copy',
+        sources: files,
+        destDir: dest,
+        show,
+        onSuccess: () => {
           const paneId = payload.target?.attributes?.['data-pane-id'];
           if (isPaneId(paneId)) {
             const current = usePaneStore.getState().getPath(paneId);
@@ -91,8 +92,9 @@ export const useExternalFileDrop = (enabled: boolean): void => {
               usePaneStore.getState().navigate(paneId, dest);
             }
           }
-        })
-        .catch((e) => show(errMessage(e), 'error'));
+        },
+        onSettled: () => refreshAfterDrop(qc, dest, files),
+      });
     });
 
     return () => {

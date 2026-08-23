@@ -3,10 +3,19 @@ import {
   BookmarkService,
   FileService,
   GitService,
+  PortService,
   SettingsService,
 } from '../../shared/api/bindings';
 import { isRemotePath } from '../../features/connections/helpers';
-import type { AppSettings, GitDirStatus, PaneTabsState, ThemePreference } from './types';
+import type {
+  AppSettings,
+  DiskUsage,
+  GitDirStatus,
+  PaneTabsState,
+  ThemePreference,
+  PortListener,
+  Volume,
+} from './types';
 import { defaultSettings } from './types';
 
 const queryKeys = {
@@ -19,6 +28,9 @@ const queryKeys = {
   bookmarks: ['bookmarks'] as const,
   pathCompletions: (partial: string) => ['pathCompletions', partial] as const,
   paneTabs: ['paneTabs'] as const,
+  volumes: ['volumes'] as const,
+  ports: ['ports'] as const,
+  diskUsage: (path: string) => ['diskUsage', path] as const,
 };
 
 export const useHomeDir = () => {
@@ -138,6 +150,41 @@ export const useSearchTree = (
   });
 };
 
+export const useVolumes = () => {
+  return useQuery({
+    queryKey: queryKeys.volumes,
+    queryFn: async () => ((await FileService.ListVolumes()) ?? []) as Volume[],
+  });
+};
+
+export const usePorts = (enabled: boolean) => {
+  return useQuery({
+    queryKey: queryKeys.ports,
+    queryFn: async () => ((await PortService.List()) ?? []) as PortListener[],
+    enabled,
+  });
+};
+
+export const useKillPort = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pid: number) => PortService.Kill(pid),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.ports });
+    },
+  });
+};
+
+export const useKillAllPorts = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pids: number[]) => PortService.KillAll(pids),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.ports });
+    },
+  });
+};
+
 export const useDirListing = (path: string | undefined, showHidden: boolean) => {
   return useQuery({
     queryKey: queryKeys.dir(path ?? '', showHidden),
@@ -146,6 +193,24 @@ export const useDirListing = (path: string | undefined, showHidden: boolean) => 
       return rows ?? [];
     },
     enabled: Boolean(path),
+  });
+};
+
+export const useDiskUsage = (path: string | undefined) => {
+  const remote = isRemotePath(path);
+  return useQuery({
+    queryKey: queryKeys.diskUsage(path ?? ''),
+    queryFn: async (): Promise<DiskUsage> => {
+      const u = await FileService.DiskUsage(path!);
+      return {
+        path: u.path ?? '',
+        total: u.total ?? 0,
+        free: u.free ?? 0,
+        used: u.used ?? 0,
+      };
+    },
+    enabled: Boolean(path && !remote),
+    staleTime: 10_000,
   });
 };
 
@@ -270,18 +335,6 @@ export const useFileOps = () => {
   const invalidate = useInvalidateDirs();
   const qc = useQueryClient();
 
-  const copy = useMutation({
-    mutationFn: ({ sources, destDir }: { sources: string[]; destDir: string }) =>
-      FileService.Copy(sources, destDir),
-    onSuccess: (_d, v) => invalidate(...parentDirs(v.sources), v.destDir),
-  });
-
-  const move = useMutation({
-    mutationFn: ({ sources, destDir }: { sources: string[]; destDir: string }) =>
-      FileService.Move(sources, destDir),
-    onSuccess: (_d, v) => invalidate(...parentDirs(v.sources), v.destDir),
-  });
-
   const del = useMutation({
     mutationFn: (paths: string[]) => FileService.Delete(paths),
     onSuccess: (_d, paths) => invalidate(...parentDirs(paths)),
@@ -319,7 +372,7 @@ export const useFileOps = () => {
     },
   });
 
-  return { copy, move, del, rename, mkdir, mkfile, addBookmark, removeBookmark };
+  return { del, rename, mkdir, mkfile, addBookmark, removeBookmark };
 };
 
 const parentDirs = (paths: string[]): string[] => {
