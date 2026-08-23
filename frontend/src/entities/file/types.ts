@@ -14,6 +14,15 @@ export interface FileEntry {
   access: string;
 }
 
+export interface Volume {
+  path: string;
+  name: string;
+  kind: string;
+  unmountable: boolean;
+  sourcePath?: string;
+  device?: string;
+}
+
 interface TabState {
   path: string;
 }

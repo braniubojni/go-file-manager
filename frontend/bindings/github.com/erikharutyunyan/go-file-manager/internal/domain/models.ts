@@ -323,3 +323,23 @@ export interface ShortcutDef {
 export interface TabState {
     "path": string;
 }
+
+/**
+ * Volume is an OS-mounted drive, network share, or disk image.
+ */
+export interface Volume {
+    "path": string;
+    "name": string;
+
+    /**
+     * internal | external | network | disk-image
+     */
+    "kind": string;
+    "unmountable": boolean;
+
+    /**
+     * .dmg path when known
+     */
+    "sourcePath"?: string;
+    "device"?: string;
+}

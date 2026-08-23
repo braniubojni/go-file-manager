@@ -20,5 +20,6 @@ export type {
     SearchPrefs,
     Settings,
     ShortcutDef,
-    TabState
+    TabState,
+    Volume
 } from "./models.js";

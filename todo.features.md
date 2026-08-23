@@ -7,6 +7,7 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 ## Core file-manager gaps (Double Commander parity)
 
 - [ ] Archive support: browse zip/tar as virtual folder, extract/compress via context menu
+- [x] DMG as folder (macOS): double-click attaches via hdiutil, browse/copy like a directory, unmount from drives menu
 - [ ] Quick view panel (F3-style preview: images, text, PDF) without opening editor
 - [ ] Folder compare/sync (diff two dirs, sync one-way or two-way)
 - [ ] Batch rename (pattern-based, regex, counter)
@@ -25,7 +26,7 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 - [x] Title of SSH can be changed to SSH/SFTP cuz we support both protocols at this moment not just SSH
 - [ ] FTP support
 - [ ] SMB Kerberos / ticket auth (NTLM only in V1)
-- [ ] OS-level SMB mount (Finder `/Volumes`, Linux cifs, Windows `net use`)
+- [x] OS-level SMB mount — volumes menu (`/Volumes`, unmount); Finder SMB shares listed as network drives
 - [ ] Copy/move between SSH and SMB in one step
 - [ ] Persist remote passwords (SSH/SMB) in OS keychain
 - [ ] SMB discovery / Bonjour browse for nearby shares

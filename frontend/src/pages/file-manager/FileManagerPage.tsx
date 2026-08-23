@@ -4,6 +4,8 @@ import { Suspense, lazy, type FC } from 'react';
 import { useExternalFileDrop } from '../../features/dnd/useExternalFileDrop';
 import { useEditorStore } from '../../features/editor/editorStore';
 import { useFileOpsStore } from '../../features/file-ops/fileOpsStore';
+import { useTransferEvents } from '../../features/transfers/useTransferEvents';
+import { useVolumeEvents } from '../../features/volumes/useVolumeEvents';
 import { useDialogStore } from '../../features/ui/dialogStore';
 import { useAutoUpdateCheck } from '../../features/updates/hooks/useAutoUpdateCheck';
 import { FileContextMenu } from '../../widgets/file-pane/FileContextMenu';
@@ -32,6 +34,8 @@ export const FileManagerPage: FC = () => {
   useMouseNavButtons();
   useAutoUpdateCheck(ready);
   useExternalFileDrop(ready);
+  useTransferEvents();
+  useVolumeEvents();
 
   const settingsOpen = useDialogStore((s) => s.settingsOpen);
   const shortcutsOpen = useDialogStore((s) => s.shortcutsOpen);

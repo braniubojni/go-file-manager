@@ -30,6 +30,8 @@ import { useFolderSizeStore } from '../../features/folder-size/folderSizeStore';
 import { newJobId, usePaneJobStore } from '../../features/jobs/paneJobStore';
 import { usePaneStore } from '../../features/pane/paneStore';
 import { useTerminalStore } from '../../features/terminal/terminalStore';
+import { startTransfer } from '../../features/transfers/startTransfer';
+import { useDestRowUpdates } from '../../features/transfers/useDestRowUpdates';
 import { useColumnStore } from '../../features/ui/columnStore';
 import { errMessage } from '../../shared/lib/format';
 import { FileService } from '../../shared/api/bindings';
@@ -172,6 +174,15 @@ export const useFilePane = (id: PaneId) => {
       navigate(entry.path);
       return;
     }
+    const ext = (entry.ext || entry.name.split('.').pop() || '').toLowerCase();
+    if (ext === 'dmg' && !isRemotePath(entry.path)) {
+      void FileService.AttachDiskImage(entry.path)
+        .then((mp) => {
+          if (mp) navigate(mp);
+        })
+        .catch((e) => show(errMessage(e), 'error'));
+      return;
+    }
     // Remote files are fine: ReadTextFile/WriteTextFile dispatch over SFTP.
     // FileService.Open (the "open in OS" path) is the local-only one.
     if (settings?.useBuiltInEditor !== false || isRemotePath(entry.path)) {
@@ -196,19 +207,20 @@ export const useFilePane = (id: PaneId) => {
     // Dropping back into the same parent dir = cancel (user regretted the drag).
     // Applies to both copy and move so we never create "name (1)" self-duplicates.
     if (allSameParentAsDest(paths, dest)) return;
-    const op = mode === 'move' ? FileService.Move : FileService.Copy;
-    const verb = mode === 'move' ? 'Moved' : 'Copied';
-    void op(paths, dest)
-      .then(() => {
-        show(`${verb} ${paths.length} item(s)`, 'success');
+    startTransfer({
+      kind: mode,
+      sources: paths,
+      destDir: dest,
+      show,
+      onSuccess: () => {
         clearSelection();
-        refreshAfterDrop(qc, dest, paths);
         setActivePane(id);
         if (!sameDirPath(dest, path)) {
           navigate(dest);
         }
-      })
-      .catch((e) => show(errMessage(e), 'error'));
+      },
+      onSettled: () => refreshAfterDrop(qc, dest, paths),
+    });
   };
 
   const cancelJob = () => {
@@ -413,6 +425,7 @@ export const useFileTable = ({
     () => sortRowsPinParent(baseRows, sortModel, folderSizes),
     [baseRows, sortModel, folderSizes],
   );
+  useDestRowUpdates(apiRef, panePath, rows.length);
 
   const orderedPaths = useMemo(() => rows.map((r) => r.path), [rows]);
 

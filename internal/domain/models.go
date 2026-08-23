@@ -165,6 +165,37 @@ type SearchErrorPayload struct {
 	Error string `json:"error"`
 }
 
+// TransferProgressPayload is emitted while a copy/move job runs.
+type TransferProgressPayload struct {
+	JobID       string `json:"jobId"`
+	Kind        string `json:"kind"` // copy | move
+	BytesDone   int64  `json:"bytesDone"`
+	BytesTotal  int64  `json:"bytesTotal"`
+	CurrentPath string `json:"currentPath"`
+	Label       string `json:"label"`
+	DestDir     string `json:"destDir"`
+	DestPath    string `json:"destPath,omitempty"`
+	DestSize    int64  `json:"destSize"`
+	DestIsDir   bool   `json:"destIsDir"`
+}
+
+// Volume is an OS-mounted drive, network share, or disk image.
+type Volume struct {
+	Path        string `json:"path"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"` // internal | external | network | disk-image
+	Unmountable bool   `json:"unmountable"`
+	SourcePath  string `json:"sourcePath,omitempty"` // .dmg path when known
+	Device      string `json:"device,omitempty"`
+}
+
+// TransferDonePayload is emitted when a copy/move job finishes (success or error).
+type TransferDonePayload struct {
+	JobID string `json:"jobId"`
+	Kind  string `json:"kind"`  // copy | move
+	Error string `json:"error"` // empty on success
+}
+
 // ReplaceAllRequest replaces find with replace across paths (content mode).
 type ReplaceAllRequest struct {
 	Paths         []string `json:"paths"`

@@ -705,6 +705,14 @@ func removeAll(c *sftp.Client, p string) error {
 
 // CopyWithin copies sources into destDir on the same host (remote only).
 func (m *Manager) CopyWithin(sources []string, destDir string) error {
+	return m.CopyWithinCtx(context.Background(), sources, destDir, nil)
+}
+
+// CopyWithinCtx copies sources into destDir on the same host with progress.
+func (m *Manager) CopyWithinCtx(ctx context.Context, sources []string, destDir string, onProgress filesystem.ProgressFunc) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	dloc, err := ParseLocation(destDir)
 	if err != nil {
 		return err
@@ -713,7 +721,26 @@ func (m *Manager) CopyWithin(sources []string, destDir string) error {
 	if err != nil {
 		return err
 	}
+	total, err := m.remoteSourcesBytes(sources)
+	if err != nil {
+		return err
+	}
+	rep := newRemoteProgress(total, onProgress)
+	if onProgress != nil {
+		onProgress(filesystem.ProgressEvent{Total: total})
+	}
+	var created []string
+	defer func() {
+		if errors.Is(err, context.Canceled) {
+			for _, p := range created {
+				_ = removeAll(ds.sftp, p)
+			}
+		}
+	}()
 	for _, src := range sources {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		sloc, err := ParseLocation(src)
 		if err != nil {
 			return err
@@ -722,16 +749,29 @@ func (m *Manager) CopyWithin(sources []string, destDir string) error {
 			return fmt.Errorf("cross-host copy not supported")
 		}
 		base := path.Base(sloc.RemotePath)
-		dest := path.Join(dloc.RemotePath, base)
-		if err := copyRemote(ds.sftp, sloc.RemotePath, dest); err != nil {
+		dest := uniqueRemotePath(ds.sftp, path.Join(dloc.RemotePath, base))
+		created = append(created, dest)
+		st, statErr := ds.sftp.Stat(sloc.RemotePath)
+		srcIsDir := statErr == nil && st.IsDir()
+		rep.setDest(dloc.JoinPath(dest), srcIsDir)
+		if err := copyRemoteCtx(ctx, ds.sftp, sloc.RemotePath, dest, rep); err != nil {
 			return err
 		}
 	}
+	rep.finish("")
 	return nil
 }
 
 // MoveWithin moves sources into destDir on the same host.
 func (m *Manager) MoveWithin(sources []string, destDir string) error {
+	return m.MoveWithinCtx(context.Background(), sources, destDir, nil)
+}
+
+// MoveWithinCtx moves sources into destDir on the same host with progress.
+func (m *Manager) MoveWithinCtx(ctx context.Context, sources []string, destDir string, onProgress filesystem.ProgressFunc) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	dloc, err := ParseLocation(destDir)
 	if err != nil {
 		return err
@@ -740,7 +780,37 @@ func (m *Manager) MoveWithin(sources []string, destDir string) error {
 	if err != nil {
 		return err
 	}
-	for _, src := range sources {
+
+	var total int64
+	weights := make([]int64, len(sources))
+	for i, src := range sources {
+		loc, err := ParseLocation(src)
+		if err != nil {
+			return err
+		}
+		ss, err := m.get(loc)
+		if err != nil {
+			return err
+		}
+		n, err := remotePathBytes(ss.sftp, loc.RemotePath)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			n = 1
+		}
+		weights[i] = n
+		total += n
+	}
+	rep := newRemoteProgress(total, onProgress)
+	if onProgress != nil {
+		onProgress(filesystem.ProgressEvent{Total: total})
+	}
+
+	for i, src := range sources {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		sloc, err := ParseLocation(src)
 		if err != nil {
 			return err
@@ -749,21 +819,29 @@ func (m *Manager) MoveWithin(sources []string, destDir string) error {
 			return fmt.Errorf("cross-host move not supported")
 		}
 		base := path.Base(sloc.RemotePath)
-		dest := path.Join(dloc.RemotePath, base)
+		dest := uniqueRemotePath(ds.sftp, path.Join(dloc.RemotePath, base))
+		st, statErr := ds.sftp.Stat(sloc.RemotePath)
+		srcIsDir := statErr == nil && st.IsDir()
+		rep.setDest(dloc.JoinPath(dest), srcIsDir)
 		if err := ds.sftp.Rename(sloc.RemotePath, dest); err != nil {
-			// fallback copy+delete for cross-device
-			if err2 := copyRemote(ds.sftp, sloc.RemotePath, dest); err2 != nil {
+			if err2 := copyRemoteCtx(ctx, ds.sftp, sloc.RemotePath, dest, rep); err2 != nil {
 				return err
 			}
 			if err2 := removeAll(ds.sftp, sloc.RemotePath); err2 != nil {
 				return err2
 			}
+			continue
 		}
+		rep.add(weights[i], sloc.RemotePath)
 	}
+	rep.finish("")
 	return nil
 }
 
-func copyRemote(c *sftp.Client, src, dst string) error {
+func copyRemoteCtx(ctx context.Context, c *sftp.Client, src, dst string, rep *remoteProgress) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	st, err := c.Stat(src)
 	if err != nil {
 		return err
@@ -777,7 +855,10 @@ func copyRemote(c *sftp.Client, src, dst string) error {
 			return err
 		}
 		for _, e := range entries {
-			if err := copyRemote(c, path.Join(src, e.Name()), path.Join(dst, e.Name())); err != nil {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := copyRemoteCtx(ctx, c, path.Join(src, e.Name()), path.Join(dst, e.Name()), rep); err != nil {
 				return err
 			}
 		}
@@ -793,7 +874,11 @@ func copyRemote(c *sftp.Client, src, dst string) error {
 		return err
 	}
 	defer func() { _ = out.Close() }()
-	if _, err = io.Copy(out, in); err != nil {
+	reader := io.Reader(in)
+	if rep != nil && rep.on != nil {
+		reader = &ctxCountingReader{r: in, path: src, report: rep, ctx: ctx}
+	}
+	if _, err = io.Copy(out, reader); err != nil {
 		return err
 	}
 	return out.Close()

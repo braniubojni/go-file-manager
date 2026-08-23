@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 	"github.com/erikharutyunyan/go-file-manager/internal/filesystem"
 	"github.com/erikharutyunyan/go-file-manager/internal/remote"
+	"github.com/erikharutyunyan/go-file-manager/internal/volumes"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -25,6 +27,7 @@ type FileService struct {
 	smb    *remote.SMBManager
 	trash  *filesystem.Trash
 	app    *application.App
+	vols   *volumes.Manager
 }
 
 type remoteBackend interface {
@@ -44,7 +47,12 @@ type remoteBackend interface {
 }
 
 func NewFileService(remoteMgr *remote.Manager, smbMgr *remote.SMBManager, trashDir string) *FileService {
-	return &FileService{remote: remoteMgr, smb: smbMgr, trash: filesystem.NewTrash(trashDir)}
+	return &FileService{
+		remote: remoteMgr,
+		smb:    smbMgr,
+		trash:  filesystem.NewTrash(trashDir),
+		vols:   volumes.NewManager(),
+	}
 }
 
 func (s *FileService) backendFor(path string) (remoteBackend, error) {
@@ -74,6 +82,9 @@ func (s *FileService) PurgeTrash() error {
 //wails:ignore
 func (s *FileService) SetApp(app *application.App) {
 	s.app = app
+	if s.vols != nil {
+		s.vols.StartWatch(func() { s.emit("volumes:changed", map[string]any{}) })
+	}
 }
 
 func (s *FileService) emit(name string, data any) {
@@ -105,7 +116,7 @@ func (s *FileService) jobCtx(jobID string) context.Context {
 	return context.Background()
 }
 
-// CancelJob cancels a long-running Archive/Extract/DirChildSizes started with NewJobID.
+// CancelJob cancels a long-running Archive/Extract/DirChildSizes/Copy/Move started with NewJobID.
 func (s *FileService) CancelJob(jobID string) error {
 	if jobID == "" {
 		return nil
@@ -135,7 +146,12 @@ func (s *FileService) ListDir(path string, showHidden bool) ([]domain.FileEntry,
 		}
 		return be.ListDir(path, showHidden)
 	}
-	return filesystem.ListDir(path, showHidden)
+	entries, err := filesystem.ListDir(path, showHidden)
+	if err != nil {
+		return nil, err
+	}
+	s.rewriteDMGParent(path, entries)
+	return entries, nil
 }
 
 func (s *FileService) ListPathCompletions(partial string) ([]string, error) {
@@ -164,18 +180,59 @@ func (s *FileService) Exists(path string) (bool, error) {
 	return filesystem.Exists(path)
 }
 
-func (s *FileService) Copy(sources []string, destDir string) error {
-	kind, err := transferKind(sources, destDir)
+// Copy copies sources into destDir.
+// jobID from NewJobID enables CancelJob and transfer:progress events; empty is fire-and-forget.
+func (s *FileService) Copy(jobID string, sources []string, destDir string) error {
+	return s.runTransfer(jobID, "copy", sources, destDir, false)
+}
+
+// Move moves sources into destDir.
+// jobID from NewJobID enables CancelJob and transfer:progress events; empty is fire-and-forget.
+func (s *FileService) Move(jobID string, sources []string, destDir string) error {
+	return s.runTransfer(jobID, "move", sources, destDir, true)
+}
+
+func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir string, isMove bool) (err error) {
+	defer func() { _ = s.FinishJob(jobID) }()
+	label := transferLabel(kind, sources, destDir)
+	emitDone := func(e error) {
+		if jobID == "" {
+			return
+		}
+		msg := ""
+		if e != nil {
+			msg = e.Error()
+		}
+		s.emit("transfer:done", domain.TransferDonePayload{JobID: jobID, Kind: kind, Error: msg})
+	}
+	defer func() { emitDone(err) }()
+
+	onProgress := s.transferProgress(jobID, kind, label, destDir)
+	ctx := s.jobCtx(jobID)
+
+	xfer, err := transferKind(sources, destDir)
 	if err != nil {
 		return err
 	}
-	switch kind {
+	switch xfer {
 	case transferLocal:
-		return filesystem.Copy(sources, destDir)
+		if isMove {
+			return filesystem.MoveCtx(ctx, sources, destDir, onProgress)
+		}
+		return filesystem.CopyCtx(ctx, sources, destDir, onProgress)
 	case transferRemoteWithin:
 		be, err := s.backendFor(destDir)
 		if err != nil {
 			return err
+		}
+		if mgr, ok := be.(*remote.Manager); ok {
+			if isMove {
+				return mgr.MoveWithinCtx(ctx, sources, destDir, onProgress)
+			}
+			return mgr.CopyWithinCtx(ctx, sources, destDir, onProgress)
+		}
+		if isMove {
+			return be.MoveWithin(sources, destDir)
 		}
 		return be.CopyWithin(sources, destDir)
 	case transferDownload:
@@ -183,53 +240,75 @@ func (s *FileService) Copy(sources []string, destDir string) error {
 		if err != nil {
 			return err
 		}
-		return be.Download(sources, destDir)
+		if mgr, ok := be.(*remote.Manager); ok {
+			if err := mgr.DownloadCtx(ctx, sources, destDir, onProgress); err != nil {
+				return err
+			}
+		} else if err := be.Download(sources, destDir); err != nil {
+			return err
+		}
+		if isMove {
+			return be.Delete(sources)
+		}
+		return nil
 	case transferUpload:
 		be, err := s.backendFor(destDir)
 		if err != nil {
 			return err
 		}
-		return be.Upload(sources, destDir)
+		if mgr, ok := be.(*remote.Manager); ok {
+			if err := mgr.UploadCtx(ctx, sources, destDir, onProgress); err != nil {
+				return err
+			}
+		} else if err := be.Upload(sources, destDir); err != nil {
+			return err
+		}
+		if isMove {
+			return filesystem.Delete(sources)
+		}
+		return nil
 	default:
-		return fmt.Errorf("unsupported copy")
+		return fmt.Errorf("unsupported %s", kind)
 	}
 }
 
-func (s *FileService) Move(sources []string, destDir string) error {
-	kind, err := transferKind(sources, destDir)
-	if err != nil {
-		return err
+func (s *FileService) transferProgress(jobID, kind, label, destDir string) filesystem.ProgressFunc {
+	if jobID == "" {
+		return nil
 	}
-	switch kind {
-	case transferLocal:
-		return filesystem.Move(sources, destDir)
-	case transferRemoteWithin:
-		be, err := s.backendFor(destDir)
-		if err != nil {
-			return err
-		}
-		return be.MoveWithin(sources, destDir)
-	case transferDownload:
-		be, err := s.backendFor(sources[0])
-		if err != nil {
-			return err
-		}
-		if err := be.Download(sources, destDir); err != nil {
-			return err
-		}
-		return be.Delete(sources)
-	case transferUpload:
-		be, err := s.backendFor(destDir)
-		if err != nil {
-			return err
-		}
-		if err := be.Upload(sources, destDir); err != nil {
-			return err
-		}
-		return filesystem.Delete(sources)
-	default:
-		return fmt.Errorf("unsupported move")
+	return func(ev filesystem.ProgressEvent) {
+		s.emit("transfer:progress", domain.TransferProgressPayload{
+			JobID:       jobID,
+			Kind:        kind,
+			BytesDone:   ev.Done,
+			BytesTotal:  ev.Total,
+			CurrentPath: ev.CurrentPath,
+			Label:       label,
+			DestDir:     destDir,
+			DestPath:    ev.DestPath,
+			DestSize:    ev.DestSize,
+			DestIsDir:   ev.DestIsDir,
+		})
 	}
+}
+
+func transferLabel(kind string, sources []string, destDir string) string {
+	n := len(sources)
+	if n == 0 {
+		return kind
+	}
+	base := sources[0]
+	if i := strings.LastIndexAny(base, `/\`); i >= 0 {
+		base = base[i+1:]
+	}
+	verb := "Copy"
+	if kind == "move" {
+		verb = "Move"
+	}
+	if n == 1 {
+		return fmt.Sprintf("%s %s → %s", verb, base, destDir)
+	}
+	return fmt.Sprintf("%s %d items → %s", verb, n, destDir)
 }
 
 type xferKind int

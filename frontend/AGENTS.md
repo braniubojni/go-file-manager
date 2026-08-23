@@ -26,6 +26,7 @@ public/          # usually empty; no brand icons here
 | `FC` components                     | class components       |
 | Colocate `styles.ts` / `helpers.ts` | Dump into global utils |
 | Keep files ~100–150 lines           | Mega-components        |
+| Derive in render / event handlers   | `useEffect` for UI state |
 | CodeMirror 6 editor                 | Monaco / workers       |
 
 ## Data flow
@@ -33,6 +34,8 @@ public/          # usually empty; no brand icons here
 - **Server state:** TanStack Query in `entities/file/queries.ts` → `FileService` / settings / bookmarks via `shared/api/bindings`.
 - **UI state:** Zustand — `features/pane`, `editor`, `terminal`, `file-ops`, `jobs`, `updates`, `ui/*`.
 - **Jobs:** pane-level busy (copy/archive/sizes) → `features/jobs/paneJobStore` + toolbar `runPaneJob`.
+- **Transfers:** status bar + dest-row `apiRef.updateRows` (`useDestRowUpdates`); do not refetch `['dir']` on progress ticks.
+- **Volumes:** `useVolumes` + `useVolumeEvents`; toolbar `DrivesMenu`.
 
 ## Editor
 

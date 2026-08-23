@@ -1,0 +1,34 @@
+---
+description: Prefer render/event-driven React; avoid useEffect unless there is a real external sync.
+globs: frontend/**/*.{ts,tsx}
+alwaysApply: true
+---
+
+# Avoid useEffect by default
+
+Prefer derived values, event handlers, and store/query updates over `useEffect`. Effects are for syncing with an **external** system (DOM, subscriptions, timers, Wails events), not for computing UI state.
+
+```tsx
+// ❌ BAD — state derived in an effect (extra render, easy loops)
+const [ops, setOps] = useState<Op[]>([]);
+useEffect(() => {
+  setOps(Object.values(byId));
+}, [byId]);
+
+// ✅ GOOD — derive during render
+const ops = Object.values(byId);
+```
+
+```tsx
+// ❌ BAD — fire a store write because props changed
+useEffect(() => {
+  store.setLabel(name);
+}, [name]);
+
+// ✅ GOOD — write in the event that caused the change
+const onRename = (name: string) => store.setLabel(name);
+```
+
+`useEffect` is OK for: one-shot subscriptions (`Events.On`, `addEventListener`) with cleanup, and focusing/measuring the DOM. Do not use it to keep React state in sync with other React state.
+
+Zustand: selectors must return a **cached** snapshot (`s.byId`, a primitive, or `useShallow`). Never `Object.values` / spread / filter **inside** the selector — that new reference makes `useSyncExternalStore` loop.

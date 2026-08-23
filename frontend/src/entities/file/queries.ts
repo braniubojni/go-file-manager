@@ -6,7 +6,7 @@ import {
   SettingsService,
 } from '../../shared/api/bindings';
 import { isRemotePath } from '../../features/connections/helpers';
-import type { AppSettings, GitDirStatus, PaneTabsState, ThemePreference } from './types';
+import type { AppSettings, GitDirStatus, PaneTabsState, ThemePreference, Volume } from './types';
 import { defaultSettings } from './types';
 
 const queryKeys = {
@@ -19,6 +19,7 @@ const queryKeys = {
   bookmarks: ['bookmarks'] as const,
   pathCompletions: (partial: string) => ['pathCompletions', partial] as const,
   paneTabs: ['paneTabs'] as const,
+  volumes: ['volumes'] as const,
 };
 
 export const useHomeDir = () => {
@@ -135,6 +136,13 @@ export const useSearchTree = (
     },
     enabled: Boolean(enabled && root && !isRemotePath(root)),
     staleTime: 2_000,
+  });
+};
+
+export const useVolumes = () => {
+  return useQuery({
+    queryKey: queryKeys.volumes,
+    queryFn: async () => ((await FileService.ListVolumes()) ?? []) as Volume[],
   });
 };
 
@@ -270,18 +278,6 @@ export const useFileOps = () => {
   const invalidate = useInvalidateDirs();
   const qc = useQueryClient();
 
-  const copy = useMutation({
-    mutationFn: ({ sources, destDir }: { sources: string[]; destDir: string }) =>
-      FileService.Copy(sources, destDir),
-    onSuccess: (_d, v) => invalidate(...parentDirs(v.sources), v.destDir),
-  });
-
-  const move = useMutation({
-    mutationFn: ({ sources, destDir }: { sources: string[]; destDir: string }) =>
-      FileService.Move(sources, destDir),
-    onSuccess: (_d, v) => invalidate(...parentDirs(v.sources), v.destDir),
-  });
-
   const del = useMutation({
     mutationFn: (paths: string[]) => FileService.Delete(paths),
     onSuccess: (_d, paths) => invalidate(...parentDirs(paths)),
@@ -319,7 +315,7 @@ export const useFileOps = () => {
     },
   });
 
-  return { copy, move, del, rename, mkdir, mkfile, addBookmark, removeBookmark };
+  return { del, rename, mkdir, mkfile, addBookmark, removeBookmark };
 };
 
 const parentDirs = (paths: string[]): string[] => {

@@ -24,6 +24,7 @@ import type { ThemePreference } from '../../../entities/file/types';
 import type { ToolbarBarProps } from '../types';
 import { BookmarksSelect } from './BookmarksSelect';
 import { ConnectionsMenu } from './ConnectionsMenu';
+import { DrivesMenu } from './DrivesMenu';
 import { FileActionsMenu } from './FileActionsMenu';
 
 export type { ToolbarBarProps } from '../types';
@@ -105,6 +106,7 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
 
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
         <ConnectionsMenu />
+        <DrivesMenu />
 
         <BookmarksSelect activePane={p.activePane} onAddCurrent={p.onBookmark} />
         <Box sx={{ flex: 1 }} />

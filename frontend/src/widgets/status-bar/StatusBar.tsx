@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { useDirListing, useSettings } from '../../entities/file/queries';
 import { usePaneStore } from '../../features/pane/paneStore';
+import { TransferStatusSegment } from './TransferStatusSegment';
 
 export const StatusBar: FC = () => {
   const activePane = usePaneStore((s) => s.activePane);
@@ -47,10 +48,11 @@ export const StatusBar: FC = () => {
         variant="caption"
         color="text.secondary"
         noWrap
-        sx={{ flex: 1, fontFamily: 'monospace' }}
+        sx={{ flex: 1, fontFamily: 'monospace', minWidth: 0 }}
       >
         {path}
       </Typography>
+      <TransferStatusSegment />
       <Typography data-testid="status-items" variant="caption" color="text.secondary">
         Items: {count}
       </Typography>

@@ -8,6 +8,7 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 | ------------ | ----------------------------------------------------------------------------- |
 | `domain`     | Shared models (settings, files, bookmarks)                       |
 | `filesystem` | Local FS: list/copy/move/delete, archive/extract, search, text R/W, dir sizes |
+| `volumes`    | OS mounts list/unmount, DMG attach (darwin), poll watcher                       |
 | `gitstatus`  | Upward-only repo root + one scoped `git status` (no disk-wide `.git` walk)   |
 | `remote`     | SSH/SFTP + SMB (`path.go`, `ssh.go`, `smb.go`)                                |
 | `storage`    | SQLite bookmarks + crypto helpers                                             |
