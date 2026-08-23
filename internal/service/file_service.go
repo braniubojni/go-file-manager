@@ -180,6 +180,14 @@ func (s *FileService) Exists(path string) (bool, error) {
 	return filesystem.Exists(path)
 }
 
+// DiskUsage returns volume capacity for a local path.
+func (s *FileService) DiskUsage(path string) (domain.DiskUsage, error) {
+	if remote.IsRemote(path) {
+		return domain.DiskUsage{}, fmt.Errorf("disk usage is not available on remote paths")
+	}
+	return filesystem.DiskUsage(path)
+}
+
 // Copy copies sources into destDir.
 // jobID from NewJobID enables CancelJob and transfer:progress events; empty is fire-and-forget.
 func (s *FileService) Copy(jobID string, sources []string, destDir string) error {

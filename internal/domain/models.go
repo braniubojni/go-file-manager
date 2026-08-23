@@ -24,6 +24,14 @@ type DirSizes struct {
 	Denied []string         `json:"denied"`
 }
 
+// DiskUsage is capacity of the volume that contains Path.
+type DiskUsage struct {
+	Path  string `json:"path"`
+	Total int64  `json:"total"`
+	Free  int64  `json:"free"` // available to the user (bavail)
+	Used  int64  `json:"used"`
+}
+
 // GitStatusEntry is one child name with a compact git working-tree status.
 // Status is one of: M (modified), A (added), D (deleted), U (unmerged), ? (untracked).
 type GitStatusEntry struct {

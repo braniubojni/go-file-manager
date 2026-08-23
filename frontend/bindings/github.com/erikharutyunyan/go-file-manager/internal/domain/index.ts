@@ -7,6 +7,7 @@ export type {
     ConnectResult,
     ConnectionProfile,
     DirSizes,
+    DiskUsage,
     FileEntry,
     GitDirStatus,
     GitFileDiff,

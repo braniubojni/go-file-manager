@@ -119,6 +119,20 @@ export interface DirSizes {
 }
 
 /**
+ * DiskUsage is capacity of the volume that contains Path.
+ */
+export interface DiskUsage {
+    "path": string;
+    "total": number;
+
+    /**
+     * available to the user (bavail)
+     */
+    "free": number;
+    "used": number;
+}
+
+/**
  * FileEntry is a single directory listing row.
  */
 export interface FileEntry {

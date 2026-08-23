@@ -1,6 +1,12 @@
 import path from "node:path";
 import { test, expect } from "@playwright/test";
-import { waitAppReady, doubleClickRow, expectRowVisible, LEFT_DIR } from "../fixtures/app";
+import {
+  waitAppReady,
+  doubleClickRow,
+  expectRowVisible,
+  selectRow,
+  LEFT_DIR,
+} from "../fixtures/app";
 
 test.describe("ui polish", () => {
   test.beforeEach(async ({ page }) => {
@@ -24,5 +30,14 @@ test.describe("ui polish", () => {
 
     await expect(page.getByTestId("status-path")).toContainText(LEFT_DIR);
     await expectRowVisible(page, "left", "docs");
+  });
+
+  test("status bar shows selection size and free disk space", async ({ page }) => {
+    await selectRow(page, "left", "note.txt");
+    const selected = page.getByTestId("status-selected");
+    await expect(selected).toContainText("Selected: 1");
+    await expect(selected).toHaveText(/Selected: 1 \([^)]*(B|KB)\)/);
+    await expect(page.getByTestId("status-free")).toBeVisible();
+    await expect(page.getByTestId("status-free")).toContainText("Free:");
   });
 });

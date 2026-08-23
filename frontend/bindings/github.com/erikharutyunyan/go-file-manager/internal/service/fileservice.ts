@@ -74,6 +74,13 @@ export function DirChildSizes(jobID: string, dir: string): $CancellablePromise<d
     return $Call.ByID(4082514371, jobID, dir);
 }
 
+/**
+ * DiskUsage returns volume capacity for a local path.
+ */
+export function DiskUsage(path: string): $CancellablePromise<domain$0.DiskUsage> {
+    return $Call.ByID(1676274460, path);
+}
+
 export function Exists(path: string): $CancellablePromise<boolean> {
     return $Call.ByID(2431508164, path);
 }

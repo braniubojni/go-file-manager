@@ -23,6 +23,13 @@ export interface Volume {
   device?: string;
 }
 
+export interface DiskUsage {
+  path: string;
+  total: number;
+  free: number;
+  used: number;
+}
+
 interface TabState {
   path: string;
 }

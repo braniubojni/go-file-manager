@@ -6,7 +6,14 @@ import {
   SettingsService,
 } from '../../shared/api/bindings';
 import { isRemotePath } from '../../features/connections/helpers';
-import type { AppSettings, GitDirStatus, PaneTabsState, ThemePreference, Volume } from './types';
+import type {
+  AppSettings,
+  DiskUsage,
+  GitDirStatus,
+  PaneTabsState,
+  ThemePreference,
+  Volume,
+} from './types';
 import { defaultSettings } from './types';
 
 const queryKeys = {
@@ -20,6 +27,7 @@ const queryKeys = {
   pathCompletions: (partial: string) => ['pathCompletions', partial] as const,
   paneTabs: ['paneTabs'] as const,
   volumes: ['volumes'] as const,
+  diskUsage: (path: string) => ['diskUsage', path] as const,
 };
 
 export const useHomeDir = () => {
@@ -154,6 +162,24 @@ export const useDirListing = (path: string | undefined, showHidden: boolean) => 
       return rows ?? [];
     },
     enabled: Boolean(path),
+  });
+};
+
+export const useDiskUsage = (path: string | undefined) => {
+  const remote = isRemotePath(path);
+  return useQuery({
+    queryKey: queryKeys.diskUsage(path ?? ''),
+    queryFn: async (): Promise<DiskUsage> => {
+      const u = await FileService.DiskUsage(path!);
+      return {
+        path: u.path ?? '',
+        total: u.total ?? 0,
+        free: u.free ?? 0,
+        used: u.used ?? 0,
+      };
+    },
+    enabled: Boolean(path && !remote),
+    staleTime: 10_000,
   });
 };
 
