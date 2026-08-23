@@ -7,12 +7,12 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 | Package      | Role                                                                          |
 | ------------ | ----------------------------------------------------------------------------- |
 | `domain`     | Shared models (settings, files, bookmarks)                       |
-| `filesystem` | Local FS: list/copy/move/delete, archive/extract, search, text R/W, dir sizes |
+| `filesystem` | Local FS: list/copy/move/delete, archive/extract, search, text R/W, dir sizes, `DiskUsage` |
 | `volumes`    | OS mounts list/unmount, DMG attach (darwin), poll watcher                       |
 | `gitstatus`  | Upward-only repo root + one scoped `git status` (no disk-wide `.git` walk)   |
 | `remote`     | SSH/SFTP + SMB (`path.go`, `ssh.go`, `smb.go`)                                |
 | `storage`    | SQLite bookmarks + crypto helpers                                             |
-| `config`     | Config dir, open files in OS (`open_unix` / `open_windows`)                   |
+| `config`     | Config dir, OS open, Open-with (`openwith_*.go`)                              |
 | `service`    | Wails-bound services (thin orchestration over packages above)                 |
 | `version`    | `Version` string; set via `-ldflags` / Task `VERSION`                         |
 
@@ -20,8 +20,8 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 
 Registered in `main.go`:
 
-- `FileService` — FS + remote + jobs cancel
-- `SettingsService` — JSON settings/shortcuts + pane paths
+- `FileService` — FS + remote + jobs cancel; `DiskUsage`, `ListOpenWithApps` / `OpenWith` / `OpenWithPicker`
+- `SettingsService` — JSON settings/shortcuts + pane paths + `GetGridPrefs` / `SaveGridPrefs` KV
 - `BookmarkService` — SQLite
 - `ConnectionService` — SSH/SMB profiles/sessions
 - `TerminalService` — PTY per pane (`_unix` / `_windows`); holds `*application.App` for events

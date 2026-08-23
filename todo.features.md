@@ -38,17 +38,16 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 
 ## UI/UX polish
 
-- [ ] Clickable breadcrumb path segments (not just Autocomplete bar) - `https://mui.com/material-ui/react-breadcrumbs/`
-- [ ] Column customization: show/hide, reorder, per-pane sort persist - `https://mui.com/x/react-data-grid/column-visibility/`
-- [ ] Status bar: selected count, total size, free disk space
-- [ ] Command palette (Cmd+K) for actions/shortcuts discoverability
-- [ ] Toast/undo for delete-to-trash instead of hard delete
-- [ ] Progress dialog for long copy/move ops (verify async status in `internal/filesystem`), progress dialog with minimize functionality, per pane progress(dialog should show source and destination)
+- [x] Clickable breadcrumb path segments (not just Autocomplete bar) - `https://mui.com/material-ui/react-breadcrumbs/`
+- [x] Column customization: show/hide, reorder, per-pane sort persist - `https://mui.com/x/react-data-grid/column-visibility/`
+- [x] Status bar: selected count, total size, free disk space
+- [x] Command palette (Cmd+K) for actions/shortcuts discoverability
+- [x] Toast/undo for delete-to-trash instead of hard delete
 
 ## Editor/terminal
 
-- [ ] Split terminal per pane, cwd synced to active pane
-- [ ] Open-with menu (external app picker per OS)
+- [x] Split terminal per pane, cwd synced to active pane
+- [x] Open-with menu (external app picker per OS)
 
 ## Other
 
@@ -56,3 +55,4 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 - [ ] Disk usage treemap view (like WinDirStat) per folder
 - [ ] Plugin/extension points — low priority, only if long-term extensibility actually needed
 - [ ] New settings to show only in the tray or both tray and system menu
+- [ ] Progress dialog for long copy/move ops (async status, minimize, per-pane source/dest)

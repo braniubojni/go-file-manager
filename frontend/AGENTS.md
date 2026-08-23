@@ -9,7 +9,7 @@ src/
   main.tsx, App.tsx
   app/           # Providers, MUI theme (system/dark/light)
   pages/file-manager/   # Shell: panes, keyboard, path persist
-  widgets/       # file-pane, toolbar, editor, terminal, menu, go-to, status-bar
+  widgets/       # file-pane, toolbar, editor, terminal, menu, go-to, command-palette, status-bar
   features/      # Zustand stores + small dialogs (settings, shortcuts, updates…)
   entities/file/ # TanStack Query hooks + domain TS types
   shared/        # api/bindings re-export, format, shortcuts, ErrorBoundary
@@ -32,7 +32,8 @@ public/          # usually empty; no brand icons here
 ## Data flow
 
 - **Server state:** TanStack Query in `entities/file/queries.ts` → `FileService` / settings / bookmarks via `shared/api/bindings`.
-- **UI state:** Zustand — `features/pane`, `editor`, `terminal`, `file-ops`, `jobs`, `updates`, `ui/*`.
+- **UI state:** Zustand — `features/pane`, `editor`, `terminal`, `file-ops`, `jobs`, `updates`, `ui/*` (grid prefs: `gridPrefsStore`, KV via `SettingsService`).
+- **Command palette:** `widgets/command-palette` + `features/command-palette` (Mod+K); runs catalog ids through `runShortcutAction`.
 - **Jobs:** pane-level busy (copy/archive/sizes) → `features/jobs/paneJobStore` + toolbar `runPaneJob`.
 - **Transfers:** status bar + dest-row `apiRef.updateRows` (`useDestRowUpdates`); do not refetch `['dir']` on progress ticks.
 - **Volumes:** `useVolumes` + `useVolumeEvents`; toolbar `DrivesMenu`.
