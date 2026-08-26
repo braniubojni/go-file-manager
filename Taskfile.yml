@@ -39,19 +39,22 @@ tasks:
           if [ "$(uname -s)" = "Darwin" ]; then
             echo "Launching Docker Desktop..."
             open -a Docker
+            # Mark "we launched it" now, not after the wait succeeds — so a
+            # timed-out wait below still gets cleaned up by docker:maybe-quit
+            # instead of leaving Docker Desktop open forever.
+            touch "$STAMP"
             echo "Waiting for Docker daemon to initialize..."
             tries=0
             until docker info >/dev/null 2>&1; do
               tries=$((tries + 1))
-              if [ "$tries" -ge 60 ]; then
-                echo "Docker did not start within 2 minutes (blocked first-run prompt?). Start it manually and re-run." >&2
+              if [ "$tries" -ge 100 ]; then
+                echo "Docker did not start within 5 minutes (blocked first-run prompt?). Start it manually and re-run." >&2
                 exit 1
               fi
-              sleep 2
+              sleep 3
             done
             echo "=== Docker daemon is up! ==="
             sleep 2 # Extra buffer for socket readiness
-            touch "$STAMP"
           else
             echo "Please start the Docker daemon, then re-run this task." >&2
             exit 1
@@ -180,10 +183,14 @@ tasks:
       - sh: test -n "{{.VERSION}}"
         msg: "VERSION is required, e.g. task dist VERSION=0.1.0"
     cmds:
+      # Registered before docker:ensure runs, not after — so it still fires
+      # (and cleans up Docker Desktop) even if docker:ensure itself fails,
+      # e.g. its own start-wait times out. A defer registered as a later cmd
+      # is never reached if an earlier cmd errors out first.
+      - defer: { task: docker:maybe-quit }
       - task: docker:ensure
         vars:
           LINUX_ARCH: "{{.LINUX_ARCH}}"
-      - defer: { task: docker:maybe-quit }
       - task: dist:build
         vars:
           VERSION: "{{.VERSION}}"
@@ -354,10 +361,18 @@ tasks:
         msg: "VERSION is required, e.g. task release:publish VERSION=0.1.0"
       - sh: ls dist/*.zip dist/*.tar.gz >/dev/null 2>&1
         msg: "dist/ has no release archives — run `task dist VERSION={{.VERSION}}` first"
+      - sh: test -f dist/SHA256SUMS
+        msg: "dist/SHA256SUMS is missing — the in-app updater can't verify a release without it. Re-run `task dist VERSION={{.VERSION}}`."
       - sh: command -v gh >/dev/null 2>&1
         msg: "gh CLI not found — install it: https://cli.github.com"
       - sh: gh auth status >/dev/null 2>&1
         msg: "Not logged in — run `gh auth login` first"
+      - sh: test -z "$(git status --porcelain)"
+        msg: "Working tree is dirty — commit or stash before tagging a release (uncommitted changes wouldn't be in the tagged commit)."
+      - sh: '! git rev-parse --verify --quiet "refs/tags/v{{.VERSION}}" >/dev/null'
+        msg: "Tag v{{.VERSION}} already exists locally — bump VERSION or delete the tag first (git tag -d v{{.VERSION}})."
+      - sh: '! git ls-remote --exit-code --tags origin "v{{.VERSION}}" >/dev/null 2>&1'
+        msg: "Tag v{{.VERSION}} already exists on origin — bump VERSION."
     cmds:
       - |
         set -euo pipefail
