@@ -59,6 +59,7 @@ jobs:
         uses: arduino/setup-task@v2
         with:
           version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Linux webview deps (Wails v3 GTK4 + WebKitGTK 6.0)
         if: matrix.goos == 'linux'

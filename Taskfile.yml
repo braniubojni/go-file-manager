@@ -167,12 +167,15 @@ tasks:
       without QEMU. For CI-like linux/amd64 on arm64 Mac:
         task setup:docker ARCH=amd64 && task dist VERSION=0.1.0 LINUX_ARCH=amd64
       Example: task dist VERSION=0.1.0
-      Upload dist/* to a GitHub Release, or push tag v* to let CI do it.
+      Upload dist/* to a GitHub Release, or push tag v* to let CI do it —
+      or add PUBLISH=true to tag/push/publish automatically once the build
+      succeeds: task dist VERSION=0.1.0 PUBLISH=true (needs `gh auth login`).
     vars:
       DARWIN_ARCH: '{{.DARWIN_ARCH | default "arm64"}}'
       WINDOWS_ARCH: '{{.WINDOWS_ARCH | default "amd64"}}'
       # Host arch (Task ARCH) — arm64 on Apple Silicon, amd64 on Intel/x86_64 Linux.
       LINUX_ARCH: "{{.LINUX_ARCH | default ARCH}}"
+      PUBLISH: '{{.PUBLISH | default "false"}}'
     preconditions:
       - sh: test -n "{{.VERSION}}"
         msg: "VERSION is required, e.g. task dist VERSION=0.1.0"
@@ -193,6 +196,24 @@ tasks:
           DARWIN_ARCH: "{{.DARWIN_ARCH}}"
           WINDOWS_ARCH: "{{.WINDOWS_ARCH}}"
           LINUX_ARCH: "{{.LINUX_ARCH}}"
+      # Only reached if dist:build/dist:archive above succeeded (Task stops
+      # the cmds chain on first failure).
+      - task: dist:maybe-publish
+        vars:
+          VERSION: "{{.VERSION}}"
+          PUBLISH: "{{.PUBLISH}}"
+
+  dist:maybe-publish:
+    internal: true
+    # status (skip-if-true) is Task's native conditional-skip mechanism —
+    # avoids shelling out to a nested `task`/`wails3 task` invocation, which
+    # would need to know how *this* run was invoked.
+    status:
+      - '[ "{{.PUBLISH}}" != "true" ]'
+    cmds:
+      - task: release:publish
+        vars:
+          VERSION: "{{.VERSION}}"
 
   dist:build:
     summary: Compile all platform artifacts for dist/
@@ -320,6 +341,45 @@ tasks:
 
             echo "=== dist/ ready ==="
             ls -lh dist/
+
+  release:publish:
+    summary: Tag, push, and publish an already-built dist/ as a GitHub Release
+    desc: |
+      Requires: `task dist VERSION=...` already run (dist/ populated), and
+      `gh auth login`. Mirrors .github/workflows/release.yml's publish job,
+      but from your own dist/ instead of CI build artifacts.
+      Example: task release:publish VERSION=0.1.0
+    preconditions:
+      - sh: test -n "{{.VERSION}}"
+        msg: "VERSION is required, e.g. task release:publish VERSION=0.1.0"
+      - sh: ls dist/*.zip dist/*.tar.gz >/dev/null 2>&1
+        msg: "dist/ has no release archives — run `task dist VERSION={{.VERSION}}` first"
+      - sh: command -v gh >/dev/null 2>&1
+        msg: "gh CLI not found — install it: https://cli.github.com"
+      - sh: gh auth status >/dev/null 2>&1
+        msg: "Not logged in — run `gh auth login` first"
+    cmds:
+      - |
+        set -euo pipefail
+        TAG="v{{.VERSION}}"
+        git tag "$TAG"
+        git push origin "$TAG"
+        gh release create "$TAG" dist/* --title "$TAG" --generate-notes
+
+  release:local:
+    summary: Full local release — build dist/ then publish it as a GitHub Release
+    desc: |
+      One-shot equivalent of the CI release workflow, run from your machine.
+      Alias for `task dist VERSION=... PUBLISH=true`.
+      Example: task release:local VERSION=0.1.0
+    preconditions:
+      - sh: test -n "{{.VERSION}}"
+        msg: "VERSION is required, e.g. task release:local VERSION=0.1.0"
+    cmds:
+      - task: dist
+        vars:
+          VERSION: "{{.VERSION}}"
+          PUBLISH: "true"
 
   run:
     summary: Runs the application
