@@ -49,7 +49,14 @@ export const FileContextMenu: FC = () => {
   const show = useSnack((s) => s.show);
 
   const remote = isRemotePath(entry?.path ?? panePath);
-  const inArchive = !remote && isArchivePanePath(panePath);
+  // The path heuristic alone can misfire on a real directory literally named
+  // "*.zip" (backend's own SplitArchivePath deliberately excludes that case).
+  // When we have an entry, confirm with its backend-reported access — real
+  // archive members are always listed as "readonly", a real file/dir isn't.
+  // No entry (empty-space right-click) has nothing to confirm with, so the
+  // heuristic alone decides there.
+  const inArchive =
+    !remote && isArchivePanePath(panePath) && (!entry || entry.access === 'readonly');
   const isDir = entry?.isDir ?? false;
   const canBrowse =
     Boolean(entry) && !isDir && !remote && isBrowsableArchive(entry?.name ?? '', entry?.ext ?? '');

@@ -1,6 +1,7 @@
 import { isRemotePath } from '../../features/connections/helpers';
 import { parentDirOf } from '../../features/editor/editorStore';
 import { FileService } from '../api/bindings';
+import { isArchivePanePath } from './archives';
 import { errMessage } from './format';
 
 /** Extension → MIME. Only types we treat as not-for-the-built-in-editor. */
@@ -134,14 +135,19 @@ export const openDocument = (opts: {
 }): void => {
   const { path, useBuiltInEditor, openWorkspace, show } = opts;
   const remote = isRemotePath(path);
+  const inArchive = !remote && isArchivePanePath(path);
   const name = opts.name || basename(path);
   const editable = isBuiltInEditable(name, opts.ext);
-  if (editable && (useBuiltInEditor !== false || remote)) {
+  if (editable && (useBuiltInEditor !== false || remote || inArchive)) {
     openWorkspace(parentDirOf(path), path);
     return;
   }
   if (remote) {
     show('This file type cannot be opened in the built-in editor on remote connections', 'warning');
+    return;
+  }
+  if (inArchive) {
+    show('Extract this file first to open it outside the built-in editor', 'warning');
     return;
   }
   void FileService.Open(path).catch((e) => show(errMessage(e), 'error'));

@@ -40,7 +40,13 @@ tasks:
             echo "Launching Docker Desktop..."
             open -a Docker
             echo "Waiting for Docker daemon to initialize..."
+            tries=0
             until docker info >/dev/null 2>&1; do
+              tries=$((tries + 1))
+              if [ "$tries" -ge 60 ]; then
+                echo "Docker did not start within 2 minutes (blocked first-run prompt?). Start it manually and re-run." >&2
+                exit 1
+              fi
               sleep 2
             done
             echo "=== Docker daemon is up! ==="
