@@ -39,12 +39,9 @@ func copyFileCtx(ctx context.Context, src, dst string, mode os.FileMode, rep *pr
 	}
 	defer func() { _ = out.Close() }()
 
-	stop := context.AfterFunc(ctx, func() {
-		_ = in.Close()
-		_ = out.Close()
-	})
-	defer stop()
-
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := cloneFDs(int(out.Fd()), int(in.Fd())); err == nil {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -58,6 +55,16 @@ func copyFileCtx(ctx context.Context, src, dst string, mode os.FileMode, rep *pr
 	if _, err := in.Seek(0, io.SeekStart); err != nil {
 		return preferCanceled(ctx, err)
 	}
+
+	// AfterFunc registered only around the syscall that can actually block
+	// (copy_file_range et al.) — registering it earlier races Close() against
+	// the .Fd() calls cloneFDs makes above.
+	stop := context.AfterFunc(ctx, func() {
+		_ = in.Close()
+		_ = out.Close()
+	})
+	defer stop()
+
 	if err := copyFileKernel(ctx, in, out, src, dst, rep); err == nil {
 		if err := ctx.Err(); err != nil {
 			return err
