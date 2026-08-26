@@ -5,12 +5,13 @@ package filesystem
 import (
 	"context"
 	"os"
-	"syscall"
 )
 
-func clonePathOS(src, dst string) error {
-	// Kernel CopyFileW; fail if dest exists (we pick UniquePath first).
-	return syscall.CopyFile(src, dst, true)
+// No COW clone on Windows (NTFS has none; CopyFileW is a real byte copy, not
+// a clone, and blocks uncancelably with no progress — worse than the regular
+// byte-copy fallback below, which is cancelable and progress-reported).
+func clonePathOS(_, _ string) error {
+	return errNoClone
 }
 
 func cloneFDs(_, _ int) error {

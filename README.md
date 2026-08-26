@@ -164,13 +164,12 @@ git push origin v0.1.0
 
 Archives must have a **single top-level entry** (Wails extract rule): `.app` / one binary / one `.exe`.
 
-Or release entirely from your machine, no CI (needs `gh auth login` once, Docker for the linux/windows cross-builds) — the same `dist` command you already run to get a local binary, with one flag added once the build succeeds:
+Or release entirely from your machine, no CI (needs `gh auth login` once, Docker for the linux/windows cross-builds):
 
 ```bash
-wails3 task dist VERSION=0.1.0 PUBLISH=true
-# builds dist/ for all 3 platforms, then (only if that succeeded) tags
-# v0.1.0, pushes it, and runs gh release create
-# alias: wails3 task release:local VERSION=0.1.0
+wails3 task release:local VERSION=0.1.0
+# = task dist VERSION=0.1.0  (builds dist/ for all 3 platforms)
+# + task release:publish VERSION=0.1.0  (tags v0.1.0, pushes it, gh release create)
 ```
 
 Or split the two steps (e.g. to inspect `dist/` before publishing):
