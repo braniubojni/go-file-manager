@@ -164,11 +164,20 @@ git push origin v0.1.0
 
 Archives must have a **single top-level entry** (Wails extract rule): `.app` / one binary / one `.exe`.
 
-Or build locally and attach assets yourself:
+Or release entirely from your machine, no CI (needs `gh auth login` once, Docker for the linux/windows cross-builds) — the same `dist` command you already run to get a local binary, with one flag added once the build succeeds:
+
+```bash
+wails3 task dist VERSION=0.1.0 PUBLISH=true
+# builds dist/ for all 3 platforms, then (only if that succeeded) tags
+# v0.1.0, pushes it, and runs gh release create
+# alias: wails3 task release:local VERSION=0.1.0
+```
+
+Or split the two steps (e.g. to inspect `dist/` before publishing):
 
 ```bash
 wails3 task dist VERSION=0.1.0
-# create a release in the GitHub UI and upload dist/* (includes SHA256SUMS)
+wails3 task release:publish VERSION=0.1.0
 ```
 
 The updater’s default asset matcher picks by `GOOS` + `GOARCH` substrings (`darwin`/`windows`/`linux`, `arm64`/`amd64`).
