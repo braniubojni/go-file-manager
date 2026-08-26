@@ -33,8 +33,25 @@ tasks:
         mkdir -p "{{.ROOT_DIR}}/.task"
         rm -f "$STAMP"
 
+        # Fails fast on a real error response ("API version" mismatch between
+        # the docker CLI and Desktop's daemon — happens after a CLI/Desktop
+        # version drift). That's not a "still starting" state: docker info
+        # returns this same error on every call, so blind retrying just
+        # burns the full timeout for nothing. Only "connection refused"/
+        # "daemon not running"-type errors are worth waiting out below.
+        fail_if_api_mismatch() {
+          if printf '%s' "$1" | grep -qi "requested API version"; then
+            echo "Docker CLI/daemon API version mismatch — waiting won't fix this:" >&2
+            printf '%s\n' "$1" >&2
+            echo "Fix: Docker Desktop menu -> Troubleshoot -> Restart Docker Desktop (or fully quit + relaunch), then re-run." >&2
+            exit 1
+          fi
+        }
+
         # 1. Check if Docker daemon is running; start Docker Desktop if not
-        if ! docker info >/dev/null 2>&1; then
+        docker_err=$(docker info 2>&1 >/dev/null) || true
+        if [ -n "$docker_err" ]; then
+          fail_if_api_mismatch "$docker_err"
           echo "=== Docker is not running. ==="
           if [ "$(uname -s)" = "Darwin" ]; then
             echo "Launching Docker Desktop..."
@@ -45,7 +62,8 @@ tasks:
             touch "$STAMP"
             echo "Waiting for Docker daemon to initialize..."
             tries=0
-            until docker info >/dev/null 2>&1; do
+            while ! docker_err=$(docker info 2>&1 >/dev/null); do
+              fail_if_api_mismatch "$docker_err"
               tries=$((tries + 1))
               if [ "$tries" -ge 100 ]; then
                 echo "Docker did not start within 5 minutes (blocked first-run prompt?). Start it manually and re-run." >&2
