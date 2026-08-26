@@ -162,7 +162,7 @@ func sumGrokWindow(sessionsDir string, window time.Duration) (in, out int64, cal
 		if err != nil {
 			return nil
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		i, o, _, c := sumGrokTokens(f)
 		in += i
 		out += o
