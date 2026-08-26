@@ -253,6 +253,115 @@ func isCanceled(err error) bool {
 	return errors.Is(err, context.Canceled)
 }
 
+// TestCopyFileCtxCancelRace stresses the exact window copyFileCtx opens
+// between os.Open/OpenFile and the cloneFDs .Fd() calls: cancel the ctx
+// as early as possible on every iteration so a closer registered before
+// cloneFDs would race Close() against .Fd() (caught by `go test -race`).
+func TestCopyFileCtxCancelRace(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
+	root := t.TempDir()
+	data := []byte("race-bait")
+	for i := 0; i < 100; i++ {
+		src := filepath.Join(root, fmt.Sprintf("src%d.bin", i))
+		dst := filepath.Join(root, fmt.Sprintf("dst%d.bin", i))
+		if err := os.WriteFile(src, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // already canceled before copyFileCtx even opens the files
+		rep := newProgressReporter(int64(len(data)), nil)
+		_ = copyFileCtx(ctx, src, dst, 0o644, rep)
+	}
+}
+
+// TestCopyPathCtxCancelStopsEarly exercises the exact call path MoveCtx uses
+// on cross-device fallback (os.Rename fails -> copyPathCtx -> copyFileCtx),
+// since MoveCtx itself can't be made to hit EXDEV inside a single tmp volume.
+func TestCopyPathCtxCancelStopsEarly(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
+	root := t.TempDir()
+	src := filepath.Join(root, "big.bin")
+	dst := filepath.Join(root, "dst.bin")
+	chunk := make([]byte, 8<<20) // 8MiB, several copyFileUser loop iterations
+	if err := os.WriteFile(src, chunk, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{})
+	rep := newProgressReporter(int64(len(chunk)), func(ev ProgressEvent) {
+		if ev.Done > 0 {
+			select {
+			case <-started:
+			default:
+				close(started)
+			}
+		}
+	})
+	errCh := make(chan error, 1)
+	go func() { errCh <- copyPathCtx(ctx, src, dst, rep) }()
+	select {
+	case <-started:
+		cancel()
+	case <-time.After(5 * time.Second):
+		t.Fatal("progress never started")
+	}
+	if err := <-errCh; err == nil {
+		t.Fatal("expected cancel error")
+	} else if !isCanceled(err) {
+		t.Fatalf("expected canceled error, got %v", err)
+	}
+}
+
+// TestCopyDirCtxCancelStopsEarly covers MoveCtx's cross-device fallback for
+// directory sources (copyPathCtx -> copyDirCtx -> copyFileCtx per entry).
+func TestCopyDirCtxCancelStopsEarly(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
+	root := t.TempDir()
+	srcDir := filepath.Join(root, "src")
+	dstDir := filepath.Join(root, "dst")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	chunk := make([]byte, 512*1024)
+	for i := 0; i < 8; i++ {
+		p := filepath.Join(srcDir, fmt.Sprintf("f%d.bin", i))
+		if err := os.WriteFile(p, chunk, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started := make(chan struct{})
+	rep := newProgressReporter(int64(len(chunk)*8), func(ev ProgressEvent) {
+		if ev.Done > 0 {
+			select {
+			case <-started:
+			default:
+				close(started)
+			}
+		}
+	})
+	errCh := make(chan error, 1)
+	go func() { errCh <- copyDirCtx(ctx, srcDir, dstDir, 0o755, rep) }()
+	select {
+	case <-started:
+		cancel()
+	case <-time.After(5 * time.Second):
+		t.Fatal("progress never started")
+	}
+	if err := <-errCh; err == nil {
+		t.Fatal("expected cancel error")
+	} else if !isCanceled(err) {
+		t.Fatalf("expected canceled error, got %v", err)
+	}
+}
+
 func TestMoveCtxReportsProgressOnRename(t *testing.T) {
 	root := t.TempDir()
 	left := filepath.Join(root, "left")
