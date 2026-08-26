@@ -32,6 +32,9 @@ func copyFileKernel(ctx context.Context, in, out *os.File, src, dst string, rep 
 		n, err := unix.CopyFileRange(rfd, nil, wfd, nil, copyRangeChunk, 0)
 		if n > 0 {
 			rep.addAt(int64(n), src, dst, false)
+			if testAfterChunk != nil {
+				testAfterChunk(ctx)
+			}
 		}
 		if n == 0 && err == nil {
 			return nil

@@ -105,6 +105,13 @@ func reportCopiedFile(src, dst string, rep *progressReporter) error {
 	return nil
 }
 
+// testAfterChunk, when non-nil, runs after every user-space chunk write.
+// Tests use it to block until a ctx they just canceled has actually taken
+// effect, instead of racing wall-clock copy speed against test goroutine
+// scheduling (a fast/small copy can finish before a test's cancel() lands).
+// Nil in production — zero overhead.
+var testAfterChunk func(ctx context.Context)
+
 func copyFileUser(ctx context.Context, in *os.File, out *os.File, src, dst string, rep *progressReporter) error {
 	buf := make([]byte, copyUserBufSize)
 	for {
@@ -122,6 +129,9 @@ func copyFileUser(ctx context.Context, in *os.File, out *os.File, src, dst strin
 			}
 			if nw != nr {
 				return io.ErrShortWrite
+			}
+			if testAfterChunk != nil {
+				testAfterChunk(ctx)
 			}
 		}
 		if rerr == io.EOF {
