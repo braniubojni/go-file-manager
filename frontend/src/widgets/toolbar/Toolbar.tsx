@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { swapPanes } from '../../pages/file-manager/helpers';
+import { openActiveFolderInOtherPane } from '../file-pane/helpers';
 import { ArchiveDialog } from './components/ArchiveDialog';
 import { DeleteDialogs } from './components/DeleteDialogs';
 import { ExtractDialog } from './components/ExtractDialog';
@@ -21,6 +22,7 @@ export const Toolbar: FC = () => {
         onBack={a.goBack}
         onForward={a.goForward}
         onSwapPanes={swapPanes}
+        onSameDir={openActiveFolderInOtherPane}
         onCopy={a.onCopy}
         onMove={a.onMove}
         onMkdir={a.onMkdir}

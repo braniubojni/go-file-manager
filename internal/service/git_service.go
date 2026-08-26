@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
+	"github.com/erikharutyunyan/go-file-manager/internal/filesystem"
 	"github.com/erikharutyunyan/go-file-manager/internal/gitstatus"
 	"github.com/erikharutyunyan/go-file-manager/internal/remote"
 )
@@ -20,7 +21,7 @@ func NewGitService() *GitService {
 // StatusForDir returns git status for immediate children of path.
 // Remote paths and non-repos return an empty result (no error).
 func (s *GitService) StatusForDir(path string) (domain.GitDirStatus, error) {
-	if path == "" || remote.IsRemote(path) {
+	if path == "" || remote.IsRemote(path) || filesystem.IsArchivePath(path) {
 		return domain.GitDirStatus{}, nil
 	}
 	st, err := s.cache.StatusForDir(context.Background(), path)
@@ -42,6 +43,9 @@ func (s *GitService) StatusForDir(path string) (domain.GitDirStatus, error) {
 func (s *GitService) FileDiff(path string) (domain.GitFileDiff, error) {
 	if path == "" || remote.IsRemote(path) {
 		return domain.GitFileDiff{Path: path, Message: "remote paths are not supported"}, nil
+	}
+	if filesystem.IsArchivePath(path) {
+		return domain.GitFileDiff{Path: path, Message: "archive paths are not supported"}, nil
 	}
 	d := s.cache.FileDiff(context.Background(), path)
 	return domain.GitFileDiff{

@@ -22,7 +22,7 @@ import type { FileOpsAction } from '../../features/file-ops/types';
 import { usePaneStore } from '../../features/pane/paneStore';
 import { getPaneGrid } from '../../pages/file-manager/helpers';
 import { SettingsService } from '../../shared/api/bindings';
-import { isArchiveExt } from '../../shared/lib/archives';
+import { isArchiveExt, isArchivePanePath, isBrowsableArchive } from '../../shared/lib/archives';
 import { copyText } from '../../shared/lib/clipboard';
 import { errMessage } from '../../shared/lib/format';
 import { useSnack } from '../../shared/ui/SnackbarHost';
@@ -49,7 +49,10 @@ export const FileContextMenu: FC = () => {
   const show = useSnack((s) => s.show);
 
   const remote = isRemotePath(entry?.path ?? panePath);
+  const inArchive = !remote && isArchivePanePath(panePath);
   const isDir = entry?.isDir ?? false;
+  const canBrowse =
+    Boolean(entry) && !isDir && !remote && isBrowsableArchive(entry?.name ?? '', entry?.ext ?? '');
 
   const act = (fn: () => void) => () => {
     close();
@@ -62,11 +65,16 @@ export const FileContextMenu: FC = () => {
   if (entry) {
     items.push({
       key: 'open',
-      label: isDir ? 'Open folder' : 'Open',
-      icon: isDir ? <FolderOpenIcon fontSize="small" /> : <OpenInNewIcon fontSize="small" />,
+      label: isDir || canBrowse ? 'Open folder' : 'Open',
+      icon:
+        isDir || canBrowse ? (
+          <FolderOpenIcon fontSize="small" />
+        ) : (
+          <OpenInNewIcon fontSize="small" />
+        ),
       run: act(() => getPaneGrid(paneId)?.__gfmOpenFocused?.()),
     });
-    if (!isDir) {
+    if (!isDir && !canBrowse && !inArchive) {
       items.push({
         key: 'edit',
         label: 'Edit',
@@ -74,12 +82,14 @@ export const FileContextMenu: FC = () => {
         run: op('editFile'),
       });
     }
-    items.push({
-      key: 'rename',
-      label: 'Rename…',
-      icon: <DriveFileRenameOutlineIcon fontSize="small" />,
-      run: op('rename'),
-    });
+    if (!inArchive) {
+      items.push({
+        key: 'rename',
+        label: 'Rename…',
+        icon: <DriveFileRenameOutlineIcon fontSize="small" />,
+        run: op('rename'),
+      });
+    }
     items.push({
       key: 'copy',
       label: `Copy to ${otherPane(paneId)} pane`,
@@ -87,16 +97,18 @@ export const FileContextMenu: FC = () => {
       run: op('copy'),
       dividerBefore: true,
     });
-    items.push({
-      key: 'move',
-      label: `Move to ${otherPane(paneId)} pane`,
-      icon: <DriveFileMoveIcon fontSize="small" />,
-      run: op('move'),
-    });
+    if (!inArchive) {
+      items.push({
+        key: 'move',
+        label: `Move to ${otherPane(paneId)} pane`,
+        icon: <DriveFileMoveIcon fontSize="small" />,
+        run: op('move'),
+      });
+    }
 
     // Archive/extract are local-only in the backend, and extracting something
     // that is not an archive just fails deep inside the walk.
-    if (!remote) {
+    if (!remote && !inArchive) {
       items.push({
         key: 'archive',
         label: 'Archive…',
@@ -125,7 +137,7 @@ export const FileContextMenu: FC = () => {
           .catch((e) => show(errMessage(e), 'error'));
       }),
     });
-    if (!remote) {
+    if (!remote && !inArchive) {
       items.push({
         key: 'reveal',
         label: 'Reveal in file manager',
@@ -137,21 +149,23 @@ export const FileContextMenu: FC = () => {
     }
   }
 
-  items.push({
-    key: 'mkdir',
-    label: 'New folder',
-    icon: <CreateNewFolderIcon fontSize="small" />,
-    run: op('mkdir'),
-    dividerBefore: items.length > 0,
-  });
-  items.push({
-    key: 'mkfile',
-    label: 'New file',
-    icon: <NoteAddIcon fontSize="small" />,
-    run: op('mkfile'),
-  });
+  if (!inArchive) {
+    items.push({
+      key: 'mkdir',
+      label: 'New folder',
+      icon: <CreateNewFolderIcon fontSize="small" />,
+      run: op('mkdir'),
+      dividerBefore: items.length > 0,
+    });
+    items.push({
+      key: 'mkfile',
+      label: 'New file',
+      icon: <NoteAddIcon fontSize="small" />,
+      run: op('mkfile'),
+    });
+  }
 
-  if (entry) {
+  if (entry && !inArchive) {
     items.push({
       key: 'delete',
       label: 'Delete',
@@ -180,7 +194,7 @@ export const FileContextMenu: FC = () => {
             slotProps={it.danger ? { primary: { color: 'error' } } : undefined}
           />
         </MenuItem>,
-        it.key === 'open' && entry && !isDir && !remote ? (
+        it.key === 'open' && entry && !isDir && !remote && !canBrowse && !inArchive ? (
           <OpenWithMenu key="open-with" path={entry.path} onDone={close} />
         ) : null,
       ])}

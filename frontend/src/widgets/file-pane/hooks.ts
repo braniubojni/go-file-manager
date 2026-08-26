@@ -23,7 +23,7 @@ import {
 } from '../../entities/file/queries';
 import type { FileEntry, PaneId } from '../../entities/file/types';
 import { isRemotePath } from '../../features/connections/helpers';
-import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
+import { useEditorStore } from '../../features/editor/editorStore';
 import { useContextMenuStore } from '../../features/file-ops/contextMenuStore';
 import { useFolderSizeStore } from '../../features/folder-size/folderSizeStore';
 import { newJobId, usePaneJobStore } from '../../features/jobs/paneJobStore';
@@ -33,7 +33,11 @@ import { startTransfer } from '../../features/transfers/startTransfer';
 import { useDestRowUpdates } from '../../features/transfers/useDestRowUpdates';
 import { useColumnStore } from '../../features/ui/columnStore';
 import { useGridPrefsStore } from '../../features/ui/gridPrefsStore';
+import { useDmgPasswordStore } from '../../features/dmg/dmgPasswordStore';
+import { startAttachDmg } from '../../features/dmg/startAttach';
+import { isBrowsableArchive } from '../../shared/lib/archives';
 import { errMessage } from '../../shared/lib/format';
+import { openDocument } from '../../shared/lib/openDocument';
 import { FileService } from '../../shared/api/bindings';
 import { useSnack } from '../../shared/ui/SnackbarHost';
 import { getColumns } from './consts';
@@ -63,6 +67,7 @@ type GridKeyboardHelpers = {
   __gfmOpenFocused?: () => void;
   __gfmOpenDir?: () => void;
   __gfmToggleMulti?: () => void;
+  __gfmSelectAll?: () => void;
   __gfmFocusHome?: () => void;
   __gfmFocusEnd?: () => void;
 };
@@ -175,21 +180,36 @@ export const useFilePane = (id: PaneId) => {
       return;
     }
     const ext = (entry.ext || entry.name.split('.').pop() || '').toLowerCase();
+    if (!isRemotePath(entry.path) && isBrowsableArchive(entry.name, ext)) {
+      navigate(entry.path);
+      return;
+    }
     if (ext === 'dmg' && !isRemotePath(entry.path)) {
-      void FileService.AttachDiskImage(entry.path)
-        .then((mp) => {
-          if (mp) navigate(mp);
+      const prompt = useDmgPasswordStore.getState().prompt;
+      void FileService.IsEncryptedDiskImage(entry.path)
+        .then((encrypted) => {
+          if (encrypted) {
+            prompt(entry.path, id);
+            return;
+          }
+          startAttachDmg({
+            path: entry.path,
+            show,
+            onMounted: (mp) => navigate(mp),
+            onNeedPassword: (p, err) => prompt(p, id, err),
+          });
         })
         .catch((e) => show(errMessage(e), 'error'));
       return;
     }
-    // Remote files are fine: ReadTextFile/WriteTextFile dispatch over SFTP.
-    // FileService.Open (the "open in OS" path) is the local-only one.
-    if (settings?.useBuiltInEditor !== false || isRemotePath(entry.path)) {
-      openWorkspace(parentDirOf(entry.path), entry.path);
-      return;
-    }
-    void FileService.Open(entry.path).catch((e) => show(errMessage(e), 'error'));
+    openDocument({
+      path: entry.path,
+      name: entry.name,
+      ext,
+      useBuiltInEditor: settings?.useBuiltInEditor !== false,
+      openWorkspace,
+      show,
+    });
   };
 
   const onDropPaths = (
@@ -778,13 +798,16 @@ export const useFileTable = ({
     el.__gfmToggleMulti = () => {
       if (focused) onToggleMulti(focused);
     };
+    el.__gfmSelectAll = () => {
+      onSelect(rows.filter((r) => r.name !== '..').map((r) => r.path));
+    };
     el.__gfmFocusHome = () => {
       if (rows.length) onFocus(rows[0].path);
     };
     el.__gfmFocusEnd = () => {
       if (rows.length) onFocus(rows[rows.length - 1].path);
     };
-  }, [moveFocus, openFocused, openFocusedDirOnly, focused, onToggleMulti, rows, onFocus]);
+  }, [moveFocus, openFocused, openFocusedDirOnly, focused, onToggleMulti, onSelect, rows, onFocus]);
 
   return {
     paneId,

@@ -1,5 +1,6 @@
 import type { AppSettings } from '../../entities/file/types';
-import { enterPaneTab } from '../../widgets/file-pane/helpers';
+import { getPaneGrid } from '../../pages/file-manager/helpers';
+import { enterPaneTab, openActiveFolderInOtherPane } from '../../widgets/file-pane/helpers';
 import { useFileOpsStore } from '../file-ops/fileOpsStore';
 import type { FileOpsAction } from '../file-ops/types';
 import { useGoToStore } from '../go-to/goToStore';
@@ -103,6 +104,15 @@ export const runShortcutAction = (id: string, toggles?: ShortcutToggleFns): void
   if (id === 'switchPane') {
     const s = usePaneStore.getState();
     s.setActivePane(s.activePane === 'left' ? 'right' : 'left');
+    return;
+  }
+  if (id === 'selectAll') {
+    getPaneGrid(usePaneStore.getState().activePane)?.__gfmSelectAll?.();
+    return;
+  }
+  if (id === 'sameDirLeft' || id === 'sameDirRight') {
+    // Always active → inactive, regardless of which arrow/id fired.
+    openActiveFolderInOtherPane();
     return;
   }
   if (id === 'tabNew' || id === 'tabClose' || id === 'tabNext' || id === 'tabPrev') {

@@ -7,7 +7,7 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 | Package      | Role                                                                          |
 | ------------ | ----------------------------------------------------------------------------- |
 | `domain`     | Shared models (settings, files, bookmarks)                       |
-| `filesystem` | Local FS: list/copy/move/delete, archive/extract, search, text R/W, dir sizes, `DiskUsage` |
+| `filesystem` | Local FS: list/copy/move/delete (clonefile/FICLONE then byte copy; 1 stream for large files, ≤4 workers for small files; cancel deletes copy dests), archive/extract, zip/tar virtual folders, search, text R/W, dir sizes, `DiskUsage` |
 | `volumes`    | OS mounts list/unmount, DMG attach (darwin), poll watcher                       |
 | `ports`      | Local TCP LISTEN sockets (`lsof`/`netstat`) + force-kill by PID                 |
 | `gitstatus`  | Upward-only repo root + one scoped `git status` (no disk-wide `.git` walk)   |
@@ -22,7 +22,7 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 Registered in `main.go`:
 
 - `FileService` — FS + remote + jobs cancel; `DiskUsage`, `ListOpenWithApps` / `OpenWith` / `OpenWithPicker`
-- `SettingsService` — JSON settings/shortcuts + pane paths + `GetGridPrefs` / `SaveGridPrefs` KV
+- `SettingsService` — JSON settings/shortcuts + pane paths + `GetGridPrefs` / `SaveGridPrefs` + `GetWindowState` / `SaveWindowState` KV
 - `BookmarkService` — SQLite
 - `ConnectionService` — SSH/SMB profiles/sessions
 - `TerminalService` — PTY per pane (`_unix` / `_windows`); holds `*application.App` for events
@@ -33,6 +33,7 @@ Registered in `main.go`:
 ## Remote paths
 
 - Virtual paths: `ssh://user@host:port/remote/path` or `smb://user@host:port/Share/path` (see `remote.ParseLocation`).
+- Archive browse: pane path is the zip/tar file plus inner members (`/path/to/a.zip/docs`); writes inside archives are rejected (`ErrArchiveReadOnly`).
 - `Location` **embeds** `Spec` → use `loc.JoinPath(...)`, not `loc.Spec.JoinPath` (staticcheck QF1008).
 
 ## Lint / style

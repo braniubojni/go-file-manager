@@ -23,6 +23,22 @@ export const enterPaneTab = (id: PaneId, path: string): void => {
   }
 };
 
+/** Navigate `to` to the same directory as `from` (inactive pane follows source). */
+const copyPaneDir = (from: PaneId, to: PaneId): void => {
+  if (from === to) return;
+  const s = usePaneStore.getState();
+  const path = s.getPath(from);
+  if (!path) return;
+  enterPaneTab(to, path);
+  s.navigate(to, path);
+};
+
+/** Inactive pane opens the active pane's current folder. */
+export const openActiveFolderInOtherPane = (): void => {
+  const s = usePaneStore.getState();
+  copyPaneDir(s.activePane, s.otherPane(s.activePane));
+};
+
 /** History back/forward + enterPaneTab side effects. Returns false if stack empty. */
 export const historyNav = (id: PaneId, dir: 'back' | 'forward'): boolean => {
   const store = usePaneStore.getState();

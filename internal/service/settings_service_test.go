@@ -202,6 +202,41 @@ func TestGridPrefsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestWindowStateDefaultAndRoundTrip(t *testing.T) {
+	svc := newTestSettingsService(t)
+
+	got, err := svc.GetWindowState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Width != domain.DefaultWindowWidth || got.Height != domain.DefaultWindowHeight {
+		t.Fatalf("default window: %+v", got)
+	}
+
+	in := domain.WindowState{Width: 1920, Height: 1080}
+	if err := svc.SaveWindowState(in); err != nil {
+		t.Fatal(err)
+	}
+	out, err := svc.GetWindowState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Width != 1920 || out.Height != 1080 {
+		t.Fatalf("round-trip: %+v", out)
+	}
+
+	if err := svc.SaveWindowState(domain.WindowState{Width: 100, Height: 100}); err != nil {
+		t.Fatal(err)
+	}
+	clamped, err := svc.GetWindowState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if clamped.Width != domain.DefaultWindowWidth || clamped.Height != domain.DefaultWindowHeight {
+		t.Fatalf("too-small should clamp to default: %+v", clamped)
+	}
+}
+
 func assertDefaultPaneGridPrefs(t *testing.T, side string, p domain.PaneGridPrefs) {
 	t.Helper()
 	if p.SortField != "displayName" || p.SortDir != "asc" {

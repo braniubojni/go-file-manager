@@ -1,4 +1,4 @@
-export type TransferKind = 'copy' | 'move';
+export type TransferKind = 'copy' | 'move' | 'attach';
 
 export type TransferOp = {
   jobId: string;

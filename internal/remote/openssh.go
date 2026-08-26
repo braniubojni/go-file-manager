@@ -57,7 +57,7 @@ func dialOpenSSH(spec Spec, password string) (*Session, error) {
 	}
 	done := make(chan pipeResult, 1)
 	go func() {
-		c, e := sftp.NewClientPipe(stdout, stdin)
+		c, e := sftp.NewClientPipe(stdout, stdin, sftpClientOpts()...)
 		done <- pipeResult{c, e}
 	}()
 

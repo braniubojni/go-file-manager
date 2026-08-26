@@ -5,6 +5,7 @@ import {
   expectRowVisible,
   selectRow,
   LEFT_DIR,
+  RIGHT_DIR,
 } from "../fixtures/app";
 
 test.describe("navigation", () => {
@@ -48,6 +49,16 @@ test.describe("navigation", () => {
     await expect(page.getByTestId("status-selected")).toContainText("Selected: 1");
   });
 
+  test("opens text in the built-in editor and skips the editor for pdf", async ({ page }) => {
+    await doubleClickRow(page, "left", "note.txt");
+    await expect(page.getByTestId("editor-workspace")).toBeVisible();
+    await page.getByTestId("btn-editor-close").click();
+    await expect(page.getByTestId("editor-workspace")).toHaveCount(0);
+
+    await doubleClickRow(page, "left", "report.pdf");
+    await expect(page.getByTestId("editor-workspace")).toHaveCount(0);
+  });
+
   test("history back/forward toolbar and Backspace", async ({ page }) => {
     await expect(page.getByTestId("btn-back")).toBeDisabled();
     await expect(page.getByTestId("btn-forward")).toBeDisabled();
@@ -83,5 +94,37 @@ test.describe("navigation", () => {
     await expectRowVisible(page, "left", "readme.md");
     // No error toast about path not found
     await expect(page.getByText(/Path not found/i)).toHaveCount(0);
+  });
+
+  test("same-dir button opens the active folder in the other pane", async ({ page }) => {
+    await doubleClickRow(page, "left", "docs");
+    await expect(page.getByTestId("status-path")).toContainText("docs");
+    await page.getByTestId("btn-same-dir").click();
+
+    await page.getByTestId("pane-right").click();
+    await expect(page.getByTestId("status-path")).toContainText("docs");
+    await expectRowVisible(page, "right", "readme.md");
+    await expect(page.getByTestId("status-path")).not.toContainText(RIGHT_DIR);
+  });
+
+  test("Ctrl+ArrowRight copies the left pane directory to the right pane", async ({ page }) => {
+    await doubleClickRow(page, "left", "docs");
+    await expect(page.getByTestId("status-path")).toContainText("docs");
+    await page.getByTestId("file-grid-left").click();
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowRight",
+          code: "ArrowRight",
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    await page.getByTestId("pane-right").click();
+    await expect(page.getByTestId("status-path")).toContainText("docs");
+    await expectRowVisible(page, "right", "readme.md");
   });
 });

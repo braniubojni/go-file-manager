@@ -44,6 +44,7 @@ func main() {
 	updateSvc := service.NewUpdateService()
 	gitSvc := service.NewGitService()
 	portSvc := service.NewPortService()
+	aiUsageSvc := service.NewAIUsageService()
 
 	app := application.New(application.Options{
 		Name:        "Go File Manager",
@@ -57,6 +58,7 @@ func main() {
 			application.NewService(updateSvc),
 			application.NewService(gitSvc),
 			application.NewService(portSvc),
+			application.NewService(aiUsageSvc),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -96,12 +98,13 @@ func main() {
 		_ = db.Close()
 	})
 
+	winW, winH := loadWindowSize(settingsSvc)
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:          "Go File Manager",
-		Width:          1280,
-		Height:         800,
-		MinWidth:       900,
-		MinHeight:      500,
+		Width:          winW,
+		Height:         winH,
+		MinWidth:       domain.MinWindowWidth,
+		MinHeight:      domain.MinWindowHeight,
 		EnableFileDrop: true,
 		Mac: application.MacWindow{
 			InvisibleTitleBarHeight: 0,
@@ -132,6 +135,7 @@ func main() {
 		}
 		app.Event.Emit("files-dropped", payload)
 	})
+	attachWindowSizePersistence(win, settingsSvc)
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

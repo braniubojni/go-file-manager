@@ -9,10 +9,9 @@ import { useEffect, useMemo, useState, type FC, type KeyboardEvent } from 'react
 import { useSearchTree, useSettings } from '../../entities/file/queries';
 import type { SearchHit } from '../../entities/file/types';
 import { isRemotePath } from '../../features/connections/helpers';
-import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
+import { useEditorStore } from '../../features/editor/editorStore';
 import { usePaneStore } from '../../features/pane/paneStore';
-import { FileService } from '../../shared/api/bindings';
-import { errMessage } from '../../shared/lib/format';
+import { openDocument } from '../../shared/lib/openDocument';
 import { useSnack } from '../../shared/ui/SnackbarHost';
 import { enterPaneTab } from '../file-pane/helpers';
 import { listSx, paperSx, rowSx } from './styles';
@@ -43,11 +42,13 @@ export const GoToDialog: FC<Props> = ({ open, onClose }) => {
       navigate(activePane, hit.path);
       return;
     }
-    if (settings?.useBuiltInEditor !== false) {
-      openWorkspace(parentDirOf(hit.path), hit.path);
-      return;
-    }
-    void FileService.Open(hit.path).catch((e) => show(errMessage(e), 'error'));
+    openDocument({
+      path: hit.path,
+      name: hit.name,
+      useBuiltInEditor: settings?.useBuiltInEditor !== false,
+      openWorkspace,
+      show,
+    });
   };
 
   const onKeyDown = (e: KeyboardEvent) => {

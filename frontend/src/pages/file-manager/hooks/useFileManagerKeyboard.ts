@@ -84,6 +84,19 @@ export const useFileManagerKeyboard = () => {
 
       if (isEditableTarget(e.target)) return;
 
+      // Mod+A: select all in the active pane (skip inputs; editor is handled above).
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        (e.key === 'a' || e.key === 'A') &&
+        (!map.selectAll || matched === 'selectAll')
+      ) {
+        e.preventDefault();
+        runShortcutAction('selectAll', toggles);
+        return;
+      }
+
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
         const pane = usePaneStore.getState().activePane;
         const sel = usePaneStore.getState().getSelection(pane);
@@ -109,6 +122,22 @@ export const useFileManagerKeyboard = () => {
         e.preventDefault();
         historyNav(usePaneStore.getState().activePane, 'forward');
         return;
+      }
+
+      // Ctrl+← / Ctrl+→: inactive pane opens the active pane's folder.
+      // Handled here (like Alt+arrow history) so it works before shortcut
+      // defs load and so DataGrid does not steal the keys.
+      if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        if (e.key === 'ArrowLeft' && (!map.sameDirLeft || matched === 'sameDirLeft')) {
+          e.preventDefault();
+          runShortcutAction('sameDirLeft', toggles);
+          return;
+        }
+        if (e.key === 'ArrowRight' && (!map.sameDirRight || matched === 'sameDirRight')) {
+          e.preventDefault();
+          runShortcutAction('sameDirRight', toggles);
+          return;
+        }
       }
 
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {

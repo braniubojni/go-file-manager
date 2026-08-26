@@ -8,6 +8,7 @@ export type PaneGridApi = HTMLElement & {
   __gfmOpenFocused?: () => void;
   __gfmOpenDir?: () => void;
   __gfmToggleMulti?: () => void;
+  __gfmSelectAll?: () => void;
   __gfmFocusHome?: () => void;
   __gfmFocusEnd?: () => void;
   __gfmStartRename?: (path?: string) => void;
@@ -22,7 +23,10 @@ export const isEditableTarget = (target: EventTarget | null): boolean => {
     tag === 'TEXTAREA' ||
     el.isContentEditable ||
     Boolean(el.closest?.('.xterm')) ||
-    Boolean(el.closest?.('[role="dialog"]'))
+    Boolean(el.closest?.('[role="dialog"]')) ||
+    // MUI Popover/Menu (AI usage, bookmarks, connections, …) render no
+    // role="dialog", so global shortcuts would otherwise leak into them.
+    Boolean(el.closest?.('.MuiPopover-root, .MuiMenu-root'))
   );
 };
 

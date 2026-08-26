@@ -11,6 +11,7 @@ import {
   contextAction,
   fileAction,
   refresh,
+  doubleClickRow,
   LEFT_DIR,
   RIGHT_DIR,
 } from "../fixtures/app";
@@ -201,5 +202,31 @@ test.describe("file operations", () => {
       timeout: 15_000,
     });
     await expect(page.getByTestId("dialog-archive")).toBeHidden();
+  });
+
+  test("browses a zip as a virtual folder and copies a member out", async ({ page }) => {
+    const inner = `zip-inner-${Date.now()}.txt`;
+    fs.writeFileSync(path.join(LEFT_DIR, inner), "inside");
+    await refresh(page);
+    await selectRow(page, "left", inner);
+    const zipBase = `browse-${Date.now()}`;
+    await page.getByTestId("btn-archive").click();
+    await expect(page.getByTestId("dialog-archive")).toBeVisible();
+    await page.getByTestId("input-archive-name").locator("input").fill(zipBase);
+    await page.getByTestId("btn-archive-confirm").click();
+    await expect(page.getByTestId("snackbar")).toContainText("Archive created", {
+      timeout: 15_000,
+    });
+    const zipName = `${zipBase}.zip`;
+    await expectRowVisible(page, "left", zipName);
+    await doubleClickRow(page, "left", zipName);
+    await expect(page.getByTestId("status-path")).toContainText(zipName, { timeout: 10_000 });
+    await expectRowVisible(page, "left", inner);
+    await selectRow(page, "left", inner);
+    await fileAction(page, "btn-copy");
+    await expect(page.getByTestId("snackbar")).toContainText(/Copied|completed/, {
+      timeout: 15_000,
+    });
+    await expectRowVisible(page, "right", inner);
   });
 });

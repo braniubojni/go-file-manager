@@ -19,15 +19,19 @@ import (
 // TrashMaxAge is how long an undoable delete stays on disk.
 const TrashMaxAge = 24 * time.Hour
 
+// maxConcurrentTransfers caps overlapping copy/move/attach jobs.
+const maxConcurrentTransfers = 2
+
 // FileService exposes filesystem operations to the frontend.
 type FileService struct {
-	jobs   sync.Map // jobID -> *jobHandle
-	jobSeq atomic.Uint64
-	remote *remote.Manager
-	smb    *remote.SMBManager
-	trash  *filesystem.Trash
-	app    *application.App
-	vols   *volumes.Manager
+	jobs         sync.Map // jobID -> *jobHandle
+	jobSeq       atomic.Uint64
+	transferGate chan struct{}
+	remote       *remote.Manager
+	smb          *remote.SMBManager
+	trash        *filesystem.Trash
+	app          *application.App
+	vols         *volumes.Manager
 }
 
 type remoteBackend interface {
@@ -48,10 +52,33 @@ type remoteBackend interface {
 
 func NewFileService(remoteMgr *remote.Manager, smbMgr *remote.SMBManager, trashDir string) *FileService {
 	return &FileService{
-		remote: remoteMgr,
-		smb:    smbMgr,
-		trash:  filesystem.NewTrash(trashDir),
-		vols:   volumes.NewManager(),
+		transferGate: make(chan struct{}, maxConcurrentTransfers),
+		remote:       remoteMgr,
+		smb:          smbMgr,
+		trash:        filesystem.NewTrash(trashDir),
+		vols:         volumes.NewManager(),
+	}
+}
+
+func (s *FileService) acquireTransfer(ctx context.Context) error {
+	if s == nil || s.transferGate == nil {
+		return nil
+	}
+	select {
+	case s.transferGate <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (s *FileService) releaseTransfer() {
+	if s == nil || s.transferGate == nil {
+		return
+	}
+	select {
+	case <-s.transferGate:
+	default:
 	}
 }
 
@@ -116,7 +143,7 @@ func (s *FileService) jobCtx(jobID string) context.Context {
 	return context.Background()
 }
 
-// CancelJob cancels a long-running Archive/Extract/DirChildSizes/Copy/Move started with NewJobID.
+// CancelJob cancels a long-running Archive/Extract/DirChildSizes/Copy/Move/Attach started with NewJobID.
 func (s *FileService) CancelJob(jobID string) error {
 	if jobID == "" {
 		return nil
@@ -146,6 +173,9 @@ func (s *FileService) ListDir(path string, showHidden bool) ([]domain.FileEntry,
 		}
 		return be.ListDir(path, showHidden)
 	}
+	if a, inner, ok := filesystem.SplitArchivePath(path); ok {
+		return filesystem.ListArchiveDir(a, inner, showHidden)
+	}
 	entries, err := filesystem.ListDir(path, showHidden)
 	if err != nil {
 		return nil, err
@@ -169,6 +199,11 @@ func (s *FileService) GetHomeDir() (string, error) {
 	return filesystem.HomeDir()
 }
 
+// ICloudDrivePath returns the macOS iCloud Drive folder, or "" if it is not present.
+func (s *FileService) ICloudDrivePath() (string, error) {
+	return filesystem.ICloudDrivePath()
+}
+
 func (s *FileService) Exists(path string) (bool, error) {
 	if remote.IsRemote(path) {
 		be, err := s.backendFor(path)
@@ -176,6 +211,12 @@ func (s *FileService) Exists(path string) (bool, error) {
 			return false, err
 		}
 		return be.Exists(path)
+	}
+	if a, inner, ok := filesystem.SplitArchivePath(path); ok {
+		if inner == "" {
+			return filesystem.Exists(a)
+		}
+		return filesystem.ArchiveMemberExists(a, inner)
 	}
 	return filesystem.Exists(path)
 }
@@ -185,7 +226,18 @@ func (s *FileService) DiskUsage(path string) (domain.DiskUsage, error) {
 	if remote.IsRemote(path) {
 		return domain.DiskUsage{}, fmt.Errorf("disk usage is not available on remote paths")
 	}
+	if a, _, ok := filesystem.SplitArchivePath(path); ok {
+		return filesystem.DiskUsage(a)
+	}
 	return filesystem.DiskUsage(path)
+}
+
+// IsArchivePath reports whether path is a browsable archive or a member inside one.
+func (s *FileService) IsArchivePath(path string) bool {
+	if remote.IsRemote(path) {
+		return false
+	}
+	return filesystem.IsArchivePath(path)
 }
 
 // Copy copies sources into destDir.
@@ -217,6 +269,26 @@ func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir 
 
 	onProgress := s.transferProgress(jobID, kind, label, destDir)
 	ctx := s.jobCtx(jobID)
+	if err := s.acquireTransfer(ctx); err != nil {
+		return err
+	}
+	defer s.releaseTransfer()
+
+	if err := rejectArchiveDest(destDir); err != nil {
+		return err
+	}
+	if n := countInsideArchive(sources); n > 0 {
+		if n != len(sources) {
+			return fmt.Errorf("mixed archive/local selection is not supported")
+		}
+		if remote.IsRemote(destDir) {
+			return fmt.Errorf("copy from archive to remote is not supported yet")
+		}
+		if isMove {
+			return filesystem.ErrArchiveReadOnly
+		}
+		return extractArchiveSources(ctx, sources, destDir)
+	}
 
 	xfer, err := transferKind(sources, destDir)
 	if err != nil {
@@ -364,6 +436,9 @@ func transferKind(sources []string, destDir string) (xferKind, error) {
 // delete cannot be undone: remote (SFTP has no trash) or a cross-volume path
 // that had to be removed outright. The frontend only offers Undo for a non-empty id.
 func (s *FileService) Delete(paths []string) (string, error) {
+	if err := rejectInsideArchive(paths...); err != nil {
+		return "", err
+	}
 	if anyRemote(paths) {
 		if !allRemote(paths) {
 			return "", fmt.Errorf("mixed local/remote delete not supported")
@@ -389,6 +464,9 @@ func (s *FileService) RestoreDeleted(batchID string) error {
 }
 
 func (s *FileService) Rename(oldPath, newName string) (string, error) {
+	if err := rejectInsideArchive(oldPath); err != nil {
+		return "", err
+	}
 	if remote.IsRemote(oldPath) {
 		be, err := s.backendFor(oldPath)
 		if err != nil {
@@ -400,6 +478,9 @@ func (s *FileService) Rename(oldPath, newName string) (string, error) {
 }
 
 func (s *FileService) Mkdir(parent, name string) (string, error) {
+	if err := rejectArchiveWrite(parent); err != nil {
+		return "", err
+	}
 	if remote.IsRemote(parent) {
 		be, err := s.backendFor(parent)
 		if err != nil {
@@ -412,6 +493,9 @@ func (s *FileService) Mkdir(parent, name string) (string, error) {
 
 // CreateFile creates an empty file under parent (local only).
 func (s *FileService) CreateFile(parent, name string) (string, error) {
+	if err := rejectArchiveWrite(parent); err != nil {
+		return "", err
+	}
 	if remote.IsRemote(parent) {
 		return "", fmt.Errorf("create file is not available on remote connections yet")
 	}
@@ -427,11 +511,17 @@ func (s *FileService) ReadTextFile(path string) (string, error) {
 		}
 		return be.ReadTextFile(path)
 	}
+	if a, inner, ok := filesystem.SplitArchivePath(path); ok && inner != "" {
+		return filesystem.ReadArchiveTextFile(a, inner)
+	}
 	return filesystem.ReadTextFile(path)
 }
 
 // WriteTextFile writes a text file from the built-in editor (local or remote).
 func (s *FileService) WriteTextFile(path, content string) error {
+	if err := rejectInsideArchive(path); err != nil {
+		return err
+	}
 	if remote.IsRemote(path) {
 		be, err := s.backendFor(path)
 		if err != nil {
@@ -447,6 +537,9 @@ func (s *FileService) SearchTree(root, query string, showHidden bool, limit int)
 	if remote.IsRemote(root) {
 		return nil, fmt.Errorf("go-to is not available on remote connections yet")
 	}
+	if filesystem.IsArchivePath(root) {
+		return nil, fmt.Errorf("go-to is not available inside archives yet")
+	}
 	return filesystem.SearchTree(root, query, showHidden, limit)
 }
 
@@ -460,6 +553,9 @@ func (s *FileService) StartSearch(
 ) error {
 	if remote.IsRemote(root) {
 		return fmt.Errorf("search is not available on remote connections yet")
+	}
+	if filesystem.IsArchivePath(root) {
+		return fmt.Errorf("search is not available inside archives yet")
 	}
 	if jobID == "" {
 		return fmt.Errorf("jobID required")
@@ -543,6 +639,9 @@ func (s *FileService) runSearch(
 
 // ReplaceOccurrence replaces one content match at path:line:column.
 func (s *FileService) ReplaceOccurrence(path, find, replace string, line, column int, caseSensitive bool) error {
+	if err := rejectInsideArchive(path); err != nil {
+		return err
+	}
 	if remote.IsRemote(path) {
 		return fmt.Errorf("replace is not available on remote connections yet")
 	}
@@ -551,6 +650,9 @@ func (s *FileService) ReplaceOccurrence(path, find, replace string, line, column
 
 // ReplaceAllInPaths replaces find with replace in each path (all occurrences per file).
 func (s *FileService) ReplaceAllInPaths(paths []string, find, replace string, caseSensitive bool) (domain.ReplaceAllResult, error) {
+	if err := rejectInsideArchive(paths...); err != nil {
+		return domain.ReplaceAllResult{}, err
+	}
 	for _, p := range paths {
 		if remote.IsRemote(p) {
 			return domain.ReplaceAllResult{}, fmt.Errorf("replace is not available on remote connections yet")
@@ -578,12 +680,18 @@ func (s *FileService) Open(path string) error {
 	if remote.IsRemote(path) {
 		return fmt.Errorf("open is not supported for remote paths yet")
 	}
+	if filesystem.IsInsideArchive(path) {
+		return filesystem.ErrArchiveReadOnly
+	}
 	return config.OpenInOS(path)
 }
 
 func rejectRemoteOpenWith(path string) error {
 	if remote.IsRemote(path) {
 		return fmt.Errorf("open with is not supported for remote paths")
+	}
+	if filesystem.IsInsideArchive(path) {
+		return filesystem.ErrArchiveReadOnly
 	}
 	return nil
 }
@@ -617,6 +725,9 @@ func (s *FileService) OpenWithPicker(path string) error {
 // jobID from NewJobID enables CancelJob; empty jobID is non-cancellable.
 func (s *FileService) DirChildSizes(jobID string, dir string) (domain.DirSizes, error) {
 	defer func() { _ = s.FinishJob(jobID) }()
+	if filesystem.IsArchivePath(dir) {
+		return domain.DirSizes{Sizes: map[string]int64{}, Denied: []string{}}, nil
+	}
 	if remote.IsRemote(dir) {
 		be, err := s.backendFor(dir)
 		if err != nil {
@@ -661,6 +772,9 @@ func (s *FileService) Archive(jobID string, sources []string, destPath, format, 
 	if anyRemote(sources) || remote.IsRemote(destPath) {
 		return fmt.Errorf("archive is not supported for remote paths yet")
 	}
+	if err := rejectInsideArchive(append(sources, destPath)...); err != nil {
+		return err
+	}
 	return filesystem.Archive(s.jobCtx(jobID), sources, destPath, format, password)
 }
 
@@ -669,6 +783,9 @@ func (s *FileService) Archive(jobID string, sources []string, destPath, format, 
 func (s *FileService) Extract(jobID string, archivePath, destDir, password string) error {
 	if remote.IsRemote(archivePath) || remote.IsRemote(destDir) {
 		return fmt.Errorf("extract is not supported for remote paths yet")
+	}
+	if filesystem.IsInsideArchive(archivePath) || filesystem.IsArchivePath(destDir) {
+		return filesystem.ErrArchiveReadOnly
 	}
 	return filesystem.Extract(s.jobCtx(jobID), archivePath, destDir, password)
 }

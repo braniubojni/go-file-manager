@@ -68,6 +68,14 @@ export function GetShortcutsPath(): $CancellablePromise<string> {
 }
 
 /**
+ * GetWindowState returns the last saved main-window size. Missing or invalid
+ * blobs yield the default size (wide enough for every file-grid column).
+ */
+export function GetWindowState(): $CancellablePromise<domain$0.WindowState> {
+    return $Call.ByID(3771019838);
+}
+
+/**
  * ListSearchHistory returns newest-first history for field (max 500).
  */
 export function ListSearchHistory(field: string, limit: number): $CancellablePromise<string[] | null> {
@@ -114,4 +122,11 @@ export function SaveSettings(settings: domain$0.Settings): $CancellablePromise<v
 
 export function SaveShortcuts(shortcuts: { [_ in string]?: string } | null): $CancellablePromise<void> {
     return $Call.ByID(695437449, shortcuts);
+}
+
+/**
+ * SaveWindowState persists the main-window size for the next launch.
+ */
+export function SaveWindowState(st: domain$0.WindowState): $CancellablePromise<void> {
+    return $Call.ByID(1734824719, st);
 }

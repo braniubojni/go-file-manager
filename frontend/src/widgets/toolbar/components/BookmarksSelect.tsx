@@ -8,6 +8,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import type { FC } from 'react';
 import { useBookmarks, useFileOps } from '../../../entities/file/queries';
+import { isRemotePath } from '../../../features/connections/helpers';
 import { ensureSessionThenNavigate } from '../../../features/connections/navigate';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
@@ -20,24 +21,29 @@ import {
 } from '../styles';
 import type { BookmarksSelectProps } from '../types';
 
+type BookmarkGroup = 'Add' | 'Local' | 'Remote';
+
 type Option =
-  | { kind: 'add'; group: 'Add'; label: string }
-  | { kind: 'bookmark'; group: 'Bookmarks'; label: string; id: number; path: string };
+  | { kind: 'add'; group: BookmarkGroup; label: string }
+  | { kind: 'bookmark'; group: BookmarkGroup; label: string; id: number; path: string };
 
 export const BookmarksSelect: FC<BookmarksSelectProps> = ({ activePane, onAddCurrent }) => {
   const { data: bookmarks = [] } = useBookmarks();
   const ops = useFileOps();
   const show = useSnack((s) => s.show);
 
+  const toOption = (b: (typeof bookmarks)[number], group: BookmarkGroup): Option => ({
+    kind: 'bookmark',
+    group,
+    label: b.name || b.path,
+    id: b.id,
+    path: b.path,
+  });
+
   const options: Option[] = [
     { kind: 'add', group: 'Add', label: 'Add current path' },
-    ...bookmarks.map<Option>((b) => ({
-      kind: 'bookmark',
-      group: 'Bookmarks',
-      label: b.name || b.path,
-      id: b.id,
-      path: b.path,
-    })),
+    ...bookmarks.filter((b) => !isRemotePath(b.path)).map((b) => toOption(b, 'Local')),
+    ...bookmarks.filter((b) => isRemotePath(b.path)).map((b) => toOption(b, 'Remote')),
   ];
 
   return (

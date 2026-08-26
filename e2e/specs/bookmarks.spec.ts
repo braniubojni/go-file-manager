@@ -32,6 +32,7 @@ test.describe("bookmarks", () => {
     await expect(page.getByTestId("status-path")).toContainText(LEFT_DIR);
 
     await page.getByTestId("input-bookmarks").locator("input").click();
+    await expect(page.getByText("Local", { exact: true })).toBeVisible();
     await page
       .getByRole("option", { name: new RegExp(folder) })
       .first()

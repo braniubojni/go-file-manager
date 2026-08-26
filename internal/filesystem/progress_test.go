@@ -1,11 +1,13 @@
 package filesystem
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -86,7 +88,54 @@ func TestCopyCtxReportsByteProgress(t *testing.T) {
 	}
 }
 
+func TestCopyCtxProgressPerDestFile(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
+	root := t.TempDir()
+	srcDir := filepath.Join(root, "src")
+	dstDir := filepath.Join(root, "dst")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	payload := bytes.Repeat([]byte("q"), 48*1024)
+	var sources []string
+	for _, name := range []string{"one.bin", "two.bin", "three.bin"} {
+		p := filepath.Join(srcDir, name)
+		if err := os.WriteFile(p, payload, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		sources = append(sources, p)
+	}
+
+	maxByDest := map[string]int64{}
+	var mu sync.Mutex
+	if err := CopyCtx(context.Background(), sources, dstDir, func(ev ProgressEvent) {
+		if ev.DestPath == "" {
+			return
+		}
+		mu.Lock()
+		if ev.DestSize > maxByDest[ev.DestPath] {
+			maxByDest[ev.DestPath] = ev.DestSize
+		}
+		mu.Unlock()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	want := int64(len(payload))
+	for _, name := range []string{"one.bin", "two.bin", "three.bin"} {
+		p := filepath.Join(dstDir, name)
+		if maxByDest[p] != want {
+			t.Fatalf("%s dest progress max=%d want %d (map=%v)", name, maxByDest[p], want, maxByDest)
+		}
+	}
+}
+
 func TestCopyCtxCancelStopsEarly(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
 	root := t.TempDir()
 	srcDir := filepath.Join(root, "src")
 	dstDir := filepath.Join(root, "dst")
@@ -148,6 +197,8 @@ func TestCopyCtxCancelStopsEarly(t *testing.T) {
 }
 
 func TestCopyCtxCancelRemovesDestDir(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
 	root := t.TempDir()
 	srcDir := filepath.Join(root, "src")
 	dstDir := filepath.Join(root, "dst")

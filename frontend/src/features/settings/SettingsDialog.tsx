@@ -122,7 +122,7 @@ const SettingsDialog: FC<Props> = ({ open, onClose }) => {
             />
           </Tooltip>
 
-          <Tooltip title="Open text files in the built-in editor instead of the system app.">
+          <Tooltip title="Open text and code in the built-in editor. Images, PDFs, Office files, and other binary types always use the system app.">
             <FormControlLabel
               control={
                 <Switch

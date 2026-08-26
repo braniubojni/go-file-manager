@@ -4,7 +4,8 @@ import DialogContent from '@mui/material/DialogContent';
 import { useCallback, useEffect, useState, type FC } from 'react';
 import { useSettings } from '../../entities/file/queries';
 import { isRemotePath } from '../../features/connections/helpers';
-import { parentDirOf, useEditorStore } from '../../features/editor/editorStore';
+import { useEditorStore } from '../../features/editor/editorStore';
+import { openDocument } from '../../shared/lib/openDocument';
 import { usePaneStore } from '../../features/pane/paneStore';
 import { FileService, SettingsService } from '../../shared/api/bindings';
 import { errMessage } from '../../shared/lib/format';
@@ -142,11 +143,12 @@ export const SearchDialog: FC<Props> = ({ open, onClose }) => {
         return;
       }
       onClose();
-      if (settings?.useBuiltInEditor !== false) {
-        openWorkspace(parentDirOf(r.hit.path), r.hit.path);
-        return;
-      }
-      void FileService.Open(r.hit.path).catch((e) => show(errMessage(e), 'error'));
+      openDocument({
+        path: r.hit.path,
+        useBuiltInEditor: settings?.useBuiltInEditor !== false,
+        openWorkspace,
+        show,
+      });
     },
     [activePane, navigate, onClose, openWorkspace, results, settings?.useBuiltInEditor, show],
   );

@@ -8,6 +8,7 @@ import { useTransferEvents } from '../../features/transfers/useTransferEvents';
 import { useVolumeEvents } from '../../features/volumes/useVolumeEvents';
 import { useDialogStore } from '../../features/ui/dialogStore';
 import { useAutoUpdateCheck } from '../../features/updates/hooks/useAutoUpdateCheck';
+import { DmgPasswordDialog } from '../../features/dmg/DmgPasswordDialog';
 import { FileContextMenu } from '../../widgets/file-pane/FileContextMenu';
 import { FilePane } from '../../widgets/file-pane/FilePane';
 import { CommandPaletteHost } from '../../widgets/command-palette/CommandPaletteHost';
@@ -89,6 +90,7 @@ export const FileManagerPage: FC = () => {
         </Box>
       )}
       {!editorOpen && <StatusBar />}
+      <DmgPasswordDialog />
       <GoToHost />
       <CommandPaletteHost />
       <SearchHost />
