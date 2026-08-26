@@ -369,9 +369,9 @@ tasks:
         msg: "Not logged in — run `gh auth login` first"
       - sh: test -z "$(git status --porcelain)"
         msg: "Working tree is dirty — commit or stash before tagging a release (uncommitted changes wouldn't be in the tagged commit)."
-      - sh: '! git rev-parse "v{{.VERSION}}" >/dev/null 2>&1'
+      - sh: '! git rev-parse --verify --quiet "refs/tags/v{{.VERSION}}" >/dev/null'
         msg: "Tag v{{.VERSION}} already exists locally — bump VERSION or delete the tag first (git tag -d v{{.VERSION}})."
-      - sh: '! git ls-remote --tags origin "refs/tags/v{{.VERSION}}" | grep -q .'
+      - sh: '! git ls-remote --exit-code --tags origin "v{{.VERSION}}" >/dev/null 2>&1'
         msg: "Tag v{{.VERSION}} already exists on origin — bump VERSION."
     cmds:
       - |
