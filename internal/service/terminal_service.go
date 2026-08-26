@@ -5,6 +5,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/erikharutyunyan/go-file-manager/internal/filesystem"
 	"github.com/erikharutyunyan/go-file-manager/internal/remote"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -82,7 +83,7 @@ func (t *TerminalService) Start(paneID, cwd string) error {
 		}
 		handle, err = spawnRemotePTY(t.remote, cwd, defaultCols, defaultRows)
 	} else {
-		handle, err = spawnLocalPTY(cwd, defaultCols, defaultRows)
+		handle, err = spawnLocalPTY(filesystem.LocalShellDir(cwd), defaultCols, defaultRows)
 	}
 	if err != nil {
 		return err
@@ -180,13 +181,15 @@ func (t *TerminalService) SetCwd(paneID, cwd string) error {
 	if !ok {
 		return nil
 	}
-	shellPath := cwd
+	var shellPath string
 	if remote.IsRemote(cwd) {
 		loc, err := remote.ParseLocation(cwd)
 		if err != nil {
 			return err
 		}
 		shellPath = loc.RemotePath
+	} else {
+		shellPath = filesystem.LocalShellDir(cwd)
 	}
 	return h.Write(fmt.Sprintf("cd %q\n", shellPath))
 }

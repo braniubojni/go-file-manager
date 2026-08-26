@@ -1,7 +1,7 @@
 package volumes
 
 import (
-	"fmt"
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -52,7 +52,7 @@ func (m *Manager) Unmount(path string) error {
 	return nil
 }
 
-func (m *Manager) AttachDiskImage(path string) (string, error) {
+func (m *Manager) AttachDiskImage(ctx context.Context, path, password string, onProgress func(float64)) (string, error) {
 	abs, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return "", err
@@ -63,7 +63,7 @@ func (m *Manager) AttachDiskImage(path string) (string, error) {
 	if mp := m.mountForImage(abs); mp != "" {
 		return mp, nil
 	}
-	mp, err := attachDiskImage(abs)
+	mp, err := attachDiskImage(ctx, abs, password, onProgress)
 	if err != nil {
 		return "", err
 	}
@@ -71,6 +71,18 @@ func (m *Manager) AttachDiskImage(path string) (string, error) {
 	m.attach[mp] = abs
 	m.mu.Unlock()
 	return mp, nil
+}
+
+// IsEncryptedDiskImage reports whether path is an encrypted disk image.
+func (m *Manager) IsEncryptedDiskImage(path string) (bool, error) {
+	abs, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return false, err
+	}
+	if _, err := os.Stat(abs); err != nil {
+		return false, err
+	}
+	return imageIsEncrypted(abs), nil
 }
 
 func (m *Manager) ParentOverride(dir string) string {
@@ -165,8 +177,4 @@ func classify(path, fs string, images map[string]string, rootDevs map[string]str
 		v.Unmountable = true
 	}
 	return v
-}
-
-func errUnsupportedImage() error {
-	return fmt.Errorf("disk images are only supported on macOS")
 }

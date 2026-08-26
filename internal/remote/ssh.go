@@ -141,7 +141,7 @@ func (m *Manager) connectNative(spec Spec, password string) error {
 		return fmt.Errorf("ssh dial %s: %w", spec.DialAddr(), err)
 	}
 
-	sftpClient, err := sftp.NewClient(conn)
+	sftpClient, err := sftp.NewClient(conn, sftpClientOpts()...)
 	if err != nil {
 		_ = conn.Close()
 		return fmt.Errorf("sftp: %w", err)
@@ -754,7 +754,7 @@ func (m *Manager) CopyWithinCtx(ctx context.Context, sources []string, destDir s
 		st, statErr := ds.sftp.Stat(sloc.RemotePath)
 		srcIsDir := statErr == nil && st.IsDir()
 		rep.setDest(dloc.JoinPath(dest), srcIsDir)
-		if err := copyRemoteCtx(ctx, ds.sftp, sloc.RemotePath, dest, rep); err != nil {
+		if err := copyRemoteCtx(ctx, ds, sloc.RemotePath, dest, rep); err != nil {
 			return err
 		}
 	}
@@ -824,8 +824,8 @@ func (m *Manager) MoveWithinCtx(ctx context.Context, sources []string, destDir s
 		srcIsDir := statErr == nil && st.IsDir()
 		rep.setDest(dloc.JoinPath(dest), srcIsDir)
 		if err := ds.sftp.Rename(sloc.RemotePath, dest); err != nil {
-			if err2 := copyRemoteCtx(ctx, ds.sftp, sloc.RemotePath, dest, rep); err2 != nil {
-				return err
+			if err2 := copyRemoteCtx(ctx, ds, sloc.RemotePath, dest, rep); err2 != nil {
+				return err2
 			}
 			if err2 := removeAll(ds.sftp, sloc.RemotePath); err2 != nil {
 				return err2
@@ -838,13 +838,27 @@ func (m *Manager) MoveWithinCtx(ctx context.Context, sources []string, destDir s
 	return nil
 }
 
-func copyRemoteCtx(ctx context.Context, c *sftp.Client, src, dst string, rep *remoteProgress) error {
+func copyRemoteCtx(ctx context.Context, s *Session, src, dst string, rep *remoteProgress) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	c := s.sftp
 	st, err := c.Stat(src)
 	if err != nil {
 		return err
+	}
+	if err := s.remoteCP(ctx, src, dst); err == nil {
+		n := st.Size()
+		if st.IsDir() {
+			n, err = remotePathBytes(c, src)
+			if err != nil || n <= 0 {
+				n = 1
+			}
+		} else if n <= 0 {
+			n = 1
+		}
+		rep.add(n, src)
+		return nil
 	}
 	if st.IsDir() {
 		if err := c.MkdirAll(dst); err != nil {
@@ -858,7 +872,7 @@ func copyRemoteCtx(ctx context.Context, c *sftp.Client, src, dst string, rep *re
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if err := copyRemoteCtx(ctx, c, path.Join(src, e.Name()), path.Join(dst, e.Name()), rep); err != nil {
+			if err := copyRemoteCtx(ctx, s, path.Join(src, e.Name()), path.Join(dst, e.Name()), rep); err != nil {
 				return err
 			}
 		}
@@ -874,11 +888,7 @@ func copyRemoteCtx(ctx context.Context, c *sftp.Client, src, dst string, rep *re
 		return err
 	}
 	defer func() { _ = out.Close() }()
-	reader := io.Reader(in)
-	if rep != nil && rep.on != nil {
-		reader = &ctxCountingReader{r: in, path: src, report: rep, ctx: ctx}
-	}
-	if _, err = io.Copy(out, reader); err != nil {
+	if err := copyUnwrapped(ctx, out, in, src, st.Size(), nil, rep); err != nil {
 		return err
 	}
 	return out.Close()

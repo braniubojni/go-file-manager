@@ -35,6 +35,7 @@ export type ToolbarBarProps = {
   onBack: () => void;
   onForward: () => void;
   onSwapPanes: () => void;
+  onSameDir: () => void;
   onCopy: () => void;
   onMove: () => void;
   onMkdir: () => void;

@@ -294,22 +294,60 @@ func (r *remoteProgress) finish(currentPath string) {
 	r.on(r.eventLocked(currentPath))
 }
 
-type ctxCountingReader struct {
-	r      io.Reader
-	path   string
-	report *remoteProgress
-	ctx    context.Context
-}
+// copyUnwrapped uses io.Copy so *sftp.File WriteTo/ReadFrom (concurrent
+// packets) stay enabled. Progress is polled from destSize; cancel closes src/dst.
+func copyUnwrapped(ctx context.Context, dst io.Writer, src io.Reader, path string, knownSize int64, destSize func() int64, rep *remoteProgress) error {
+	stop := context.AfterFunc(ctx, func() {
+		if c, ok := src.(io.Closer); ok {
+			_ = c.Close()
+		}
+		if c, ok := dst.(io.Closer); ok {
+			_ = c.Close()
+		}
+	})
+	defer stop()
 
-func (c *ctxCountingReader) Read(p []byte) (int, error) {
-	if err := c.ctx.Err(); err != nil {
-		return 0, err
+	var last int64
+	flush := func() {
+		if destSize != nil {
+			n := destSize()
+			if n > last {
+				rep.add(n-last, path)
+				last = n
+			}
+			return
+		}
+		if knownSize > last {
+			rep.add(knownSize-last, path)
+			last = knownSize
+		}
 	}
-	n, err := c.r.Read(p)
-	if n > 0 {
-		c.report.add(int64(n), c.path)
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(dst, src)
+		errCh <- err
+	}()
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case err := <-errCh:
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if err == nil || destSize != nil {
+				flush()
+			}
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-tick.C:
+			if destSize != nil {
+				flush()
+			}
+		}
 	}
-	return n, err
 }
 
 func downloadPathCtx(ctx context.Context, c *sftp.Client, remotePath, localPath string, rep *remoteProgress) error {
@@ -370,11 +408,18 @@ func downloadFileCtx(ctx context.Context, c *sftp.Client, remotePath, localPath 
 	}
 	defer func() { _ = out.Close() }()
 
-	reader := io.Reader(in)
-	if rep != nil && rep.on != nil {
-		reader = &ctxCountingReader{r: in, path: remotePath, report: rep, ctx: ctx}
+	var known int64
+	if st, err := in.Stat(); err == nil {
+		known = st.Size()
 	}
-	if _, err := io.Copy(out, reader); err != nil {
+	destSize := func() int64 {
+		st, err := out.Stat()
+		if err != nil {
+			return 0
+		}
+		return st.Size()
+	}
+	if err := copyUnwrapped(ctx, out, in, remotePath, known, destSize, rep); err != nil {
 		return err
 	}
 	return out.Close()
@@ -440,11 +485,18 @@ func uploadFileCtx(ctx context.Context, c *sftp.Client, localPath, remotePath st
 	}
 	defer func() { _ = out.Close() }()
 
-	reader := io.Reader(in)
-	if rep != nil && rep.on != nil {
-		reader = &ctxCountingReader{r: in, path: localPath, report: rep, ctx: ctx}
+	var known int64
+	if st, err := in.Stat(); err == nil {
+		known = st.Size()
 	}
-	if _, err := io.Copy(out, reader); err != nil {
+	destSize := func() int64 {
+		st, err := out.Stat()
+		if err != nil {
+			return 0
+		}
+		return st.Size()
+	}
+	if err := copyUnwrapped(ctx, out, in, localPath, known, destSize, rep); err != nil {
 		return err
 	}
 	if err := out.Close(); err != nil {

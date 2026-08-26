@@ -6,8 +6,11 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useState, type FC } from 'react';
+import { useSettings } from '../../entities/file/queries';
 import { isRemotePath } from '../../features/connections/helpers';
 import { useEditorStore } from '../../features/editor/editorStore';
+import { openDocument } from '../../shared/lib/openDocument';
+import { useSnack } from '../../shared/ui/SnackbarHost';
 import { CodeMirrorPane } from './CodeMirrorPane';
 import { DiffMergePane } from './DiffMergePane';
 import { EditorHeader } from './EditorHeader';
@@ -34,6 +37,8 @@ export const EditorWorkspace: FC = () => {
   const [pendingMode, setPendingMode] = useState<'diff' | null>(null);
 
   const remote = isRemotePath(filePath);
+  const show = useSnack((s) => s.show);
+  const { data: settings } = useSettings();
 
   const requestClose = () => {
     if (mode === 'edit' && dirty) {
@@ -45,13 +50,21 @@ export const EditorWorkspace: FC = () => {
 
   const openFile = (path: string) => {
     if (path === filePath && mode === 'edit') return;
-    if (mode === 'edit' && dirty) {
-      setPendingPath(path);
-      setPendingMode(null);
-      setConfirmClose(true);
-      return;
-    }
-    setFilePath(path);
+    openDocument({
+      path,
+      useBuiltInEditor: settings?.useBuiltInEditor !== false,
+      // Stay inside this workspace's tree — switch the file, don't reset root.
+      openWorkspace: (_root, file) => {
+        if (mode === 'edit' && dirty) {
+          setPendingPath(file);
+          setPendingMode(null);
+          setConfirmClose(true);
+          return;
+        }
+        setFilePath(file);
+      },
+      show,
+    });
   };
 
   const onShowDiff = () => {

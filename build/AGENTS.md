@@ -38,6 +38,8 @@ task setup:docker          # once (Linux cross) — host arch image
 task dist VERSION=0.1.0    # → dist/* named for updater + release.yml
 ```
 
+`task dist` starts Docker Desktop on macOS when the daemon is down, and **quits it at the end of that run** (including on failure) only if this dist started it. It does not quit Docker that was already running, and does not auto-quit after `build:linux` / `setup:docker`.
+
 Defaults: darwin/arm64 `.app` zip, windows/amd64 zip, **linux/\<host arch\>** tar.gz
 (so Apple Silicon produces `linux_arm64` and matches host `wails-cross`).
 

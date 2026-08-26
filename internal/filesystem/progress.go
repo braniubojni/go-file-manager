@@ -2,12 +2,9 @@ package filesystem
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
@@ -76,13 +73,21 @@ type progressReporter struct {
 	destPath  string
 	destSize  int64
 	destIsDir bool
+	written   map[string]int64
+	emitAt    map[string]time.Time
 	on        ProgressFunc
 	lastEmit  time.Time
 	force     bool
 }
 
 func newProgressReporter(total int64, on ProgressFunc) *progressReporter {
-	return &progressReporter{total: total, on: on, force: true}
+	return &progressReporter{
+		total:   total,
+		on:      on,
+		force:   true,
+		written: make(map[string]int64),
+		emitAt:  make(map[string]time.Time),
+	}
 }
 
 func (r *progressReporter) eventLocked(currentPath string) ProgressEvent {
@@ -103,30 +108,94 @@ func (r *progressReporter) setDest(path string, isDir bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.destPath = path
-	r.destSize = 0
 	r.destIsDir = isDir
+	r.destSize = r.written[path]
 	r.lastEmit = time.Now()
 	r.force = true
 	r.on(r.eventLocked(""))
 }
 
 func (r *progressReporter) add(n int64, currentPath string) {
-	if r == nil || r.on == nil || n == 0 && currentPath == "" {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	destPath, destIsDir := r.destPath, r.destIsDir
+	r.mu.Unlock()
+	r.addAt(n, currentPath, destPath, destIsDir)
+}
+
+func (r *progressReporter) addAt(n int64, currentPath, destPath string, destIsDir bool) {
+	if r == nil || r.on == nil || n == 0 && currentPath == "" && destPath == "" {
 		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.done += n
-	r.destSize += n
+	if destPath != "" {
+		r.written[destPath] += n
+		r.destPath = destPath
+		r.destSize = r.written[destPath]
+		r.destIsDir = destIsDir
+	} else {
+		r.destSize += n
+	}
 	if r.done > r.total && r.total > 0 {
 		r.done = r.total
 	}
+	r.emitLocked(currentPath, destPath, false)
+}
+
+// resetDest un-counts bytes already attributed to destPath, for callers that
+// restart a file copy from scratch after a partial-write failure (e.g. the
+// copy_file_range/kernel fast path failing mid-transfer before falling back
+// to the byte-copy path) so the retry doesn't double-count.
+func (r *progressReporter) resetDest(destPath string) {
+	if r == nil || destPath == "" {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if n := r.written[destPath]; n > 0 {
+		r.done -= n
+		if r.done < 0 {
+			r.done = 0
+		}
+		r.written[destPath] = 0
+		if r.destPath == destPath {
+			r.destSize = 0
+		}
+	}
+}
+
+func (r *progressReporter) flushDest(currentPath, destPath string, destIsDir bool) {
+	if r == nil || r.on == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if destPath != "" {
+		r.destPath = destPath
+		r.destSize = r.written[destPath]
+		r.destIsDir = destIsDir
+	}
+	r.emitLocked(currentPath, destPath, true)
+}
+
+func (r *progressReporter) emitLocked(currentPath, destKey string, force bool) {
 	now := time.Now()
-	if !r.force && now.Sub(r.lastEmit) < 100*time.Millisecond && r.done < r.total {
+	if destKey == "" {
+		destKey = r.destPath
+	}
+	last := r.emitAt[destKey]
+	if !force && !r.force && !last.IsZero() && now.Sub(last) < 100*time.Millisecond && r.done < r.total {
 		return
 	}
 	r.force = false
 	r.lastEmit = now
+	if destKey != "" {
+		r.emitAt[destKey] = now
+	}
 	r.on(r.eventLocked(currentPath))
 }
 
@@ -142,86 +211,38 @@ func (r *progressReporter) finish(currentPath string) {
 	r.on(r.eventLocked(currentPath))
 }
 
-func removeCreatedOnCancel(err error, created []string) {
-	if !errors.Is(err, context.Canceled) {
+// removeCreatedOnErr removes every dest root the caller created once the
+// overall operation failed for any reason — cancellation or a real error
+// (e.g. ENOSPC from a concurrent worker) — so a failed CopyCtx never leaves
+// partial or completed dest files behind, matching MoveCtx's cleanup.
+func removeCreatedOnErr(err error, created []string) {
+	if err == nil {
 		return
 	}
 	for _, p := range created {
+		removeAllRetry(p)
+	}
+}
+
+func removeAllRetry(p string) {
+	if p == "" {
+		return
+	}
+	for i := 0; i < 8; i++ {
 		_ = os.RemoveAll(p)
+		if _, err := os.Lstat(p); os.IsNotExist(err) {
+			return
+		}
+		time.Sleep(time.Duration(15*(i+1)) * time.Millisecond)
 	}
+	_ = os.RemoveAll(p)
 }
 
-type countingReader struct {
-	r      io.Reader
-	path   string
-	report *progressReporter
-	ctx    context.Context
-}
-
-func (c *countingReader) Read(p []byte) (int, error) {
-	if err := c.ctx.Err(); err != nil {
-		return 0, err
-	}
-	n, err := c.r.Read(p)
-	if n > 0 {
-		c.report.add(int64(n), c.path)
-	}
-	return n, err
-}
-
-// CopyCtx copies sources into destDir with optional progress and cancel.
-// On context cancel, every dest root this call created is removed.
-func CopyCtx(ctx context.Context, sources []string, destDir string, onProgress ProgressFunc) (err error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	destAbs, err := Resolve(destDir)
-	if err != nil {
+func preferCanceled(ctx context.Context, err error) error {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	info, err := os.Stat(destAbs)
-	if err != nil {
-		return err
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("destination is not a directory: %s", destAbs)
-	}
-
-	total, err := TotalBytes(sources)
-	if err != nil {
-		return err
-	}
-	rep := newProgressReporter(total, onProgress)
-	if onProgress != nil {
-		onProgress(ProgressEvent{Total: total})
-	}
-
-	var created []string
-	defer func() { removeCreatedOnCancel(err, created) }()
-
-	for _, src := range sources {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		srcAbs, err := Resolve(src)
-		if err != nil {
-			return err
-		}
-		if srcAbs == destAbs || strings.HasPrefix(destAbs+string(os.PathSeparator), srcAbs+string(os.PathSeparator)) {
-			if isDir(srcAbs) {
-				return fmt.Errorf("cannot copy directory into itself: %s", srcAbs)
-			}
-		}
-		base := filepath.Base(srcAbs)
-		target := UniquePath(filepath.Join(destAbs, base))
-		created = append(created, target)
-		rep.setDest(target, isDir(srcAbs))
-		if err := copyPathCtx(ctx, srcAbs, target, rep); err != nil {
-			return err
-		}
-	}
-	rep.finish("")
-	return nil
+	return err
 }
 
 // MoveCtx moves sources into destDir with optional progress and cancel.
@@ -283,7 +304,8 @@ func MoveCtx(ctx context.Context, sources []string, destDir string, onProgress P
 
 		if err := os.Rename(srcAbs, target); err != nil {
 			if err := copyPathCtx(ctx, srcAbs, target, rep); err != nil {
-				return err
+				removeAllRetry(target)
+				return preferCanceled(ctx, err)
 			}
 			if err := Delete([]string{srcAbs}); err != nil {
 				return err
@@ -318,6 +340,17 @@ func copyPathCtx(ctx context.Context, src, dst string, rep *progressReporter) er
 }
 
 func copyDirCtx(ctx context.Context, src, dst string, mode os.FileMode, rep *progressReporter) error {
+	if err := clonePath(src, dst); err == nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		n, err := pathBytes(src)
+		if err != nil || n <= 0 {
+			n = 1
+		}
+		rep.addAt(n, src, dst, true)
+		return nil
+	}
 	if err := os.MkdirAll(dst, mode.Perm()); err != nil {
 		return err
 	}
@@ -334,33 +367,4 @@ func copyDirCtx(ctx context.Context, src, dst string, mode os.FileMode, rep *pro
 		}
 	}
 	return nil
-}
-
-func copyFileCtx(ctx context.Context, src, dst string, mode os.FileMode, rep *progressReporter) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = in.Close() }()
-
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode.Perm())
-	if err != nil {
-		return err
-	}
-	defer func() { _ = out.Close() }()
-
-	reader := io.Reader(in)
-	if rep != nil && rep.on != nil {
-		reader = &countingReader{r: in, path: src, report: rep, ctx: ctx}
-	} else if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	if _, err := io.Copy(out, reader); err != nil {
-		return err
-	}
-	return out.Close()
 }

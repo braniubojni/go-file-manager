@@ -30,12 +30,17 @@ export function ArchiveExtension(format: string): $CancellablePromise<string> {
     return $Call.ByID(3092024763, format);
 }
 
-export function AttachDiskImage(path: string): $CancellablePromise<string> {
-    return $Call.ByID(1140398445, path);
+/**
+ * AttachDiskImage mounts a local disk image (macOS) and returns the mount point.
+ * jobID from NewJobID enables CancelJob and transfer:progress events; empty is fire-and-forget.
+ * password is used for encrypted images (hdiutil -stdinpass).
+ */
+export function AttachDiskImage(jobID: string, path: string, password: string): $CancellablePromise<string> {
+    return $Call.ByID(1140398445, jobID, path, password);
 }
 
 /**
- * CancelJob cancels a long-running Archive/Extract/DirChildSizes/Copy/Move started with NewJobID.
+ * CancelJob cancels a long-running Archive/Extract/DirChildSizes/Copy/Move/Attach started with NewJobID.
  */
 export function CancelJob(jobID: string): $CancellablePromise<void> {
     return $Call.ByID(2151147385, jobID);
@@ -102,6 +107,27 @@ export function FinishJob(jobID: string): $CancellablePromise<void> {
 
 export function GetHomeDir(): $CancellablePromise<string> {
     return $Call.ByID(3323712262);
+}
+
+/**
+ * ICloudDrivePath returns the macOS iCloud Drive folder, or "" if it is not present.
+ */
+export function ICloudDrivePath(): $CancellablePromise<string> {
+    return $Call.ByID(2428495003);
+}
+
+/**
+ * IsArchivePath reports whether path is a browsable archive or a member inside one.
+ */
+export function IsArchivePath(path: string): $CancellablePromise<boolean> {
+    return $Call.ByID(1196725953, path);
+}
+
+/**
+ * IsEncryptedDiskImage reports whether a local disk image needs a passphrase.
+ */
+export function IsEncryptedDiskImage(path: string): $CancellablePromise<boolean> {
+    return $Call.ByID(4166480454, path);
 }
 
 /**

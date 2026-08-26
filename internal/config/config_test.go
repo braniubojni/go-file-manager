@@ -78,3 +78,36 @@ func TestCommandPaletteShortcut(t *testing.T) {
 	}
 	t.Fatal("ShortcutCatalog missing commandPalette")
 }
+
+func TestSelectAllShortcut(t *testing.T) {
+	if got := DefaultShortcuts()["selectAll"]; got != "Mod+A" {
+		t.Fatalf("selectAll default=%q", got)
+	}
+	for _, d := range ShortcutCatalog() {
+		if d.ID == "selectAll" {
+			return
+		}
+	}
+	t.Fatal("ShortcutCatalog missing selectAll")
+}
+
+func TestSameDirShortcuts(t *testing.T) {
+	if got := DefaultShortcuts()["sameDirLeft"]; got != "Ctrl+ArrowLeft" {
+		t.Fatalf("sameDirLeft default=%q", got)
+	}
+	if got := DefaultShortcuts()["sameDirRight"]; got != "Ctrl+ArrowRight" {
+		t.Fatalf("sameDirRight default=%q", got)
+	}
+	var left, right bool
+	for _, d := range ShortcutCatalog() {
+		if d.ID == "sameDirLeft" {
+			left = true
+		}
+		if d.ID == "sameDirRight" {
+			right = true
+		}
+	}
+	if !left || !right {
+		t.Fatal("ShortcutCatalog missing sameDirLeft/sameDirRight")
+	}
+}

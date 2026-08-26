@@ -1,11 +1,13 @@
 package filesystem
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -86,7 +88,54 @@ func TestCopyCtxReportsByteProgress(t *testing.T) {
 	}
 }
 
+func TestCopyCtxProgressPerDestFile(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
+	root := t.TempDir()
+	srcDir := filepath.Join(root, "src")
+	dstDir := filepath.Join(root, "dst")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	payload := bytes.Repeat([]byte("q"), 48*1024)
+	var sources []string
+	for _, name := range []string{"one.bin", "two.bin", "three.bin"} {
+		p := filepath.Join(srcDir, name)
+		if err := os.WriteFile(p, payload, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		sources = append(sources, p)
+	}
+
+	maxByDest := map[string]int64{}
+	var mu sync.Mutex
+	if err := CopyCtx(context.Background(), sources, dstDir, func(ev ProgressEvent) {
+		if ev.DestPath == "" {
+			return
+		}
+		mu.Lock()
+		if ev.DestSize > maxByDest[ev.DestPath] {
+			maxByDest[ev.DestPath] = ev.DestSize
+		}
+		mu.Unlock()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	want := int64(len(payload))
+	for _, name := range []string{"one.bin", "two.bin", "three.bin"} {
+		p := filepath.Join(dstDir, name)
+		if maxByDest[p] != want {
+			t.Fatalf("%s dest progress max=%d want %d (map=%v)", name, maxByDest[p], want, maxByDest)
+		}
+	}
+}
+
 func TestCopyCtxCancelStopsEarly(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
 	root := t.TempDir()
 	srcDir := filepath.Join(root, "src")
 	dstDir := filepath.Join(root, "dst")
@@ -109,34 +158,20 @@ func TestCopyCtxCancelStopsEarly(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	started := make(chan struct{})
+	installCancelOnFirstChunk(t, cancel)
 	errCh := make(chan error, 1)
-	go func() {
-		errCh <- CopyCtx(ctx, sources, dstDir, func(ev ProgressEvent) {
-			if ev.Done > 0 {
-				select {
-				case <-started:
-				default:
-					close(started)
-				}
-			}
-		})
-	}()
+	go func() { errCh <- CopyCtx(ctx, sources, dstDir, nil) }()
+	var err error
 	select {
-	case <-started:
-		cancel()
+	case err = <-errCh:
 	case <-time.After(5 * time.Second):
-		t.Fatal("progress never started")
+		t.Fatal("copy never returned after cancel")
 	}
-	err := <-errCh
 	if err == nil {
 		t.Fatal("expected cancel error")
 	}
-	if ctx.Err() == nil && err != context.Canceled {
-		// CopyCtx should surface context.Canceled (or wrap it).
-		if !isCanceled(err) {
-			t.Fatalf("expected canceled error, got %v", err)
-		}
+	if !isCanceled(err) {
+		t.Fatalf("expected canceled error, got %v", err)
 	}
 	ents, rdErr := os.ReadDir(dstDir)
 	if rdErr != nil {
@@ -148,6 +183,8 @@ func TestCopyCtxCancelStopsEarly(t *testing.T) {
 }
 
 func TestCopyCtxCancelRemovesDestDir(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
 	root := t.TempDir()
 	srcDir := filepath.Join(root, "src")
 	dstDir := filepath.Join(root, "dst")
@@ -167,26 +204,15 @@ func TestCopyCtxCancelRemovesDestDir(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	started := make(chan struct{})
+	installCancelOnFirstChunk(t, cancel)
 	errCh := make(chan error, 1)
-	go func() {
-		errCh <- CopyCtx(ctx, []string{srcDir}, dstDir, func(ev ProgressEvent) {
-			if ev.Done > 0 {
-				select {
-				case <-started:
-				default:
-					close(started)
-				}
-			}
-		})
-	}()
+	go func() { errCh <- CopyCtx(ctx, []string{srcDir}, dstDir, nil) }()
+	var err error
 	select {
-	case <-started:
-		cancel()
+	case err = <-errCh:
 	case <-time.After(5 * time.Second):
-		t.Fatal("progress never started")
+		t.Fatal("copy never returned after cancel")
 	}
-	err := <-errCh
 	if err == nil {
 		t.Fatal("expected cancel error")
 	}
@@ -200,6 +226,112 @@ func TestCopyCtxCancelRemovesDestDir(t *testing.T) {
 
 func isCanceled(err error) bool {
 	return errors.Is(err, context.Canceled)
+}
+
+// installCancelOnFirstChunk makes cancel-mid-copy tests deterministic: the
+// first user-space chunk write triggers cancel and then blocks until it has
+// actually taken effect, instead of racing wall-clock copy speed against a
+// separate goroutine's scheduling (a small/fast copy can otherwise finish
+// before an out-of-band cancel() call lands, flaking the test).
+func installCancelOnFirstChunk(t *testing.T, cancel context.CancelFunc) {
+	t.Helper()
+	var once sync.Once
+	testAfterChunk = func(ctx context.Context) {
+		once.Do(cancel)
+		<-ctx.Done()
+	}
+	t.Cleanup(func() { testAfterChunk = nil })
+}
+
+// TestCopyFileCtxCancelRace stresses the exact window copyFileCtx opens
+// between os.Open/OpenFile and the cloneFDs .Fd() calls: cancel the ctx
+// as early as possible on every iteration so a closer registered before
+// cloneFDs would race Close() against .Fd() (caught by `go test -race`).
+func TestCopyFileCtxCancelRace(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
+	root := t.TempDir()
+	data := []byte("race-bait")
+	for i := 0; i < 100; i++ {
+		src := filepath.Join(root, fmt.Sprintf("src%d.bin", i))
+		dst := filepath.Join(root, fmt.Sprintf("dst%d.bin", i))
+		if err := os.WriteFile(src, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // already canceled before copyFileCtx even opens the files
+		rep := newProgressReporter(int64(len(data)), nil)
+		_ = copyFileCtx(ctx, src, dst, 0o644, rep)
+	}
+}
+
+// TestCopyPathCtxCancelStopsEarly exercises the exact call path MoveCtx uses
+// on cross-device fallback (os.Rename fails -> copyPathCtx -> copyFileCtx),
+// since MoveCtx itself can't be made to hit EXDEV inside a single tmp volume.
+func TestCopyPathCtxCancelStopsEarly(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
+	root := t.TempDir()
+	src := filepath.Join(root, "big.bin")
+	dst := filepath.Join(root, "dst.bin")
+	chunk := make([]byte, 8<<20) // 8MiB, several copyFileUser loop iterations
+	if err := os.WriteFile(src, chunk, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	installCancelOnFirstChunk(t, cancel)
+	rep := newProgressReporter(int64(len(chunk)), nil)
+	errCh := make(chan error, 1)
+	go func() { errCh <- copyPathCtx(ctx, src, dst, rep) }()
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected cancel error")
+		} else if !isCanceled(err) {
+			t.Fatalf("expected canceled error, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("copy never returned after cancel")
+	}
+}
+
+// TestCopyDirCtxCancelStopsEarly covers MoveCtx's cross-device fallback for
+// directory sources (copyPathCtx -> copyDirCtx -> copyFileCtx per entry).
+func TestCopyDirCtxCancelStopsEarly(t *testing.T) {
+	allowClone = false
+	t.Cleanup(func() { allowClone = true })
+	root := t.TempDir()
+	srcDir := filepath.Join(root, "src")
+	dstDir := filepath.Join(root, "dst")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	chunk := make([]byte, 512*1024)
+	for i := 0; i < 8; i++ {
+		p := filepath.Join(srcDir, fmt.Sprintf("f%d.bin", i))
+		if err := os.WriteFile(p, chunk, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	installCancelOnFirstChunk(t, cancel)
+	rep := newProgressReporter(int64(len(chunk)*8), nil)
+	errCh := make(chan error, 1)
+	go func() { errCh <- copyDirCtx(ctx, srcDir, dstDir, 0o755, rep) }()
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("expected cancel error")
+		} else if !isCanceled(err) {
+			t.Fatalf("expected canceled error, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("copy never returned after cancel")
+	}
 }
 
 func TestMoveCtxReportsProgressOnRename(t *testing.T) {

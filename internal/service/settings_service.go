@@ -16,6 +16,7 @@ const (
 	kvTabs        = "tabs"
 	kvSearchPrefs = "search_prefs"
 	kvGridPrefs   = "grid_prefs"
+	kvWindow      = "window"
 )
 
 // SettingsService persists app settings and shortcuts in encrypted SQLite (app.db).
@@ -145,6 +146,50 @@ func (s *SettingsService) SaveGridPrefs(prefs domain.GridPrefs) error {
 		return err
 	}
 	return s.db.SetKV(kvGridPrefs, data)
+}
+
+// GetWindowState returns the last saved main-window size. Missing or invalid
+// blobs yield the default size (wide enough for every file-grid column).
+func (s *SettingsService) GetWindowState() (domain.WindowState, error) {
+	raw, err := s.db.GetKV(kvWindow)
+	if err != nil {
+		return domain.WindowState{}, err
+	}
+	if raw == nil {
+		return defaultWindowState(), nil
+	}
+	var st domain.WindowState
+	if err := json.Unmarshal(raw, &st); err != nil {
+		return defaultWindowState(), nil
+	}
+	return clampWindowState(st), nil
+}
+
+// SaveWindowState persists the main-window size for the next launch.
+func (s *SettingsService) SaveWindowState(st domain.WindowState) error {
+	st = clampWindowState(st)
+	data, err := json.Marshal(st)
+	if err != nil {
+		return err
+	}
+	return s.db.SetKV(kvWindow, data)
+}
+
+func defaultWindowState() domain.WindowState {
+	return domain.WindowState{
+		Width:  domain.DefaultWindowWidth,
+		Height: domain.DefaultWindowHeight,
+	}
+}
+
+func clampWindowState(st domain.WindowState) domain.WindowState {
+	if st.Width < domain.MinWindowWidth || st.Width > domain.MaxWindowWidth {
+		st.Width = domain.DefaultWindowWidth
+	}
+	if st.Height < domain.MinWindowHeight || st.Height > domain.MaxWindowHeight {
+		st.Height = domain.DefaultWindowHeight
+	}
+	return st
 }
 
 func defaultPaneGridPrefs() domain.PaneGridPrefs {

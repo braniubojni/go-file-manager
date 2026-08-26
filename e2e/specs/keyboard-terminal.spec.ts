@@ -6,6 +6,13 @@ test.describe("keyboard navigation and terminal", () => {
     await waitAppReady(page);
   });
 
+  test("Mod+A selects all items in the active pane", async ({ page }) => {
+    const grid = fileGrid(page, "left");
+    await grid.click();
+    await page.keyboard.press("ControlOrMeta+A");
+    await expect(page.getByTestId("status-selected")).toContainText("Selected: 3");
+  });
+
   test("arrow keys move row selection", async ({ page }) => {
     const grid = fileGrid(page, "left");
     await grid.click();

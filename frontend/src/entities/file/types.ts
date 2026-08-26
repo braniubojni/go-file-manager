@@ -21,6 +21,29 @@ export interface PortListener {
   proto: string;
 }
 
+export interface AIUsageLimit {
+  label: string;
+  percent: number;
+  resetAt?: string;
+}
+
+export interface AIUsageDetail {
+  label: string;
+  value: string;
+  depth: number;
+}
+
+export interface AIUsage {
+  id: string;
+  name: string;
+  /** 'ok' | 'not-installed' | 'unsupported' | 'error' */
+  status: string;
+  error?: string;
+  estimate: boolean;
+  limits: AIUsageLimit[];
+  details: AIUsageDetail[];
+}
+
 export interface Volume {
   path: string;
   name: string;

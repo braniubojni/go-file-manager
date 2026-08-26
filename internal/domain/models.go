@@ -106,6 +106,25 @@ type GridPrefs struct {
 	Right PaneGridPrefs `json:"right"`
 }
 
+// Default main-window size: two panes with every file-grid column visible.
+const (
+	DefaultWindowWidth  = 1680
+	DefaultWindowHeight = 900
+	MinWindowWidth      = 900
+	MinWindowHeight     = 500
+	// MaxWindowWidth/Height are a sanity ceiling on a persisted size, not a
+	// real display limit — guards against a corrupted blob or a size saved
+	// on a much larger monitor than the one the app next launches on.
+	MaxWindowWidth  = 8000
+	MaxWindowHeight = 6000
+)
+
+// WindowState is the last used main-window size (persisted separately from Settings).
+type WindowState struct {
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
 // ThemeMode values for Settings.Theme.
 const (
 	ThemeSystem = "system"
@@ -193,10 +212,10 @@ type SearchErrorPayload struct {
 	Error string `json:"error"`
 }
 
-// TransferProgressPayload is emitted while a copy/move job runs.
+// TransferProgressPayload is emitted while a copy/move/attach job runs.
 type TransferProgressPayload struct {
 	JobID       string `json:"jobId"`
-	Kind        string `json:"kind"` // copy | move
+	Kind        string `json:"kind"` // copy | move | attach
 	BytesDone   int64  `json:"bytesDone"`
 	BytesTotal  int64  `json:"bytesTotal"`
 	CurrentPath string `json:"currentPath"`
@@ -215,6 +234,31 @@ type PortListener struct {
 	Proto   string `json:"proto"` // "tcp"
 }
 
+// AIUsage is one AI coding agent's quota snapshot.
+type AIUsage struct {
+	ID       string          `json:"id"` // claude | grok | cursor
+	Name     string          `json:"name"`
+	Status   string          `json:"status"` // ok | not-installed | unsupported | error
+	Error    string          `json:"error,omitempty"`
+	Estimate bool            `json:"estimate"` // derived locally, not authoritative
+	Limits   []AIUsageLimit  `json:"limits"`
+	Details  []AIUsageDetail `json:"details"`
+}
+
+// AIUsageLimit is one quota window (e.g. "current session").
+type AIUsageLimit struct {
+	Label   string `json:"label"`
+	Percent int    `json:"percent"` // 0..100, -1 = unknown
+	ResetAt string `json:"resetAt,omitempty"`
+}
+
+// AIUsageDetail is one free-form expanded line (e.g. request counts).
+type AIUsageDetail struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+	Depth int    `json:"depth"` // 0 = header, 1 = indented bullet
+}
+
 // Volume is an OS-mounted drive, network share, or disk image.
 type Volume struct {
 	Path        string `json:"path"`
@@ -225,10 +269,10 @@ type Volume struct {
 	Device      string `json:"device,omitempty"`
 }
 
-// TransferDonePayload is emitted when a copy/move job finishes (success or error).
+// TransferDonePayload is emitted when a copy/move/attach job finishes (success or error).
 type TransferDonePayload struct {
 	JobID string `json:"jobId"`
-	Kind  string `json:"kind"`  // copy | move
+	Kind  string `json:"kind"`  // copy | move | attach
 	Error string `json:"error"` // empty on success
 }
 

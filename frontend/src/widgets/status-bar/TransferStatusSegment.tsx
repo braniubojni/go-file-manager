@@ -20,6 +20,15 @@ import {
 
 const basename = (p: string): string => p.split(/[/\\]/).pop() || p;
 
+const kindCaption = (kind: TransferOp['kind']): string => {
+  if (kind === 'move') return 'Moving';
+  if (kind === 'attach') return 'Attaching';
+  return 'Copying';
+};
+
+const determinateLabel = (determinate: boolean, avg: number): string =>
+  determinate ? ` · ${avg}%` : '';
+
 const TransferTooltipBody: FC<{ ops: TransferOp[] }> = ({ ops }) => {
   const remove = useTransferStore((s) => s.remove);
 
@@ -63,7 +72,7 @@ const TransferTooltipBody: FC<{ ops: TransferOp[] }> = ({ ops }) => {
           <Typography variant="caption" color="grey.400">
             {op.bytesTotal > 0
               ? `${formatSize(op.bytesDone, false)} / ${formatSize(op.bytesTotal, false)} · ${op.percent}%`
-              : `${op.percent}%`}
+              : 'Working…'}
           </Typography>
         </Box>
       ))}
@@ -77,11 +86,11 @@ export const TransferStatusSegment: FC = () => {
   if (!ops.length) return null;
 
   const avg = averageTransferPercent(ops);
+  const determinate = ops.every((o) => o.bytesTotal > 0);
   const caption =
     ops.length === 1
-      ? `${ops[0].kind === 'move' ? 'Moving' : 'Copying'} · ${avg}%`
+      ? `${kindCaption(ops[0].kind)}${determinateLabel(determinate, avg)}`
       : `${ops.length} transfers · ${avg}%`;
-  const determinate = ops.every((o) => o.bytesTotal > 0);
 
   return (
     <Tooltip

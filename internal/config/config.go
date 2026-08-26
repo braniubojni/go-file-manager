@@ -81,6 +81,7 @@ func DefaultShortcuts() map[string]string {
 	return map[string]string{
 		"refresh":          "F5",
 		"switchPane":       "Tab",
+		"selectAll":        "Mod+A",
 		"copy":             "Mod+Shift+C",
 		"move":             "Mod+Shift+X",
 		"delete":           "Delete",
@@ -106,6 +107,8 @@ func DefaultShortcuts() map[string]string {
 		"tabClose":       "Mod+W",
 		"tabNext":        "Ctrl+Tab",
 		"tabPrev":        "Ctrl+Shift+Tab",
+		"sameDirLeft":    "Ctrl+ArrowLeft",
+		"sameDirRight":   "Ctrl+ArrowRight",
 	}
 }
 
@@ -116,6 +119,9 @@ func ShortcutCatalog() []domain.ShortcutDef {
 	}{
 		{"refresh", "Refresh", "Refresh both panes"},
 		{"switchPane", "Switch pane", "Switch the active pane"},
+		{"selectAll", "Select all", "Select all items in the active pane (Mod+A)"},
+		{"sameDirLeft", "Same folder in left pane", "Navigate the left pane to the right pane's directory (Ctrl+← when the right pane is active)"},
+		{"sameDirRight", "Same folder in right pane", "Navigate the right pane to the left pane's directory (Ctrl+→ when the left pane is active)"},
 		{"copy", "Copy", "Copy selection to the opposite pane"},
 		{"move", "Move", "Move selection to the opposite pane"},
 		{"delete", "Delete", "Delete selection (with confirmation)"},

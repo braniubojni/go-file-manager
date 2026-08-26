@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useSetTheme, useSettings } from '../../../entities/file/queries';
 import type { ThemePreference } from '../../../entities/file/types';
 import { parentDirOf, useEditorStore } from '../../../features/editor/editorStore';
+import { openDocument } from '../../../shared/lib/openDocument';
 import { useGoToStore } from '../../../features/go-to/goToStore';
 import { isRemotePath } from '../../../features/connections/helpers';
 import { usePaneStore } from '../../../features/pane/paneStore';
@@ -100,15 +101,12 @@ export const useToolbarActions = () => {
       return;
     }
     const path = realSelection[0];
-    if (isRemotePath(path)) {
-      openWorkspace(parentDirOf(path), path);
-      return;
-    }
-    if (settings?.useBuiltInEditor === false) {
-      void FileService.Open(path).catch((e) => show(errMessage(e), 'error'));
-      return;
-    }
-    openWorkspace(parentDirOf(path), path);
+    openDocument({
+      path,
+      useBuiltInEditor: settings?.useBuiltInEditor !== false,
+      openWorkspace,
+      show,
+    });
   };
 
   const onGitDiff = () => {

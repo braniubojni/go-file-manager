@@ -5,3 +5,13 @@ npm run knip
 # Format staged Go (gofmt) and frontend (oxfmt) files before commit.
 # Prevents CI gofmt / format:check failures.
 npx lint-staged
+
+# Lint Go with golangci-lint before commit — mirrors `task lint` / CI so
+# errcheck etc. never reach the server only to fail there.
+if git diff --cached --name-only --diff-filter=ACM | grep -q '\.go$'; then
+  if command -v golangci-lint >/dev/null 2>&1; then
+    golangci-lint run --timeout=3m
+  else
+    echo "golangci-lint not found on PATH — skipping (install: https://golangci-lint.run/welcome/install/)." >&2
+  fi
+fi

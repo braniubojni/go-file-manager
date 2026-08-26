@@ -28,5 +28,24 @@ const ARCHIVE_SUFFIX_RE =
 
 export const isArchiveExt = (ext: string): boolean => ARCHIVE_EXTS.has(ext.toLowerCase());
 
+/** Archives that can be entered as a virtual folder (not single-file .gz/.bz2/…). */
+const BROWSABLE_EXTS = new Set(['zip', 'rar', '7z', 'tar', 'tgz', 'tbz', 'tbz2', 'txz']);
+
+const BROWSABLE_SUFFIX_RE = /\.(tar\.(gz|bz2|xz|zst|lz4|sz)|tgz|tbz2?|txz|zip|rar|7z|tar)$/i;
+
+export const isBrowsableArchive = (name: string, ext = ''): boolean => {
+  if (BROWSABLE_EXTS.has(ext.toLowerCase())) return true;
+  return BROWSABLE_SUFFIX_RE.test(name);
+};
+
+/** True when a pane path is an archive file or a member inside one (name heuristic). */
+export const isArchivePanePath = (path: string): boolean => {
+  if (!path) return false;
+  return path
+    .replace(/\\/g, '/')
+    .split('/')
+    .some((seg) => isBrowsableArchive(seg));
+};
+
 /** Base name with the archive suffix removed, for naming an extract target. */
 export const archiveStem = (basename: string): string => basename.replace(ARCHIVE_SUFFIX_RE, '');

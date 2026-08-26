@@ -6,6 +6,8 @@ import CreateNewFolderIcon from '@mui/icons-material/CreateNewFolder';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import DifferenceIcon from '@mui/icons-material/Difference';
 import EditIcon from '@mui/icons-material/Edit';
+import KeyboardDoubleArrowLeftIcon from '@mui/icons-material/KeyboardDoubleArrowLeft';
+import KeyboardDoubleArrowRightIcon from '@mui/icons-material/KeyboardDoubleArrowRight';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -21,6 +23,7 @@ import IconButton from '@mui/material/IconButton';
 import MuiToolbar from '@mui/material/Toolbar';
 import Tooltip from '@mui/material/Tooltip';
 import type { ThemePreference } from '../../../entities/file/types';
+import { AIUsageMenu } from '../../ai-usage/AIUsageMenu';
 import { PortKillerMenu } from '../../port-killer/PortKillerMenu';
 import type { ToolbarBarProps } from '../types';
 import { BookmarksSelect } from './BookmarksSelect';
@@ -65,6 +68,21 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
         <Tooltip title="Swap left and right panes">
           <IconButton data-testid="btn-swap-panes" onClick={p.onSwapPanes}>
             <SwapHorizIcon />
+          </IconButton>
+        </Tooltip>
+        <Tooltip
+          title={
+            p.activePane === 'left'
+              ? 'Open current folder in right pane (Ctrl+→)'
+              : 'Open current folder in left pane (Ctrl+←)'
+          }
+        >
+          <IconButton data-testid="btn-same-dir" onClick={p.onSameDir}>
+            {p.activePane === 'left' ? (
+              <KeyboardDoubleArrowRightIcon />
+            ) : (
+              <KeyboardDoubleArrowLeftIcon />
+            )}
           </IconButton>
         </Tooltip>
 
@@ -122,6 +140,7 @@ export const ToolbarBar: FC<ToolbarBarProps> = (p) => {
             {themeIcon(p.theme)}
           </IconButton>
         </Tooltip>
+        <AIUsageMenu />
         <PortKillerMenu />
         <Tooltip title="Settings">
           <IconButton data-testid="btn-settings" onClick={p.onSettings}>

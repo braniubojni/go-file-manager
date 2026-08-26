@@ -6,7 +6,7 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 
 ## Core file-manager gaps (Double Commander parity)
 
-- [ ] Archive support: browse zip/tar as virtual folder, extract/compress via context menu
+- [x] Archive support: browse zip/tar as virtual folder, extract/compress via context menu
 - [x] DMG as folder (macOS): double-click attaches via hdiutil, browse/copy like a directory, unmount from drives menu
 - [ ] Quick view panel (F3-style preview: images, text, PDF) without opening editor
 - [ ] Folder compare/sync (diff two dirs, sync one-way or two-way)
@@ -19,6 +19,11 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 - [ ] Filter results by size/date/type
 - [ ] Save search as smart folder
 - [ ] Search inside archives
+
+## Remote drives
+
+- [x] In case of apple let's add into remote connections include iCloud Drive
+- [ ] Resarch if we can add google and mega drives
 
 ## Remote/SFTP
 
@@ -41,6 +46,8 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 - [x] Clickable breadcrumb path segments (not just Autocomplete bar) - `https://mui.com/material-ui/react-breadcrumbs/`
 - [x] Column customization: show/hide, reorder, per-pane sort persist - `https://mui.com/x/react-data-grid/column-visibility/`
 - [x] Status bar: selected count, total size, free disk space
+- [x] Same folder in other pane (toolbar + Ctrl+←/→)
+- [x] Remember last window size (default wide enough for all columns)
 - [x] Command palette (Cmd+K) for actions/shortcuts discoverability
 - [x] Toast/undo for delete-to-trash instead of hard delete
 
@@ -56,4 +63,7 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 - [ ] Disk usage treemap view (like WinDirStat) per folder
 - [ ] Plugin/extension points — low priority, only if long-term extensibility actually needed
 - [ ] New settings to show only in the tray or both tray and system menu
+- [x] Fast copy/move: APFS clonefile / Linux FICLONE+copy_file_range / Windows CopyFile; same-host SFTP via remote `cp`
 - [ ] Progress dialog for long copy/move ops (async status, minimize, per-pane source/dest)
+- [x] If docker was not running and we start the app, then we should close docker at the end -> `wails3 task dist VERSION=1.0.0`
+- [ ] Add into right click menu, open terminal and open finder here

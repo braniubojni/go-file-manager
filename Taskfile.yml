@@ -25,9 +25,13 @@ tasks:
     vars:
       # Wails expects 'wails-cross' for amd64, and 'wails-cross-arm64' for arm64.
       IMAGE_NAME: 'wails-cross{{if ne .LINUX_ARCH "amd64"}}-{{.LINUX_ARCH}}{{end}}'
+      DOCKER_STAMP: '{{.ROOT_DIR}}/.task/docker-started-by-dist'
     cmds:
       - |
         set -euo pipefail
+        STAMP="{{.DOCKER_STAMP}}"
+        mkdir -p "{{.ROOT_DIR}}/.task"
+        rm -f "$STAMP"
 
         # 1. Check if Docker daemon is running; start Docker Desktop if not
         if ! docker info >/dev/null 2>&1; then
@@ -35,16 +39,23 @@ tasks:
           if [ "$(uname -s)" = "Darwin" ]; then
             echo "Launching Docker Desktop..."
             open -a Docker
+            echo "Waiting for Docker daemon to initialize..."
+            tries=0
+            until docker info >/dev/null 2>&1; do
+              tries=$((tries + 1))
+              if [ "$tries" -ge 60 ]; then
+                echo "Docker did not start within 2 minutes (blocked first-run prompt?). Start it manually and re-run." >&2
+                exit 1
+              fi
+              sleep 2
+            done
+            echo "=== Docker daemon is up! ==="
+            sleep 2 # Extra buffer for socket readiness
+            touch "$STAMP"
           else
             echo "Please start the Docker daemon, then re-run this task." >&2
             exit 1
           fi
-          echo "Waiting for Docker daemon to initialize..."
-          until docker info >/dev/null 2>&1; do
-            sleep 2
-          done
-          echo "=== Docker daemon is up! ==="
-          sleep 2 # Extra buffer for socket readiness
         fi
 
         # 2. Check if the specific architecture image exists
@@ -55,6 +66,24 @@ tasks:
         else
           echo "=== Docker image '$IMG' found! ==="
         fi
+
+  docker:maybe-quit:
+    summary: Quit Docker Desktop if docker:ensure started it for dist
+    internal: true
+    cmds:
+      - |
+        set -euo pipefail
+        STAMP="{{.ROOT_DIR}}/.task/docker-started-by-dist"
+        if [ ! -f "$STAMP" ]; then
+          exit 0
+        fi
+        rm -f "$STAMP"
+        if [ "$(uname -s)" != "Darwin" ]; then
+          exit 0
+        fi
+        echo "=== Quitting Docker Desktop (started by this dist run) ==="
+        osascript -e 'quit app "Docker"' >/dev/null 2>&1 || \
+          osascript -e 'quit app "Docker Desktop"' >/dev/null 2>&1 || true
 
   build:
     summary: Builds the application
@@ -151,6 +180,7 @@ tasks:
       - task: docker:ensure
         vars:
           LINUX_ARCH: "{{.LINUX_ARCH}}"
+      - defer: { task: docker:maybe-quit }
       - task: dist:build
         vars:
           VERSION: "{{.VERSION}}"

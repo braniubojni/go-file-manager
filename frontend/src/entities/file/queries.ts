@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AIUsageService,
   BookmarkService,
   FileService,
   GitService,
@@ -8,6 +9,7 @@ import {
 } from '../../shared/api/bindings';
 import { isRemotePath } from '../../features/connections/helpers';
 import type {
+  AIUsage,
   AppSettings,
   DiskUsage,
   GitDirStatus,
@@ -31,6 +33,7 @@ const queryKeys = {
   volumes: ['volumes'] as const,
   ports: ['ports'] as const,
   diskUsage: (path: string) => ['diskUsage', path] as const,
+  aiUsage: ['aiUsage'] as const,
 };
 
 export const useHomeDir = () => {
@@ -182,6 +185,16 @@ export const useKillAllPorts = () => {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.ports });
     },
+  });
+};
+
+export const useAIUsage = (enabled: boolean) => {
+  return useQuery({
+    queryKey: queryKeys.aiUsage,
+    queryFn: async () => ((await AIUsageService.List()) ?? []) as AIUsage[],
+    enabled,
+    retry: 0, // each retry re-spawns a multi-second CLI
+    staleTime: 5 * 60_000, // reopening the popover shouldn't re-run claude
   });
 };
 

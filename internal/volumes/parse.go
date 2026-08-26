@@ -2,6 +2,7 @@ package volumes
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -15,6 +16,8 @@ var (
 	mountLineRe  = regexp.MustCompile(`^(.+) on (/.+) \(([^,)]+)`)
 	plistKVRe    = regexp.MustCompile(`<key>(image-path|mount-point)</key>\s*<string>([^<]*)</string>`)
 	mountPointRe = regexp.MustCompile(`<key>mount-point</key>\s*<string>([^<]+)</string>`)
+	percentRe    = regexp.MustCompile(`(?i)PERCENT(?:AGE)?\s*[:=]?\s*(-?\d+(?:\.\d+)?)`)
+	encryptedRe  = regexp.MustCompile(`(?i)encrypted:\s*(YES|TRUE)\b`)
 )
 
 // parseMountOutput maps mount-point → device/fstype from `mount` output.
@@ -57,6 +60,27 @@ func firstMountPoint(plist string) string {
 		return m[1]
 	}
 	return ""
+}
+
+// parseHdiutilPercent reads a -puppetstrings PERCENT/PERCENTAGE line.
+// ok is false when the line is not progress. Value -1 means indeterminate.
+func parseHdiutilPercent(line string) (float64, bool) {
+	m := percentRe.FindStringSubmatch(strings.TrimSpace(line))
+	if len(m) != 2 {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+func imageEncryptedFromOutput(s string) bool {
+	if encryptedRe.MatchString(s) {
+		return true
+	}
+	return strings.Contains(s, "<key>encrypted</key>") && strings.Contains(s, "<true/>")
 }
 
 func isNetworkFS(fs string) bool {

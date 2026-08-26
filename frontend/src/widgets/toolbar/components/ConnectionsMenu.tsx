@@ -1,6 +1,8 @@
 import type { FC } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import AddIcon from '@mui/icons-material/Add';
 import CloudIcon from '@mui/icons-material/Cloud';
+import CloudQueueIcon from '@mui/icons-material/CloudQueue';
 import DeleteIcon from '@mui/icons-material/Delete';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
@@ -14,6 +16,9 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { sessionKeyFromProfile } from '../../../features/connections/helpers';
 import type { ConnectionProfile } from '../../../features/connections/types';
+import { usePaneStore } from '../../../features/pane/paneStore';
+import { FileService } from '../../../shared/api/bindings';
+import { enterPaneTab } from '../../file-pane/helpers';
 import { useConnections } from '../hooks/useConnections';
 import { ConnectionDialog } from './ConnectionDialog';
 
@@ -35,6 +40,20 @@ export const ConnectionsMenu: FC = () => {
     loadSSHConfig,
     connectFromConfig,
   } = useConnections();
+  const navigate = usePaneStore((s) => s.navigate);
+  const activePane = usePaneStore((s) => s.activePane);
+  const { data: iCloudPath = '' } = useQuery({
+    queryKey: ['icloudDrive'],
+    queryFn: async () => ((await FileService.ICloudDrivePath()) ?? '') as string,
+    staleTime: 60_000,
+  });
+
+  const openICloud = () => {
+    if (!iCloudPath) return;
+    enterPaneTab(activePane, iCloudPath);
+    navigate(activePane, iCloudPath);
+    setAnchor(null);
+  };
 
   const renderProfile = (p: ConnectionProfile) => {
     const key = sessionKeyFromProfile(p);
@@ -104,6 +123,18 @@ export const ConnectionsMenu: FC = () => {
         onClose={() => setAnchor(null)}
         slotProps={{ paper: { sx: { minWidth: 260 } } }}
       >
+        {iCloudPath ? (
+          <>
+            <ListSubheader sx={{ lineHeight: '32px', bgcolor: 'background.paper' }}>
+              Cloud
+            </ListSubheader>
+            <MenuItem data-testid="menu-conn-icloud" dense onClick={openICloud}>
+              <CloudQueueIcon fontSize="small" sx={{ mr: 1 }} />
+              iCloud Drive
+            </MenuItem>
+            <Divider />
+          </>
+        ) : null}
         <ListSubheader sx={{ lineHeight: '32px', bgcolor: 'background.paper' }}>
           SSH/SFTP
         </ListSubheader>

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -220,76 +221,85 @@ func Extract(ctx context.Context, archivePath, destDir, password string) error {
 	if err := os.MkdirAll(destAbs, 0o755); err != nil {
 		return err
 	}
+	return walkArchive(ctx, abs, password, func(ctx context.Context, fi archives.FileInfo) error {
+		return writeArchiveMember(destAbs, "", fi)
+	})
+}
 
-	f, err := os.Open(abs)
+func applyArchivePassword(format archives.Format, password string) archives.Format {
+	if password == "" {
+		return format
+	}
+	switch t := format.(type) {
+	case archives.Rar:
+		t.Password = password
+		return t
+	case *archives.Rar:
+		t.Password = password
+		return t
+	case archives.SevenZip:
+		t.Password = password
+		return t
+	case *archives.SevenZip:
+		t.Password = password
+		return t
+	default:
+		return format
+	}
+}
+
+func walkArchive(ctx context.Context, archiveAbs, password string, fn func(context.Context, archives.FileInfo) error) error {
+	f, err := os.Open(archiveAbs)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
 
-	format, stream, err := archives.Identify(ctx, filepath.Base(abs), f)
+	format, stream, err := archives.Identify(ctx, filepath.Base(archiveAbs), f)
 	if err != nil {
 		return fmt.Errorf("identify archive: %w", err)
 	}
-
-	// Password-protected rar/7z
-	switch t := format.(type) {
-	case archives.Rar:
-		if password != "" {
-			t.Password = password
-			format = t
-		}
-	case *archives.Rar:
-		if password != "" {
-			t.Password = password
-		}
-	case archives.SevenZip:
-		if password != "" {
-			t.Password = password
-			format = t
-		}
-	case *archives.SevenZip:
-		if password != "" {
-			t.Password = password
-		}
-	}
-
+	format = applyArchivePassword(format, password)
 	ex, ok := format.(archives.Extractor)
 	if !ok {
 		return fmt.Errorf("format does not support extraction: %s", format.Extension())
 	}
+	return ex.Extract(ctx, stream, fn)
+}
 
-	return ex.Extract(ctx, stream, func(ctx context.Context, fi archives.FileInfo) error {
-		name := filepath.Clean(fi.NameInArchive)
-		if name == "." || name == "" {
-			return nil
-		}
-		// Zip-slip guard
-		target := filepath.Join(destAbs, name)
-		if !strings.HasPrefix(target, destAbs+string(os.PathSeparator)) && target != destAbs {
-			return fmt.Errorf("illegal path in archive: %s", fi.NameInArchive)
-		}
-		if fi.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		rc, err := fi.Open()
-		if err != nil {
-			return err
-		}
-		defer func() { _ = rc.Close() }()
-		out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fi.Mode().Perm())
-		if err != nil {
-			return err
-		}
-		defer func() { _ = out.Close() }()
-		if _, err = io.Copy(out, rc); err != nil {
-			return err
-		}
-		return out.Close()
-	})
+func writeArchiveMember(destAbs, destName string, fi archives.FileInfo) error {
+	name := destName
+	if name == "" {
+		name = filepath.FromSlash(path.Clean("/" + strings.ReplaceAll(fi.NameInArchive, `\`, `/`)))
+		name = strings.TrimPrefix(name, string(os.PathSeparator))
+	}
+	if name == "." || name == "" {
+		return nil
+	}
+	target := filepath.Join(destAbs, name)
+	if !strings.HasPrefix(target, destAbs+string(os.PathSeparator)) && target != destAbs {
+		return fmt.Errorf("illegal path in archive: %s", fi.NameInArchive)
+	}
+	if fi.IsDir() {
+		return os.MkdirAll(target, 0o755)
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	rc, err := fi.Open()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rc.Close() }()
+	out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, fi.Mode().Perm())
+	if err != nil {
+		return err
+	}
+	defer func() { _ = out.Close() }()
+	if _, err = io.Copy(out, rc); err != nil {
+		return err
+	}
+	return out.Close()
 }
 
 // ExtensionForFormat returns the file extension including the leading dot.
