@@ -37,16 +37,31 @@ tasks:
         # `docker info`/`ps`/etc. have been observed to hang indefinitely on
         # a half-broken Docker Desktop, past any sleep/retry interval. Pure
         # shell (no `timeout`/`gtimeout` dependency — not on stock macOS).
+        #
+        # Runs entirely inside a real `sh -c` subprocess, NOT as background
+        # jobs directly in this script. Task's embedded shell interpreter
+        # (mvdan/sh) does not correctly support `&`/`$!`/`wait PID` — verified
+        # directly: `cmd & pid=$!; wait "$pid"` returns a bogus status
+        # immediately, without ever actually waiting. Every prior "did not
+        # respond within Ns" report from this function was that bug, not a
+        # real timeout — it never once genuinely waited before failing. A
+        # real `sh` binary, spawned as an external process, has correct job
+        # control since it's actually bash/dash, not mvdan/sh; mvdan/sh only
+        # needs to run it as a subprocess and read its exit code, which it
+        # does correctly.
         run_with_timeout() {
           secs="$1"; shift
-          "$@" &
-          pid=$!
-          ( sleep "$secs"; kill -TERM "$pid" 2>/dev/null ) &
-          watcher=$!
-          if wait "$pid" 2>/dev/null; then status=0; else status=$?; fi
-          kill "$watcher" 2>/dev/null
-          wait "$watcher" 2>/dev/null || true
-          return "$status"
+          sh -c '
+            secs="$1"; shift
+            "$@" &
+            pid=$!
+            ( sleep "$secs"; kill -TERM "$pid" 2>/dev/null ) &
+            watcher=$!
+            if wait "$pid" 2>/dev/null; then status=0; else status=$?; fi
+            kill "$watcher" 2>/dev/null
+            wait "$watcher" 2>/dev/null || true
+            exit "$status"
+          ' _ "$secs" "$@"
         }
 
         docker_probe() {
@@ -61,22 +76,69 @@ tasks:
           exit 1
         }
 
-        # Case A: Docker Desktop app already running. Probe daemon health
-        # directly (bounded) instead of an unconditional launch+wait — the
-        # app process being alive is independent of the daemon actually
-        # answering API calls (Docker Desktop can wedge into a state where
-        # the app is up but every API call 500s or hangs).
-        if pgrep -x "Docker Desktop" >/dev/null 2>&1; then
-          echo "=== Docker Desktop is already running — checking daemon health ==="
-          if docker_err=$(docker_probe); then
-            echo "=== Docker daemon is healthy ==="
-          else
-            # A killed-by-timeout process often produces no output at all —
-            # branch on the probe's actual exit status, not just whether it
-            # captured text, or a silent hang reads as "healthy" (empty err).
+        # Retries docker_probe up to $1 times (3s apart), tracking $docker_err.
+        # Only an EXPLICIT error (daemon answered, just wrong — e.g.
+        # "requested API version" 500) escalates early: that's a real wedge
+        # signal, not resolved by waiting. A silent timeout (probe hit its 8s
+        # bound with no response) is NOT treated as a wedge signal on its
+        # own — on this class of machine a slow wake or a genuine cold VM
+        # boot can produce many consecutive silent timeouts while still
+        # eventually succeeding (observed: real cold boots taking >165s of
+        # nothing but timeouts before coming up healthy). Timeouts just
+        # consume the $1 tries budget instead of fast-escalating.
+        # Never calls exit itself — only returns a status — because this
+        # function is invoked as an `if`/`while` CONDITION by its callers,
+        # and Task's embedded shell interpreter (mvdan/sh) silently swallows
+        # an `exit` triggered anywhere in the call stack while a condition is
+        # still being evaluated (observed directly: a task exits 0 despite a
+        # nested `exit 1`, no error surfaced). So every failure here is
+        # reported via return code instead, and the caller does its own
+        # `exit` afterward, as a plain top-level statement outside any
+        # condition — that DOES propagate correctly.
+        # Return codes: 0 = healthy. 1 = exhausted $1 tries, never escalated
+        # (probably just still booting). 2 = escalated (real wedge signal).
+        wait_for_daemon() {
+          max="$1"
+          tries=0
+          error_streak=0
+          while ! docker_err=$(docker_probe); do
             if [ -z "$docker_err" ]; then
               docker_err="docker info did not respond within 8s (daemon appears wedged/hung)."
+              error_streak=0
+            elif printf '%s' "$docker_err" | grep -qi "requested API version"; then
+              error_streak=$((error_streak + 1))
+            else
+              error_streak=0
             fi
+            if [ "$error_streak" -ge 5 ]; then
+              return 2
+            fi
+            tries=$((tries + 1))
+            if [ "$tries" -ge "$max" ]; then
+              return 1
+            fi
+            sleep 3
+          done
+          return 0
+        }
+
+        # Case A: Docker Desktop app already running. Probe daemon health
+        # directly (bounded, with brief retry) instead of an unconditional
+        # launch+wait — the app process being alive is independent of the
+        # daemon actually answering API calls (Docker Desktop can wedge into
+        # a state where the app is up but every API call 500s or hangs).
+        if pgrep -x "Docker Desktop" >/dev/null 2>&1; then
+          echo "=== Docker Desktop is already running — checking daemon health ==="
+          # 40 tries * up to 11s (8s probe + 3s sleep) = ~7min ceiling for
+          # silent timeouts. On this class of machine, an already-running
+          # app's daemon coming back from idle has been observed to take
+          # nearly as long as a cold launch, not just a few seconds — only
+          # an explicit wrong-version error escalates faster than this.
+          rc=0
+          wait_for_daemon 40 || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            echo "=== Docker daemon is healthy ==="
+          else
             fail_daemon_unhealthy "$docker_err"
           fi
         elif [ "$(uname -s)" = "Darwin" ]; then
@@ -88,33 +150,14 @@ tasks:
           # instead of leaving Docker Desktop open forever.
           touch "$STAMP"
           echo "Waiting for Docker daemon to initialize..."
-          tries=0
-          bad_streak=0
-          while ! docker_err=$(docker_probe); do
-            # "Connection refused"-type errors are normal early on (daemon
-            # still booting) and reset the streak. But if the daemon keeps
-            # answering with a real error (API version mismatch/500) or the
-            # probe keeps timing out (silent hang) several times in a row,
-            # it's not going to resolve by waiting out the rest of the 5
-            # minutes — escalate instead of burning the full timeout.
-            if [ -z "$docker_err" ]; then
-              docker_err="docker info did not respond within 8s (daemon appears wedged/hung)."
-              bad_streak=$((bad_streak + 1))
-            elif printf '%s' "$docker_err" | grep -qi "requested API version"; then
-              bad_streak=$((bad_streak + 1))
-            else
-              bad_streak=0
-            fi
-            if [ "$bad_streak" -ge 5 ]; then
-              fail_daemon_unhealthy "$docker_err"
-            fi
-            tries=$((tries + 1))
-            if [ "$tries" -ge 100 ]; then
-              echo "Docker did not start within 5 minutes (blocked first-run prompt?). Start it manually and re-run." >&2
-              exit 1
-            fi
-            sleep 3
-          done
+          rc=0
+          wait_for_daemon 100 || rc=$?
+          if [ "$rc" -eq 2 ]; then
+            fail_daemon_unhealthy "$docker_err"
+          elif [ "$rc" -eq 1 ]; then
+            echo "Docker did not start within 5 minutes (blocked first-run prompt?). Start it manually and re-run." >&2
+            exit 1
+          fi
           echo "=== Docker daemon is up! ==="
           sleep 2 # Extra buffer for socket readiness
         else
