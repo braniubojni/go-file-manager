@@ -473,9 +473,14 @@ tasks:
         msg: "Not logged in — run `gh auth login` first"
       - sh: test -z "$(git status --porcelain)"
         msg: "Working tree is dirty — commit or stash before tagging a release (uncommitted changes wouldn't be in the tagged commit)."
-      - sh: '! git rev-parse --verify --quiet "refs/tags/v{{.VERSION}}" >/dev/null'
+      # NOT `sh: '! cmd'` — mvdan/sh (Task's embedded shell interpreter)
+      # does not correctly propagate a `!`-negated statement's exit status
+      # to the process exit code Task observes: verified directly, a
+      # negated FAILING command (i.e. the negation succeeds) still reports
+      # exit 1 to Task. `cmd || rc=$?` avoids negation entirely.
+      - sh: 'git rev-parse --verify --quiet "refs/tags/v{{.VERSION}}" >/dev/null 2>&1; test $? -ne 0'
         msg: "Tag v{{.VERSION}} already exists locally — bump VERSION or delete the tag first (git tag -d v{{.VERSION}})."
-      - sh: '! git ls-remote --exit-code --tags origin "v{{.VERSION}}" >/dev/null 2>&1'
+      - sh: 'git ls-remote --exit-code --tags origin "v{{.VERSION}}" >/dev/null 2>&1; test $? -ne 0'
         msg: "Tag v{{.VERSION}} already exists on origin — bump VERSION."
     cmds:
       - |
