@@ -97,6 +97,18 @@ export const useFileManagerKeyboard = () => {
         return;
       }
 
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        (e.key === 'v' || e.key === 'V') &&
+        (!map.paste || matched === 'paste')
+      ) {
+        e.preventDefault();
+        runShortcutAction('paste', toggles);
+        return;
+      }
+
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
         const pane = usePaneStore.getState().activePane;
         const sel = usePaneStore.getState().getSelection(pane);

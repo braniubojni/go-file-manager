@@ -134,6 +134,7 @@ export const useToolbarActions = () => {
   useFileOpsRequest(
     createToolbarRequestHandlers({
       copy: fileOps.onCopy,
+      paste: fileOps.onPaste,
       move: fileOps.onMove,
       delete: fileOps.onDelete,
       rename: fileOps.onRename,

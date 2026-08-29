@@ -145,26 +145,7 @@ Uses **Wails v3 `app.Updater`** with the GitHub Releases provider.
 
 ### Releasing
 
-GitHub Releases stay empty until you **push a version tag**. The workflow (`.github/workflows/release.yml`) only runs on tags matching `v*`.
-
-```bash
-# After packaging/docs land on main:
-git checkout main && git pull
-git tag v0.1.0
-git push origin v0.1.0
-# Actions → “Release” → creates the GitHub Release with binaries
-```
-
-| Runner           | Artifact                                                  |
-| ---------------- | --------------------------------------------------------- |
-| `ubuntu-latest`  | `go-file-manager_{ver}_linux_amd64.tar.gz`                |
-| `macos-latest`   | `go-file-manager_{ver}_darwin_arm64.zip` (`.app` inside)  |
-| `windows-latest` | `go-file-manager_{ver}_windows_amd64.zip` (`.exe` inside) |
-| publish job      | `SHA256SUMS` (digests of the platform archives)           |
-
-Archives must have a **single top-level entry** (Wails extract rule): `.app` / one binary / one `.exe`.
-
-Or release entirely from your machine, no CI (needs `gh auth login` once, Docker for the linux/windows cross-builds):
+Build and publish from your machine (`gh auth login` once; Docker for linux/windows cross-builds). There is no GitHub Actions release job.
 
 ```bash
 wails3 task release:local VERSION=0.1.0
@@ -179,9 +160,18 @@ wails3 task dist VERSION=0.1.0
 wails3 task release:publish VERSION=0.1.0
 ```
 
+| Artifact | Typical name |
+| -------- | ------------ |
+| macOS `.app` zip | `go-file-manager_{ver}_darwin_arm64.zip` |
+| Windows zip | `go-file-manager_{ver}_windows_amd64.zip` |
+| Linux tar.gz | `go-file-manager_{ver}_linux_<host arch>.tar.gz` |
+| checksums | `SHA256SUMS` |
+
+Archives must have a **single top-level entry** (Wails extract rule): `.app` / one binary / one `.exe`.
+
 The updater’s default asset matcher picks by `GOOS` + `GOARCH` substrings (`darwin`/`windows`/`linux`, `arm64`/`amd64`).
 
-**Note:** macOS artifacts from CI are ad-hoc signed only (not Developer ID). Gatekeeper may still require right-click → Open; the updater does not re-sign binaries.
+**Note:** macOS artifacts are ad-hoc signed only (not Developer ID). Gatekeeper may still require right-click → Open; the updater does not re-sign binaries.
 
 ## Quality / CI
 
@@ -432,12 +422,6 @@ const [searchTerm, setSearchTerm] = useState("");
 - Frontend lint + build
 - golangci-lint v2.12.2
 - Platform-specific: GTK4 on Linux, no X11 on macOS
-
-# release.yml - Runs on tag v*
-- Cross-compile for all platforms
-- Generate platform archives
-- Create GitHub Release
-- Upload artifacts (darwin .app, windows .exe, linux tar.gz)
 ```
 
 **Local mirror:**
@@ -449,9 +433,8 @@ task ci:go  # Runs Go CI in Docker (Ubuntu 24.04 + GTK4)
 **Release process:**
 
 1. Merge PR to `main`
-2. `git tag v0.1.0 && git push origin v0.1.0`
-3. GitHub Actions builds + releases automatically
-4. In-app updater detects new version
+2. `task release:local VERSION=0.1.0` (or `task dist` then `task release:publish`)
+3. In-app updater detects the new GitHub Release
 
 ### Documentation Standards
 

@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/erikharutyunyan/go-file-manager/internal/clipboard"
 	"github.com/erikharutyunyan/go-file-manager/internal/config"
 	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 	"github.com/erikharutyunyan/go-file-manager/internal/filesystem"
@@ -500,6 +502,22 @@ func (s *FileService) CreateFile(parent, name string) (string, error) {
 		return "", fmt.Errorf("create file is not available on remote connections yet")
 	}
 	return filesystem.CreateFile(parent, name)
+}
+
+// PasteClipboard copies OS clipboard files into dest, or writes a PNG image.
+func (s *FileService) PasteClipboard(dest string) error {
+	if err := rejectArchiveWrite(dest); err != nil {
+		return err
+	}
+	if remote.IsRemote(dest) {
+		return fmt.Errorf("paste is not available on remote connections")
+	}
+	log.Printf("PasteClipboard dest=%s", dest)
+	err := clipboard.PasteInto(dest)
+	if err != nil {
+		log.Printf("PasteClipboard: %v", err)
+	}
+	return err
 }
 
 // ReadTextFile reads a text file for the built-in editor (local or remote).

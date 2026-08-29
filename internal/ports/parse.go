@@ -2,6 +2,7 @@ package ports
 
 import (
 	"encoding/csv"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -112,6 +113,85 @@ func parseTasklistCSV(s string) map[int]string {
 		out[pid] = name
 	}
 	return out
+}
+
+const maxCmd = 240
+
+// parsePsAXO parses `ps -axo pid=,uid=,comm=,args=` and keeps rows for uid.
+func parsePsAXO(s string, uid int) []domain.ProcessInfo {
+	var out []domain.ProcessInfo
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		pid, err := strconv.Atoi(fields[0])
+		if err != nil || pid <= 0 {
+			continue
+		}
+		u, err := strconv.Atoi(fields[1])
+		if err != nil || u != uid {
+			continue
+		}
+		name := fields[2]
+		cmd := strings.Join(fields[2:], " ")
+		if len(cmd) > maxCmd {
+			cmd = cmd[:maxCmd]
+		}
+		out = append(out, domain.ProcessInfo{PID: pid, Name: name, Cmd: cmd})
+	}
+	sortProcesses(out)
+	return out
+}
+
+func parseLsofCwd(s string) map[int]string {
+	out := make(map[int]string)
+	var pid int
+	for _, line := range strings.Split(s, "\n") {
+		if line == "" {
+			continue
+		}
+		switch line[0] {
+		case 'p':
+			pid, _ = strconv.Atoi(line[1:])
+		case 'n':
+			if pid > 0 && line[1:] != "" {
+				out[pid] = line[1:]
+			}
+		}
+	}
+	return out
+}
+
+func applyCwd(list []domain.ProcessInfo, cwds map[int]string) {
+	for i := range list {
+		if d, ok := cwds[list[i].PID]; ok {
+			list[i].Cwd = d
+		}
+	}
+}
+
+func processesFromTasklist(s string) []domain.ProcessInfo {
+	names := parseTasklistCSV(s)
+	out := make([]domain.ProcessInfo, 0, len(names))
+	for pid, name := range names {
+		out = append(out, domain.ProcessInfo{PID: pid, Name: name, Cmd: name})
+	}
+	sortProcesses(out)
+	return out
+}
+
+func sortProcesses(out []domain.ProcessInfo) {
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name != out[j].Name {
+			return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+		}
+		return out[i].PID < out[j].PID
+	})
 }
 
 // Dedup keeps one row per port+PID, sorted by port then PID.

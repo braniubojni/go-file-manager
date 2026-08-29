@@ -75,6 +75,7 @@ export type NameDialogProps = {
   state: NameDialogState;
   dispatch: Dispatch<NameDialogAction>;
   onConfirm: () => void;
+  selectStem?: boolean;
 };
 
 export type DeleteDialogsProps = {

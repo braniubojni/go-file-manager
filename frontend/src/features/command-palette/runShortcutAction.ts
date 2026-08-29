@@ -12,6 +12,7 @@ import { useCommandPaletteStore } from './commandPaletteStore';
 
 const FILE_OPS_IDS = new Set<string>([
   'copy',
+  'paste',
   'move',
   'delete',
   'rename',

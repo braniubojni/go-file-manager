@@ -28,3 +28,14 @@ func TestPortServiceList(t *testing.T) {
 		t.Fatal("nil list")
 	}
 }
+
+func TestPortServiceListProcesses(t *testing.T) {
+	s := NewPortService()
+	list, err := s.ListProcesses()
+	if err != nil {
+		t.Skipf("list processes unavailable: %v", err)
+	}
+	if list == nil {
+		t.Fatal("nil list")
+	}
+}

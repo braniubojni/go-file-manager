@@ -10,6 +10,7 @@ import { actionRowSx, actionsSx, killAllBtnSx, killAllConfirmSx, shortcutSx } fr
 
 type Props = {
   tree: boolean;
+  showTree?: boolean;
   killAllConfirm: boolean;
   onRefresh: () => void;
   onToggleTree: () => void;
@@ -20,6 +21,7 @@ type Props = {
 
 export const PortActions: FC<Props> = ({
   tree,
+  showTree = true,
   killAllConfirm,
   onRefresh,
   onToggleTree,
@@ -35,12 +37,14 @@ export const PortActions: FC<Props> = ({
           {modShortcut('R')}
         </Typography>
       </Button>
-      <Button startIcon={<FormatListBulletedIcon />} sx={actionRowSx} onClick={onToggleTree}>
-        {tree ? 'List View' : 'Tree View'}
-        <Typography component="span" sx={shortcutSx}>
-          {modShortcut('T')}
-        </Typography>
-      </Button>
+      {showTree ? (
+        <Button startIcon={<FormatListBulletedIcon />} sx={actionRowSx} onClick={onToggleTree}>
+          {tree ? 'List View' : 'Tree View'}
+          <Typography component="span" sx={shortcutSx}>
+            {modShortcut('T')}
+          </Typography>
+        </Button>
+      ) : null}
       {killAllConfirm ? (
         <Box sx={killAllConfirmSx}>
           <Typography variant="body2" sx={{ flex: 1 }}>

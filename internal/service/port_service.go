@@ -16,6 +16,10 @@ func (s *PortService) List() ([]domain.PortListener, error) {
 	return ports.List()
 }
 
+func (s *PortService) ListProcesses() ([]domain.ProcessInfo, error) {
+	return ports.ListProcesses()
+}
+
 func (s *PortService) Kill(pid int) error {
 	return ports.Kill(pid)
 }

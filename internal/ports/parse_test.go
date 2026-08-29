@@ -2,7 +2,10 @@ package ports
 
 import (
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/erikharutyunyan/go-file-manager/internal/domain"
 )
 
 func TestParseLsofF(t *testing.T) {
@@ -86,6 +89,57 @@ func TestParseTasklistCSV(t *testing.T) {
 	}
 	if got[20259] != "redis-server" {
 		t.Fatalf("redis: %q", got[20259])
+	}
+}
+
+func TestParsePsAXO(t *testing.T) {
+	in := `
+  1  0 /sbin/launchd launchd
+  501  501 postgres postgres -D /data
+  502  501 redis-server redis-server *:6379
+  503  502 other other
+`
+	got := parsePsAXO(in, 501)
+	if len(got) != 2 {
+		t.Fatalf("len=%d %+v", len(got), got)
+	}
+	if got[0].Name != "postgres" || got[0].PID != 501 {
+		t.Fatalf("postgres first: %+v", got[0])
+	}
+	if got[1].Name != "redis-server" || !strings.Contains(got[1].Cmd, "redis-server") {
+		t.Fatalf("redis: %+v", got[1])
+	}
+}
+
+func TestParseLsofCwd(t *testing.T) {
+	in := `p501
+fcwd
+n/Users/me/app
+p502
+fcwd
+n/tmp/redis
+`
+	got := parseLsofCwd(in)
+	if got[501] != "/Users/me/app" || got[502] != "/tmp/redis" {
+		t.Fatalf("%+v", got)
+	}
+	list := []domain.ProcessInfo{{PID: 501, Name: "node"}, {PID: 9, Name: "x"}}
+	applyCwd(list, got)
+	if list[0].Cwd != "/Users/me/app" || list[1].Cwd != "" {
+		t.Fatalf("%+v", list)
+	}
+}
+
+func TestProcessesFromTasklist(t *testing.T) {
+	in := `"svchost.exe","1232","Services","0","12,345 K"
+"redis-server.exe","20259","Console","1","8,192 K"
+`
+	got := processesFromTasklist(in)
+	if len(got) != 2 {
+		t.Fatalf("len=%d %+v", len(got), got)
+	}
+	if got[0].Name != "redis-server" || got[0].PID != 20259 {
+		t.Fatalf("redis first by name: %+v", got)
 	}
 }
 

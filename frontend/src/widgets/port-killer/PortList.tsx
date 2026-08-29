@@ -2,7 +2,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import type { FC } from 'react';
 import type { PortListener } from '../../entities/file/types';
-import { groupByPid } from './helpers';
+import { groupByPid, knownServiceTag } from './helpers';
 import { PortRow } from './PortRow';
 import { emptyListSx, listSx } from './styles';
 
@@ -44,6 +44,7 @@ export const PortList: FC<Props> = ({ rows, tree, confirm, onSelect, onKill, onC
               process={g.process}
               pid={g.pid}
               confirming={isConfirm(confirm, g.pid)}
+              tag={knownServiceTag(g.process)}
               leading={
                 <Typography variant="body2" noWrap sx={{ flex: 1, fontWeight: 600 }}>
                   {g.process || `PID ${g.pid}`}
@@ -61,6 +62,7 @@ export const PortList: FC<Props> = ({ rows, tree, confirm, onSelect, onKill, onC
                 confirming={isConfirm(confirm, g.pid, port)}
                 indent
                 showPid={false}
+                tag={knownServiceTag(g.process, port)}
                 leading={
                   <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums', flex: 1 }}>
                     :{port}
@@ -85,6 +87,7 @@ export const PortList: FC<Props> = ({ rows, tree, confirm, onSelect, onKill, onC
           process={r.process}
           pid={r.pid}
           confirming={isConfirm(confirm, r.pid, r.port)}
+          tag={knownServiceTag(r.process, r.port)}
           leading={
             <>
               <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums', minWidth: 56 }}>

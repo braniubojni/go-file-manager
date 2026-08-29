@@ -23,7 +23,12 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 ## Remote drives
 
 - [x] In case of apple let's add into remote connections include iCloud Drive
-- [ ] Resarch if we can add google and mega drives
+- [ ] Google Drive / MEGA — research only (no code yet)
+  - **Google Drive (easy later, same as iCloud):** Drive for desktop is a local folder. macOS File Provider: `~/Library/CloudStorage/GoogleDrive-<account>/` (location locked by macOS). [Drive for desktop on macOS](https://support.google.com/drive/answer/12178485). Older streaming mount: `/Volumes/GoogleDrive`. Windows: drive letter (`G:`) or `%USERPROFILE%\Google Drive`. Later: scan `CloudStorage` for `GoogleDrive-` like [`internal/filesystem/icloud.go`](internal/filesystem/icloud.go).
+  - **Google Drive in-app (no desktop app):** Drive API v3 + OAuth (Cloud project, refresh tokens, keychain) — heavy. rclone: [rclone.org/drive](https://rclone.org/drive/).
+  - **MEGA (not a fixed folder):** Desktop syncs to user-chosen paths. [How desktop sync works](https://help.mega.io/desktop-app/desktop-syncs/how-does-syncing-work). macOS config: `~/Library/Application Support/Mega Limited/MEGAsync/`. Windows: `%LOCALAPPDATA%\Mega Limited\MEGAsync\MEGAsync.cfg` (base64 values, not a public path API). [Locate MEGAsync folder](https://stackoverflow.com/questions/29555905/how-do-i-programmatically-locate-my-megasync-folder).
+  - **MEGA in-app later:** official C++ SDK [github.com/meganz/sdk](https://github.com/meganz/sdk) / [developers](https://megalink.nz/developers) (CGO). Go client [github.com/t3rm1n4l/go-mega](https://github.com/t3rm1n4l/go-mega) (real remote like SMB). rclone: [rclone.org/mega](https://rclone.org/mega/).
+  - **Later pick:** Google Drive = iCloud-style local shortcut. MEGA = fragile cfg parse or full remote backend — not a Finder CloudStorage folder.
 
 ## Remote/SFTP
 
@@ -50,6 +55,7 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 - [x] Remember last window size (default wide enough for all columns)
 - [x] Command palette (Cmd+K) for actions/shortcuts discoverability
 - [x] Toast/undo for delete-to-trash instead of hard delete
+- [x] In case of rename when dialog is opened and input is focused we need to preselect the text(not including extension) so that user was able to edit the name immidently
 
 ## Editor/terminal
 
@@ -59,11 +65,12 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 ## Other
 
 - [x] Port killer — toolbar popover (next to Settings): local TCP listeners, inline kill, tree view, kill all
+- [x] Port killer tabs: Local Ports + Processes (lazy), kill by PID, tags for known services
 - [ ] Trash/recycle bin integration (soft delete, restore) instead of permanent delete
 - [ ] Disk usage treemap view (like WinDirStat) per folder
 - [ ] Plugin/extension points — low priority, only if long-term extensibility actually needed
 - [ ] New settings to show only in the tray or both tray and system menu
 - [x] Fast copy/move: APFS clonefile / Linux FICLONE+copy_file_range / Windows CopyFile; same-host SFTP via remote `cp`
 - [ ] Progress dialog for long copy/move ops (async status, minimize, per-pane source/dest)
-- [x] If docker was not running and we start the app, then we should close docker at the end -> `wails3 task dist VERSION=1.0.0`
-- [ ] Add into right click menu, open terminal and open finder here
+- [x] Add into right click menu option to open terminal and open finder in the specific folder
+- [x] If in clipboard we have photo/video or any binary file and user clicks on pane then ctrl/cmd+v, we need to paste that content
