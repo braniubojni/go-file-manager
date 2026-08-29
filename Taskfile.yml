@@ -33,8 +33,12 @@ tasks:
         mkdir -p "{{.ROOT_DIR}}/.task"
         rm -f "$STAMP"
 
-        # macOS only: GET /_ping. If it fails, killall Docker and relaunch,
-        # up to 5 times with 10s, 20s, 30s, 40s, 50s windows.
+        # macOS only: GET /_ping. Restart only when the engine is wedged
+        # (socket exists, ping 500/timeout after boot grace). No socket =
+        # still starting — do not kill. Up to 5 restarts, 10s…50s wedge windows.
+        last_launch=0
+        BOOT_GRACE=60
+
         desktop_running() {
           pgrep -x "Docker Desktop" >/dev/null 2>&1
         }
@@ -58,33 +62,70 @@ tasks:
           return 1
         }
 
-        docker_ready() {
+        ping_code() {
           sock=$(find_docker_sock) || return 1
-          code=$(curl -sS -o /dev/null -w "%{http_code}" --unix-socket "$sock" --max-time 1 http://localhost/_ping 2>/dev/null) || return 1
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --unix-socket "$sock" --max-time 1 http://localhost/_ping 2>/dev/null) || true
+          [ -n "$code" ] && [ "$code" != "000" ] && printf '%s' "$code"
+        }
+
+        docker_ready() {
+          code=$(ping_code || true)
           [ "$code" = "200" ]
+        }
+
+        # ready | booting | wedged
+        engine_state() {
+          if ! find_docker_sock >/dev/null; then
+            echo booting
+            return 0
+          fi
+          code=$(ping_code || true)
+          if [ "$code" = "200" ]; then
+            echo ready
+            return 0
+          fi
+          now=$(date +%s)
+          if [ $((now - last_launch)) -lt "$BOOT_GRACE" ]; then
+            echo booting
+            return 0
+          fi
+          echo wedged
         }
 
         wait_until_engine() {
           max_secs="$1"
           attempt="$2"
           start=$(date +%s)
-          while ! docker_ready; do
-            elapsed=$(( $(date +%s) - start ))
-            echo "=== Waiting for Docker engine /_ping (${elapsed}s / ${max_secs}s, try ${attempt}/5) ==="
-            if [ "$elapsed" -ge "$max_secs" ]; then
-              return 1
+          wedge_start=0
+          while true; do
+            state=$(engine_state)
+            if [ "$state" = "ready" ]; then
+              return 0
+            fi
+            now=$(date +%s)
+            elapsed=$((now - start))
+            echo "=== Waiting for Docker engine /_ping [${state}] (${elapsed}s, try ${attempt}/5) ==="
+            if [ "$state" = "wedged" ]; then
+              if [ "$wedge_start" -eq 0 ]; then
+                wedge_start=$now
+              fi
+              if [ $((now - wedge_start)) -ge "$max_secs" ]; then
+                return 1
+              fi
+            else
+              wedge_start=0
             fi
             sleep 1
           done
-          return 0
         }
 
         relaunch_docker() {
-          echo "=== try $1/5: no /_ping in $2s — killall Docker, relaunch ==="
+          echo "=== try $1/5: engine wedged for $2s — killall Docker, relaunch ==="
           killall Docker 2>/dev/null || true
           killall "Docker Desktop" 2>/dev/null || true
           sleep 1
           open -a Docker
+          last_launch=$(date +%s)
         }
 
         ensure_engine() {
@@ -113,6 +154,7 @@ tasks:
           if ! desktop_running; then
             echo "=== Docker Desktop is not running. Launching it. ==="
             open -a Docker
+            last_launch=$(date +%s)
             touch "$STAMP"
           else
             echo "=== Docker Desktop is running — waiting for engine /_ping ==="
@@ -120,7 +162,7 @@ tasks:
           rc=0
           ensure_engine || rc=$?
           if [ "$rc" -ne 0 ]; then
-            echo "Docker engine still silent after 5 restarts (10s…50s). Start Docker Desktop and re-run." >&2
+            echo "Docker engine still wedged after 5 restarts. Start Docker Desktop and re-run." >&2
             exit 1
           fi
           echo "=== Docker engine is healthy ==="

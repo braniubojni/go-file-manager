@@ -36,7 +36,7 @@ export const PortKillerPanel: FC<Props> = ({ open }) => {
     if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
     const k = e.key.toLowerCase();
     if (k !== 'r' && k !== 't' && k !== 'k') return;
-    if (k === 't' && tab !== 'ports') return;
+    if ((k === 't' || k === 'k') && tab !== 'ports') return;
     e.preventDefault();
     e.stopPropagation();
     if (k === 'r') {
@@ -111,6 +111,7 @@ export const PortKillerPanel: FC<Props> = ({ open }) => {
       <PortActions
         tree={tree}
         showTree={tab === 'ports'}
+        showKillAll={tab === 'ports'}
         killAllConfirm={killAllConfirm}
         onRefresh={() => {
           void refetchPorts();
@@ -120,7 +121,7 @@ export const PortKillerPanel: FC<Props> = ({ open }) => {
         onKillAll={() => setKillAllConfirm(true)}
         onCancelKillAll={() => setKillAllConfirm(false)}
         onConfirmKillAll={() =>
-          killAll.mutate(uniquePids(rows), {
+          killAll.mutate(uniquePids(portRows), {
             onSuccess: () => setKillAllConfirm(false),
             onError: fail,
           })
