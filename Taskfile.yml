@@ -25,7 +25,7 @@ tasks:
     vars:
       # Wails expects 'wails-cross' for amd64, and 'wails-cross-arm64' for arm64.
       IMAGE_NAME: 'wails-cross{{if ne .LINUX_ARCH "amd64"}}-{{.LINUX_ARCH}}{{end}}'
-      DOCKER_STAMP: '{{.ROOT_DIR}}/.task/docker-started-by-dist'
+      DOCKER_STAMP: "{{.ROOT_DIR}}/.task/docker-started-by-dist"
     cmds:
       - |
         set -euo pipefail
