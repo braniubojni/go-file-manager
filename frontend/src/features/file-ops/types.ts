@@ -24,6 +24,7 @@ export type DeleteDialogAction =
 
 export type FileOpsRequest =
   | 'copy'
+  | 'paste'
   | 'move'
   | 'delete'
   | 'rename'

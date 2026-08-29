@@ -25,3 +25,7 @@ export function KillAll(pids: number[] | null): $CancellablePromise<void> {
 export function List(): $CancellablePromise<domain$0.PortListener[] | null> {
     return $Call.ByID(3736556441);
 }
+
+export function ListProcesses(): $CancellablePromise<domain$0.ProcessInfo[] | null> {
+    return $Call.ByID(3484333438);
+}

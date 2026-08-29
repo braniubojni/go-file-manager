@@ -1,13 +1,14 @@
-# .github — agent memory (CI / release)
+# .github — agent memory (CI)
 
 Parent: root `AGENTS.md`.
 
 ## Workflows
 
-| File                    | When        | Purpose                                |
-| ----------------------- | ----------- | -------------------------------------- |
-| `workflows/ci.yml`      | PR + `main` | Go quality + frontend quality          |
-| `workflows/release.yml` | tags `v*`   | Multi-OS build + GitHub Release assets |
+| File               | When        | Purpose                       |
+| ------------------ | ----------- | ----------------------------- |
+| `workflows/ci.yml` | PR + `main` | Go quality + frontend quality |
+
+Releases are **local only** (`task dist` / `task release:local`) — no GitHub Actions release job.
 
 ## Go job (`ci.yml`) — required order
 
@@ -37,20 +38,9 @@ task ci:go
 
 **Not** a full CI mirror: `wails-cross` alone (GTK 4.8 / GtkFileDialog errors).
 
-## Release job
-
-- Triggers only on tags **`v*`** (no tags → empty GitHub Releases page).
-- Matrix: linux/amd64, darwin/arm64, windows/amd64 (native runners).
-- Linux deps: **GTK4** packages (same as CI), not gtk3.
-- Inject version from tag into ldflags + `build/config.yml`.
-- Asset naming for Wails updater: include os/arch substrings; single top-level entry per archive.
-- Publish job generates **`SHA256SUMS`** for platform zips/tarballs.
-- macOS CI: `darwin:package` → zip of `.app`; ad-hoc sign only (users may need right-click Open).
-- Local mirror of asset layout: root task **`dist`** (`task dist VERSION=x.y.z` → includes `SHA256SUMS`).
-
 ## Actions versions (current)
 
-- `actions/checkout@v5` (CI + release build job); release publish job still uses `actions/checkout@v4`
+- `actions/checkout@v5`
 - `actions/setup-go@v6`
 - `actions/setup-node@v6`
 - `golangci/golangci-lint-action@v9`

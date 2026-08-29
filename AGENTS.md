@@ -11,7 +11,7 @@ Human docs: `README.md`. Feature backlog: `todo.features.md`. **≤200 lines per
 | UI / Vite / knip                | `frontend/AGENTS.md` |
 | Go domain/services              | `internal/AGENTS.md` |
 | Icons / cross-build / Taskfiles | `build/AGENTS.md`    |
-| GitHub Actions / release        | `.github/AGENTS.md`  |
+| GitHub Actions / CI             | `.github/AGENTS.md`  |
 | Playwright                      | `e2e/AGENTS.md`      |
 
 Claude Code: also see root `CLAUDE.md` (pointer only).
@@ -24,7 +24,7 @@ internal/               # pure-ish Go + Wails services
 frontend/src/           # FSD-lite React UI
 frontend/bindings/      # GENERATED — do not hand-edit
 build/                  # appicon, platform Taskfiles, docker
-.github/workflows/      # ci.yml, release.yml
+.github/workflows/      # ci.yml
 e2e/                    # Playwright
 scripts/ci-go-docker.sh # local Linux Go CI mirror
 ```

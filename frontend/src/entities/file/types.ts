@@ -21,6 +21,13 @@ export interface PortListener {
   proto: string;
 }
 
+export interface ProcessInfo {
+  pid: number;
+  name: string;
+  cmd: string;
+  cwd?: string;
+}
+
 export interface AIUsageLimit {
   label: string;
   percent: number;

@@ -73,6 +73,7 @@ export const Toolbar: FC = () => {
         state={a.rename}
         dispatch={a.dispatchRename}
         onConfirm={a.confirmRename}
+        selectStem
       />
 
       <DeleteDialogs

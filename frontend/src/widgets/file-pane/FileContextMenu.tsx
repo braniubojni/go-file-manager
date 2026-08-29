@@ -8,6 +8,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import TerminalIcon from '@mui/icons-material/Terminal';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import Divider from '@mui/material/Divider';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -15,11 +16,13 @@ import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import type { FC, ReactNode } from 'react';
-import { isRemotePath } from '../../features/connections/helpers';
+import { isRemotePath, isSMBPath, parentOfVirtualPath } from '../../features/connections/helpers';
 import { useContextMenuStore } from '../../features/file-ops/contextMenuStore';
 import { useFileOpsStore } from '../../features/file-ops/fileOpsStore';
 import type { FileOpsAction } from '../../features/file-ops/types';
 import { usePaneStore } from '../../features/pane/paneStore';
+import { useTerminalStore } from '../../features/terminal/terminalStore';
+import { enterPaneTab } from './helpers';
 import { getPaneGrid } from '../../pages/file-manager/helpers';
 import { SettingsService } from '../../shared/api/bindings';
 import { isArchiveExt, isArchivePanePath, isBrowsableArchive } from '../../shared/lib/archives';
@@ -37,6 +40,14 @@ type Item = {
   dividerBefore?: boolean;
 };
 
+const parentOf = (p: string): string => {
+  const v = parentOfVirtualPath(p);
+  if (v) return v;
+  const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+  if (i <= 0) return p.startsWith('/') ? '/' : p;
+  return p.slice(0, i) || '/';
+};
+
 /**
  * Right-click menu for the file panes. Every entry routes through the same
  * fileOpsStore fan-out the toolbar and shortcuts use, so there is one
@@ -46,6 +57,8 @@ export const FileContextMenu: FC = () => {
   const { open, x, y, paneId, entry, panePath, close } = useContextMenuStore();
   const trigger = useFileOpsStore((s) => s.trigger);
   const otherPane = usePaneStore((s) => s.otherPane);
+  const navigate = usePaneStore((s) => s.navigate);
+  const setTerminalOpen = useTerminalStore((s) => s.setOpen);
   const show = useSnack((s) => s.show);
 
   const remote = isRemotePath(entry?.path ?? panePath);
@@ -151,6 +164,34 @@ export const FileContextMenu: FC = () => {
         icon: <FolderOpenIcon fontSize="small" />,
         run: act(() => {
           void SettingsService.RevealInOS(entry.path).catch((e) => show(errMessage(e), 'error'));
+        }),
+      });
+    }
+  }
+
+  const folder = entry?.isDir ? entry.path : entry ? parentOf(entry.path) : panePath;
+  if (!inArchive && folder) {
+    if (!isRemotePath(folder)) {
+      items.push({
+        key: 'open-os',
+        label: 'Open in file manager',
+        icon: <OpenInNewIcon fontSize="small" />,
+        dividerBefore: true,
+        run: act(() => {
+          void SettingsService.OpenInOS(folder).catch((e) => show(errMessage(e), 'error'));
+        }),
+      });
+    }
+    if (!isSMBPath(folder)) {
+      items.push({
+        key: 'open-terminal',
+        label: 'Open Terminal Here',
+        icon: <TerminalIcon fontSize="small" />,
+        dividerBefore: isRemotePath(folder),
+        run: act(() => {
+          if (!isRemotePath(folder)) enterPaneTab(paneId, folder);
+          navigate(paneId, folder);
+          setTerminalOpen(paneId, true);
         }),
       });
     }

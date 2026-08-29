@@ -100,6 +100,7 @@ export const createToolbarRequestHandlers = (
   const noop = () => undefined;
   const all: FileOpsAction[] = [
     'copy',
+    'paste',
     'move',
     'delete',
     'rename',

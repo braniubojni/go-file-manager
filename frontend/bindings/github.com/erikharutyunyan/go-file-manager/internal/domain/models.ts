@@ -319,6 +319,16 @@ export interface PortListener {
 }
 
 /**
+ * ProcessInfo is a user-owned OS process (port killer Processes tab).
+ */
+export interface ProcessInfo {
+    "pid": number;
+    "name": string;
+    "cmd": string;
+    "cwd"?: string;
+}
+
+/**
  * RemoteRecent is a recently visited remote directory path.
  */
 export interface RemoteRecent {

@@ -76,7 +76,7 @@ tasks:
       The stock wails-cross image uses Debian 12 with GTK 4.8. Wails v3 default Linux
       backend needs GTK 4.10+ (GtkFileDialog). Cross-builds therefore default to the
       legacy `gtk3` tag (WebKit2GTK 4.1). Override with EXTRA_TAGS if needed.
-      Prefer native Ubuntu 24.04 CI for full GTK4 builds (see .github/workflows/release.yml).
+      Prefer native Ubuntu 24.04 (`task ci:go` / `.github/workflows/ci.yml`) for full GTK4.
 
       Linux CGO needs a matching container arch (native GCC + GTK libs). The image is
       single-arch; rebuild for the target with: task setup:docker ARCH=amd64|arm64

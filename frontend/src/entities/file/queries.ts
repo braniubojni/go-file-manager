@@ -16,6 +16,7 @@ import type {
   PaneTabsState,
   ThemePreference,
   PortListener,
+  ProcessInfo,
   Volume,
 } from './types';
 import { defaultSettings } from './types';
@@ -32,6 +33,7 @@ const queryKeys = {
   paneTabs: ['paneTabs'] as const,
   volumes: ['volumes'] as const,
   ports: ['ports'] as const,
+  processes: ['processes'] as const,
   diskUsage: (path: string) => ['diskUsage', path] as const,
   aiUsage: ['aiUsage'] as const,
 };
@@ -168,12 +170,21 @@ export const usePorts = (enabled: boolean) => {
   });
 };
 
+export const useProcesses = (enabled: boolean) => {
+  return useQuery({
+    queryKey: queryKeys.processes,
+    queryFn: async () => ((await PortService.ListProcesses()) ?? []) as ProcessInfo[],
+    enabled,
+  });
+};
+
 export const useKillPort = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (pid: number) => PortService.Kill(pid),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.ports });
+      void qc.invalidateQueries({ queryKey: queryKeys.processes });
     },
   });
 };
@@ -184,6 +195,7 @@ export const useKillAllPorts = () => {
     mutationFn: (pids: number[]) => PortService.KillAll(pids),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.ports });
+      void qc.invalidateQueries({ queryKey: queryKeys.processes });
     },
   });
 };

@@ -211,6 +211,13 @@ export function OpenWithPicker(path: string): $CancellablePromise<void> {
 }
 
 /**
+ * PasteClipboard copies OS clipboard files into dest, or writes a PNG image.
+ */
+export function PasteClipboard(dest: string): $CancellablePromise<void> {
+    return $Call.ByID(3462084799, dest);
+}
+
+/**
  * PurgeTrash drops undo batches older than TrashMaxAge (called at startup).
  */
 export function PurgeTrash(): $CancellablePromise<void> {

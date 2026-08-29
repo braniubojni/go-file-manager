@@ -234,6 +234,14 @@ type PortListener struct {
 	Proto   string `json:"proto"` // "tcp"
 }
 
+// ProcessInfo is a user-owned OS process (port killer Processes tab).
+type ProcessInfo struct {
+	PID  int    `json:"pid"`
+	Name string `json:"name"`
+	Cmd  string `json:"cmd"`
+	Cwd  string `json:"cwd,omitempty"`
+}
+
 // AIUsage is one AI coding agent's quota snapshot.
 type AIUsage struct {
 	ID       string          `json:"id"` // claude | grok | cursor

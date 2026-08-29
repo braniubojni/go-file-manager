@@ -1,7 +1,7 @@
 import type { SxProps, Theme } from '@mui/material/styles';
 
 export const paperSx: SxProps<Theme> = {
-  width: 360,
+  width: 400,
   maxWidth: 'calc(100vw - 32px)',
   maxHeight: 'min(560px, calc(100vh - 48px))',
   display: 'flex',
@@ -30,6 +30,12 @@ export const searchRowSx: SxProps<Theme> = {
   pb: 1,
 };
 
+export const killerTabsSx: SxProps<Theme> = {
+  minHeight: 36,
+  px: 1,
+  '& .MuiTab-root': { minHeight: 36, py: 0, textTransform: 'none', fontSize: 13 },
+};
+
 export const countBadgeSx: SxProps<Theme> = {
   minWidth: 22,
   height: 22,
@@ -42,17 +48,6 @@ export const countBadgeSx: SxProps<Theme> = {
   fontSize: 12,
   fontWeight: 600,
   flex: '0 0 auto',
-};
-
-export const sectionHeaderSx: SxProps<Theme> = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 0.75,
-  px: 1.5,
-  py: 0.5,
-  color: 'success.main',
-  fontWeight: 600,
-  fontSize: 13,
 };
 
 export const listSx: SxProps<Theme> = {
@@ -82,6 +77,14 @@ export const rowSx: SxProps<Theme> = {
   '&:hover': { bgcolor: 'action.hover' },
 };
 
+export const twoLineLeadingSx: SxProps<Theme> = {
+  flex: 1,
+  minWidth: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 0.125,
+};
+
 export const indentRowSx: SxProps<Theme> = {
   display: 'flex',
   alignItems: 'center',
@@ -106,6 +109,12 @@ export const pidSx: SxProps<Theme> = {
   ml: 'auto',
   color: 'text.secondary',
   fontSize: 12,
+  flex: '0 0 auto',
+};
+
+export const tagSx: SxProps<Theme> = {
+  height: 20,
+  fontSize: 11,
   flex: '0 0 auto',
 };
 

@@ -14,6 +14,7 @@ import { FileService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
 import { isRemotePath } from '../../../features/connections/helpers';
+import { isArchivePanePath } from '../../../shared/lib/archives';
 import { isPermissionError } from '../helpers';
 import type { FileOpDialogsArgs } from '../types';
 
@@ -68,6 +69,26 @@ export const useFileOpDialogs = ({
         void qc.invalidateQueries({ queryKey: ['gitStatus'] });
       },
     });
+  };
+
+  const onPaste = () => {
+    if (isRemotePath(activePath) || isArchivePanePath(activePath)) {
+      return show('Paste is not available here', 'warning');
+    }
+    void FileService.PasteClipboard(activePath)
+      .then(() => {
+        void qc.invalidateQueries({ queryKey: ['dir'] });
+        void qc.invalidateQueries({ queryKey: ['gitStatus'] });
+        show('Pasted', 'success');
+      })
+      .catch((e) => {
+        const msg = errMessage(e);
+        if (/nothing to paste/i.test(msg)) {
+          show('Nothing to paste', 'info');
+          return;
+        }
+        show(msg, 'error');
+      });
   };
 
   const onMove = () => {
@@ -207,6 +228,7 @@ export const useFileOpDialogs = ({
     dispatchRename,
     dispatchDelete,
     onCopy,
+    onPaste,
     onMove,
     onDelete,
     onMkdir,
