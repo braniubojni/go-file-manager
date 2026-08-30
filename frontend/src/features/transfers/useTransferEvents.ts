@@ -22,6 +22,9 @@ export const useTransferEvents = (): void => {
       const payload = (ev?.data ?? ev) as TransferDonePayload;
       if (!payload?.jobId) return;
       // Keep a brief final frame then clear; startTransfer also removes on settle.
+      // remove() itself flips any still-active files to 'canceled' first, so
+      // a job that stopped from a real error (not just user cancel) still
+      // gets its ghost dest rows cleaned up.
       window.setTimeout(() => remove(payload.jobId!), 150);
     });
 

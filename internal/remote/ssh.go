@@ -721,7 +721,7 @@ func (m *Manager) CopyWithinCtx(ctx context.Context, sources []string, destDir s
 	if err != nil {
 		return err
 	}
-	total, err := m.remoteSourcesBytes(sources)
+	files, total, err := m.remoteSourcesStats(sources)
 	if err != nil {
 		return err
 	}
@@ -729,6 +729,10 @@ func (m *Manager) CopyWithinCtx(ctx context.Context, sources []string, destDir s
 	if onProgress != nil {
 		onProgress(filesystem.ProgressEvent{Total: total})
 	}
+	workers := filesystem.WorkerCount(filesystem.IONetwork, files)
+	pool := newXferPool(ctx, workers, func(ctx context.Context, j sftpFileJob) error {
+		return copyRemoteFile(ctx, j.c, j.src, j.dst, j.mode, rep)
+	})
 	var created []string
 	defer func() {
 		if errors.Is(err, context.Canceled) {
@@ -737,16 +741,20 @@ func (m *Manager) CopyWithinCtx(ctx context.Context, sources []string, destDir s
 			}
 		}
 	}()
+	var placeErr error
 	for _, src := range sources {
 		if err := ctx.Err(); err != nil {
-			return err
+			placeErr = err
+			break
 		}
 		sloc, err := ParseLocation(src)
 		if err != nil {
-			return err
+			placeErr = err
+			break
 		}
 		if sloc.SessionKey() != dloc.SessionKey() {
-			return fmt.Errorf("cross-host copy not supported")
+			placeErr = fmt.Errorf("cross-host copy not supported")
+			break
 		}
 		base := path.Base(sloc.RemotePath)
 		dest := uniqueRemotePath(ds.sftp, path.Join(dloc.RemotePath, base))
@@ -754,9 +762,22 @@ func (m *Manager) CopyWithinCtx(ctx context.Context, sources []string, destDir s
 		st, statErr := ds.sftp.Stat(sloc.RemotePath)
 		srcIsDir := statErr == nil && st.IsDir()
 		rep.setDest(dloc.JoinPath(dest), srcIsDir)
-		if err := copyRemoteCtx(ctx, ds, sloc.RemotePath, dest, rep); err != nil {
-			return err
+		if err := copyRemoteCtx(ctx, ds, sloc.RemotePath, dest, rep, pool); err != nil {
+			placeErr = err
+			break
 		}
+	}
+	if placeErr != nil {
+		pool.cancel()
+	}
+	waitErr := pool.finish()
+	if placeErr != nil {
+		err = placeErr
+		return err
+	}
+	if waitErr != nil {
+		err = waitErr
+		return err
 	}
 	rep.finish("")
 	return nil
@@ -824,7 +845,7 @@ func (m *Manager) MoveWithinCtx(ctx context.Context, sources []string, destDir s
 		srcIsDir := statErr == nil && st.IsDir()
 		rep.setDest(dloc.JoinPath(dest), srcIsDir)
 		if err := ds.sftp.Rename(sloc.RemotePath, dest); err != nil {
-			if err2 := copyRemoteCtx(ctx, ds, sloc.RemotePath, dest, rep); err2 != nil {
+			if err2 := copyRemoteOne(ctx, ds, sloc.RemotePath, dest, rep); err2 != nil {
 				return err2
 			}
 			if err2 := removeAll(ds.sftp, sloc.RemotePath); err2 != nil {
@@ -838,7 +859,24 @@ func (m *Manager) MoveWithinCtx(ctx context.Context, sources []string, destDir s
 	return nil
 }
 
-func copyRemoteCtx(ctx context.Context, s *Session, src, dst string, rep *remoteProgress) error {
+func copyRemoteOne(ctx context.Context, s *Session, src, dst string, rep *remoteProgress) error {
+	files, _, err := remotePathStats(s.sftp, src)
+	if err != nil {
+		return err
+	}
+	workers := filesystem.WorkerCount(filesystem.IONetwork, files)
+	pool := newXferPool(ctx, workers, func(ctx context.Context, j sftpFileJob) error {
+		return copyRemoteFile(ctx, j.c, j.src, j.dst, j.mode, rep)
+	})
+	if err := copyRemoteCtx(ctx, s, src, dst, rep, pool); err != nil {
+		pool.cancel()
+		_ = pool.finish()
+		return err
+	}
+	return pool.finish()
+}
+
+func copyRemoteCtx(ctx context.Context, s *Session, src, dst string, rep *remoteProgress, pool *xferPool[sftpFileJob]) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -860,23 +898,41 @@ func copyRemoteCtx(ctx context.Context, s *Session, src, dst string, rep *remote
 		rep.add(n, src)
 		return nil
 	}
-	if st.IsDir() {
-		if err := c.MkdirAll(dst); err != nil {
+	return copyRemotePlace(ctx, c, src, dst, pool)
+}
+
+func copyRemotePlace(ctx context.Context, c *sftp.Client, src, dst string, pool *xferPool[sftpFileJob]) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	st, err := c.Stat(src)
+	if err != nil {
+		return err
+	}
+	if !st.IsDir() {
+		return pool.enqueue(sftpFileJob{c: c, src: src, dst: dst, mode: st.Mode()})
+	}
+	if err := c.MkdirAll(dst); err != nil {
+		return err
+	}
+	entries, err := c.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if err := ctx.Err(); err != nil {
 			return err
 		}
-		entries, err := c.ReadDir(src)
-		if err != nil {
+		if err := copyRemotePlace(ctx, c, path.Join(src, e.Name()), path.Join(dst, e.Name()), pool); err != nil {
 			return err
 		}
-		for _, e := range entries {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			if err := copyRemoteCtx(ctx, s, path.Join(src, e.Name()), path.Join(dst, e.Name()), rep); err != nil {
-				return err
-			}
-		}
-		return nil
+	}
+	return nil
+}
+
+func copyRemoteFile(ctx context.Context, c *sftp.Client, src, dst string, _ os.FileMode, rep *remoteProgress) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	in, err := c.Open(src)
 	if err != nil {
@@ -888,7 +944,11 @@ func copyRemoteCtx(ctx context.Context, s *Session, src, dst string, rep *remote
 		return err
 	}
 	defer func() { _ = out.Close() }()
-	if err := copyUnwrapped(ctx, out, in, src, st.Size(), nil, rep); err != nil {
+	var known int64
+	if st, err := in.Stat(); err == nil {
+		known = st.Size()
+	}
+	if err := copyUnwrapped(ctx, out, in, src, known, nil, rep); err != nil {
 		return err
 	}
 	return out.Close()

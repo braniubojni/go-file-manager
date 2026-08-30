@@ -40,6 +40,7 @@ export const startAttachDmg = (opts: {
           destSize: 0,
           destIsDir: false,
           percent: 0,
+          files: [],
         });
       }
       return FileService.AttachDiskImage(jobId || '', path, password)

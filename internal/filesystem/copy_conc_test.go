@@ -8,21 +8,6 @@ import (
 	"testing"
 )
 
-func TestCopyWorkerCount(t *testing.T) {
-	if n := copyWorkerCount(copyStats{files: 1, max: 100}); n != 1 {
-		t.Fatalf("single file: %d", n)
-	}
-	if n := copyWorkerCount(copyStats{files: 20, max: largeCopyFileBytes}); n != 1 {
-		t.Fatalf("large file batch: %d", n)
-	}
-	if n := copyWorkerCount(copyStats{files: 20, max: 1024}); n != maxCopyWorkers {
-		t.Fatalf("small files: %d", n)
-	}
-	if n := copyWorkerCount(copyStats{files: 2, max: 1024}); n != 2 {
-		t.Fatalf("two small: %d", n)
-	}
-}
-
 func TestCopyManySmallFiles(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(root, "src")
@@ -105,4 +90,47 @@ func names(ents []os.DirEntry) []string {
 		out[i] = e.Name()
 	}
 	return out
+}
+
+// TestCopyPerFileCancel: cancelling one source via FileCancelRegistry skips
+// only that source (its partial dest removed) — sibling sources still copy.
+func TestCopyPerFileCancel(t *testing.T) {
+	root := t.TempDir()
+	srcDir := filepath.Join(root, "src")
+	dstDir := filepath.Join(root, "dst")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	payload := bytes.Repeat([]byte("x"), 64*1024)
+	var sources []string
+	for i := 0; i < 4; i++ {
+		p := filepath.Join(srcDir, string(rune('a'+i))+".bin")
+		if err := os.WriteFile(p, payload, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		sources = append(sources, p)
+	}
+	target := sources[1] // "b.bin" — cancel this one specifically
+
+	reg := NewFileCancelRegistry()
+	ctx := WithFileCancelRegistry(context.Background(), reg)
+	err := CopyCtx(ctx, sources, dstDir, func(ev ProgressEvent) {
+		if ev.DestPath != "" && filepath.Base(ev.DestPath) == filepath.Base(target) {
+			reg.Cancel(target)
+		}
+	})
+	if err != nil {
+		t.Fatalf("batch should not fail from a per-file cancel: %v", err)
+	}
+	if _, statErr := os.Stat(filepath.Join(dstDir, "b.bin")); !os.IsNotExist(statErr) {
+		t.Fatalf("cancelled source should not have a dest file, got err=%v", statErr)
+	}
+	for _, name := range []string{"a.bin", "c.bin", "d.bin"} {
+		if _, statErr := os.Stat(filepath.Join(dstDir, name)); statErr != nil {
+			t.Fatalf("sibling %s should have copied: %v", name, statErr)
+		}
+	}
 }

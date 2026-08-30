@@ -44,6 +44,27 @@ const applyDestOps = (apiRef: GridApiLike, panePath: string, ops: TransferOp[]):
   }
 };
 
+// Removes an optimistically-added dest row once its file is known cancelled
+// (backend deletes the partial file on cancel — see FileCancelRegistry) so it
+// doesn't linger as a ghost row until the next full directory refetch.
+const removeCanceledFileRows = (
+  apiRef: GridApiLike,
+  panePath: string,
+  op: TransferOp,
+  prevOp: TransferOp | undefined,
+): void => {
+  const api = apiRef.current;
+  if (!api || typeof api.updateRows !== 'function' || !sameDir(op.destDir, panePath)) return;
+  const prevStatus = new Map(prevOp?.files.map((f) => [f.path, f.status]));
+  for (const f of op.files) {
+    if (f.dest && f.status === 'canceled' && prevStatus.get(f.path) !== 'canceled') {
+      // FileTable's getRowId reads `path`, not `id` — a delete update needs
+      // whatever getRowId resolves to, or DataGrid rejects it as id-less.
+      api.updateRows([{ id: f.dest, path: f.dest, _action: 'delete' }]);
+    }
+  }
+};
+
 /** Patch only the dest row via DataGrid updateRows — no listing refetch. */
 export const useDestRowUpdates = (
   apiRef: GridApiLike,
@@ -59,8 +80,9 @@ export const useDestRowUpdates = (
       const api = apiRef.current;
       if (api && typeof api.updateRows === 'function' && panePath) {
         for (const op of Object.values(next)) {
-          if (!op.destPath || !sameDir(op.destDir, panePath)) continue;
           const before = prev[op.jobId];
+          removeCanceledFileRows(apiRef, panePath, op, before);
+          if (!op.destPath || !sameDir(op.destDir, panePath)) continue;
           if (
             before &&
             before.destPath === op.destPath &&

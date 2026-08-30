@@ -40,3 +40,37 @@ export const tooltipHeaderSx: SxProps<Theme> = {
 export const tooltipSlotSx: SxProps<Theme> = {
   maxWidth: 400,
 };
+
+export const fileListSx: SxProps<Theme> = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 0.25,
+  mt: 0.25,
+  maxHeight: 160,
+  overflowY: 'auto',
+};
+
+// Cancel icon stays invisible until the row is hovered/focused, so a job with
+// many files doesn't turn into a wall of buttons.
+export const fileRowSx: SxProps<Theme> = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 0.5,
+  px: 0.5,
+  py: 0.25,
+  borderRadius: 1,
+  border: '1px solid transparent',
+  '&:hover': {
+    bgcolor: 'action.hover',
+    borderColor: 'divider',
+  },
+  '&:hover .file-row-cancel, &:focus-within .file-row-cancel': {
+    visibility: 'visible',
+  },
+};
+
+export const fileRowCancelSx: SxProps<Theme> = {
+  visibility: 'hidden',
+  p: 0.25,
+  ml: 'auto',
+};
