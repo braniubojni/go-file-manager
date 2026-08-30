@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-const copyUserBufSize = 1 << 20 // 1 MiB
+var copyUserBufSize = 1 << 20 // 1 MiB; var so benchmarks can sweep it
 
 // errNoClone means this platform/FS cannot clone; callers fall back to a byte copy.
 var errNoClone = errors.New("clone not supported")
@@ -112,34 +112,78 @@ func reportCopiedFile(src, dst string, rep *progressReporter) error {
 // Nil in production — zero overhead.
 var testAfterChunk func(ctx context.Context)
 
+// readChunk is one buffer's worth of read result, handed from the reader
+// goroutine to the write loop below.
+type readChunk struct {
+	buf []byte // buf[:n]; cap(buf) is always copyUserBufSize
+	err error
+}
+
+// copyFileUser is the last-resort byte copy when no kernel fast path (clone,
+// FICLONE, copy_file_range) applies — notably every cross-volume copy on
+// darwin, which has no file-to-file zero-copy syscall at all. Reads and
+// writes overlap on two ping-ponging buffers so a slow source (e.g. a
+// compressed disk image) and a slow destination (e.g. a USB drive) pay their
+// latency concurrently instead of back-to-back: throughput goes from
+// 1/(1/read+1/write) toward min(read, write).
 func copyFileUser(ctx context.Context, in *os.File, out *os.File, src, dst string, rep *progressReporter) error {
-	buf := make([]byte, copyUserBufSize)
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	free := make(chan []byte, 2)
+	filled := make(chan readChunk, 2)
+	free <- make([]byte, copyUserBufSize)
+	free <- make([]byte, copyUserBufSize)
+
+	go func() {
+		for {
+			var buf []byte
+			select {
+			case buf = <-free:
+			case <-ctx.Done():
+				return
+			}
+			nr, rerr := in.Read(buf)
+			select {
+			case filled <- readChunk{buf: buf[:nr], err: rerr}:
+			case <-ctx.Done():
+				return
+			}
+			if rerr != nil {
+				return
+			}
 		}
-		nr, rerr := in.Read(buf)
-		if nr > 0 {
-			nw, werr := out.Write(buf[:nr])
+	}()
+
+	for {
+		var c readChunk
+		select {
+		case c = <-filled:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		if len(c.buf) > 0 {
+			nw, werr := out.Write(c.buf)
 			if nw > 0 {
 				rep.addAt(int64(nw), src, dst, false)
 			}
 			if werr != nil {
 				return preferCanceled(ctx, werr)
 			}
-			if nw != nr {
+			if nw != len(c.buf) {
 				return io.ErrShortWrite
 			}
 			if testAfterChunk != nil {
 				testAfterChunk(ctx)
 			}
 		}
-		if rerr == io.EOF {
+		if c.err == io.EOF {
 			return preferCanceled(ctx, nil)
 		}
-		if rerr != nil {
-			return preferCanceled(ctx, rerr)
+		if c.err != nil {
+			return preferCanceled(ctx, c.err)
 		}
+		free <- c.buf[:cap(c.buf)]
 	}
 }
 

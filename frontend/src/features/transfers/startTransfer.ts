@@ -51,6 +51,7 @@ export const startTransfer = (opts: StartTransferOpts): void => {
           destSize: 0,
           destIsDir: false,
           percent: 0,
+          files: [],
         });
       }
       const op = kind === 'move' ? FileService.Move : FileService.Copy;

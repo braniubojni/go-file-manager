@@ -171,7 +171,24 @@ Archives must have a **single top-level entry** (Wails extract rule): `.app` / o
 
 The updater’s default asset matcher picks by `GOOS` + `GOARCH` substrings (`darwin`/`windows`/`linux`, `arm64`/`amd64`).
 
-**Note:** macOS artifacts are ad-hoc signed only (not Developer ID). Gatekeeper may still require right-click → Open; the updater does not re-sign binaries.
+### macOS Gatekeeper (ad-hoc signed, no Developer ID)
+
+macOS artifacts are ad-hoc signed only (`codesign --sign -`, see `build/darwin/Taskfile.yml`) — no Apple Developer ID, no notarization. This costs nothing but macOS Gatekeeper can hard-block the app after a system update (seen on macOS 26 Tahoe: `spctl -a -vv` reports `rejected` with no override).
+
+Tested, does **not** work (no free fix):
+- Right-click → Open (message was "app is not supported on this Mac", not the usual "unidentified developer" dialog — no bypass offered)
+- `sudo spctl --add` — removed by Apple in modern macOS
+- Locally-trusted self-signed code-signing certificate — `spctl` still rejects; Gatekeeper's execute policy checks Apple's notarization ticket, not local keychain trust
+
+If you hit this, the app is not actually broken — Gatekeeper is blocking it outright with no in-app way around it. Workaround:
+
+```bash
+xattr -cr /Applications/go-file-manager.app   # harmless even if this isn't the cause
+```
+
+then System Settings → Privacy & Security → scroll to the bottom → **Open Anyway** next to the blocked-app notice, then confirm once more when relaunching. Repeat after every update (ad-hoc signature changes each build, so Gatekeeper re-evaluates each time).
+
+The real, permanent fix is an Apple Developer ID ($99/yr) → sign with `wails3 task darwin:sign:notarize` instead of the ad-hoc default, then staple the ticket. No plans to do this until that's worth the cost.
 
 ## Quality / CI
 

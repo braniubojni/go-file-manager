@@ -123,15 +123,17 @@ func (s *FileService) emit(name string, data any) {
 }
 
 type jobHandle struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx        context.Context
+	cancel     context.CancelFunc
+	fileCancel *filesystem.FileCancelRegistry
 }
 
 // NewJobID allocates a cancellable job context and returns its id.
 func (s *FileService) NewJobID() string {
 	id := fmt.Sprintf("job-%d", s.jobSeq.Add(1))
-	ctx, cancel := context.WithCancel(context.Background())
-	s.jobs.Store(id, &jobHandle{ctx: ctx, cancel: cancel})
+	reg := filesystem.NewFileCancelRegistry()
+	ctx, cancel := context.WithCancel(filesystem.WithFileCancelRegistry(context.Background(), reg))
+	s.jobs.Store(id, &jobHandle{ctx: ctx, cancel: cancel, fileCancel: reg})
 	return id
 }
 
@@ -152,6 +154,22 @@ func (s *FileService) CancelJob(jobID string) error {
 	}
 	if v, ok := s.jobs.LoadAndDelete(jobID); ok {
 		v.(*jobHandle).cancel()
+	}
+	return nil
+}
+
+// CancelTransferFile cancels one source path within a running Copy/Move job
+// without cancelling the rest of it (the "Cancel All" job-wide cancel is
+// CancelJob). Currently only takes effect for local (non-remote) transfers —
+// remote SMB/SFTP jobs still support job-wide cancel only.
+func (s *FileService) CancelTransferFile(jobID, path string) error {
+	if jobID == "" || path == "" {
+		return nil
+	}
+	if v, ok := s.jobs.Load(jobID); ok {
+		if abs, err := filesystem.Resolve(path); err == nil {
+			v.(*jobHandle).fileCancel.Cancel(abs)
+		}
 	}
 	return nil
 }
@@ -313,6 +331,12 @@ func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir 
 			}
 			return mgr.CopyWithinCtx(ctx, sources, destDir, onProgress)
 		}
+		if smb, ok := be.(*remote.SMBManager); ok {
+			if isMove {
+				return smb.MoveWithinCtx(ctx, sources, destDir, onProgress)
+			}
+			return smb.CopyWithinCtx(ctx, sources, destDir, onProgress)
+		}
 		if isMove {
 			return be.MoveWithin(sources, destDir)
 		}
@@ -324,6 +348,10 @@ func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir 
 		}
 		if mgr, ok := be.(*remote.Manager); ok {
 			if err := mgr.DownloadCtx(ctx, sources, destDir, onProgress); err != nil {
+				return err
+			}
+		} else if smb, ok := be.(*remote.SMBManager); ok {
+			if err := smb.DownloadCtx(ctx, sources, destDir, onProgress); err != nil {
 				return err
 			}
 		} else if err := be.Download(sources, destDir); err != nil {
@@ -340,6 +368,10 @@ func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir 
 		}
 		if mgr, ok := be.(*remote.Manager); ok {
 			if err := mgr.UploadCtx(ctx, sources, destDir, onProgress); err != nil {
+				return err
+			}
+		} else if smb, ok := be.(*remote.SMBManager); ok {
+			if err := smb.UploadCtx(ctx, sources, destDir, onProgress); err != nil {
 				return err
 			}
 		} else if err := be.Upload(sources, destDir); err != nil {
@@ -359,6 +391,15 @@ func (s *FileService) transferProgress(jobID, kind, label, destDir string) files
 		return nil
 	}
 	return func(ev filesystem.ProgressEvent) {
+		var files []domain.TransferFileProgress
+		if len(ev.Files) > 0 {
+			files = make([]domain.TransferFileProgress, len(ev.Files))
+			for i, f := range ev.Files {
+				files[i] = domain.TransferFileProgress{
+					Path: f.Path, Dest: f.Dest, Done: f.Done, Total: f.Total, Status: f.Status,
+				}
+			}
+		}
 		s.emit("transfer:progress", domain.TransferProgressPayload{
 			JobID:       jobID,
 			Kind:        kind,
@@ -370,6 +411,7 @@ func (s *FileService) transferProgress(jobID, kind, label, destDir string) files
 			DestPath:    ev.DestPath,
 			DestSize:    ev.DestSize,
 			DestIsDir:   ev.DestIsDir,
+			Files:       files,
 		})
 	}
 }

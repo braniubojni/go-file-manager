@@ -2,9 +2,11 @@ package filesystem
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -17,6 +19,29 @@ type ProgressEvent struct {
 	DestPath    string // UniquePath dest root for the current source
 	DestSize    int64  // bytes written into DestPath so far
 	DestIsDir   bool
+	Files       []FileProgress // one entry per top-level source, for per-file UI + cancel
+}
+
+// FileProgress is one top-level source's own progress within a batch job.
+type FileProgress struct {
+	Path   string // resolved source path (FileCancelRegistry key)
+	Dest   string // UniquePath dest root for this source
+	Done   int64
+	Total  int64
+	Status string // active | done | canceled
+}
+
+const (
+	FileStatusActive   = "active"
+	FileStatusDone     = "done"
+	FileStatusCanceled = "canceled"
+)
+
+type fileRoot struct {
+	path, dest string
+	total      int64
+	done       int64
+	status     string
 }
 
 // ProgressFunc reports transfer progress.
@@ -78,6 +103,7 @@ type progressReporter struct {
 	on        ProgressFunc
 	lastEmit  time.Time
 	force     bool
+	roots     []*fileRoot
 }
 
 func newProgressReporter(total int64, on ProgressFunc) *progressReporter {
@@ -91,6 +117,13 @@ func newProgressReporter(total int64, on ProgressFunc) *progressReporter {
 }
 
 func (r *progressReporter) eventLocked(currentPath string) ProgressEvent {
+	files := make([]FileProgress, len(r.roots))
+	for i, root := range r.roots {
+		files[i] = FileProgress{
+			Path: root.path, Dest: root.dest,
+			Done: root.done, Total: root.total, Status: root.status,
+		}
+	}
 	return ProgressEvent{
 		Done:        r.done,
 		Total:       r.total,
@@ -98,6 +131,62 @@ func (r *progressReporter) eventLocked(currentPath string) ProgressEvent {
 		DestPath:    r.destPath,
 		DestSize:    r.destSize,
 		DestIsDir:   r.destIsDir,
+		Files:       files,
+	}
+}
+
+// addRoot registers src as a new top-level source for per-file progress/cancel
+// UI. total <= 0 (unknown size, e.g. a directory not yet walked) still gets an
+// entry so the file list can show it as active.
+func (r *progressReporter) addRoot(src, dest string, total int64) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	r.roots = append(r.roots, &fileRoot{path: src, dest: dest, total: total, status: FileStatusActive})
+	r.force = true
+	ev := r.eventLocked("")
+	on := r.on
+	r.mu.Unlock()
+	if on != nil {
+		on(ev)
+	}
+}
+
+func (r *progressReporter) findRootLocked(destPath string) *fileRoot {
+	if destPath == "" {
+		return nil
+	}
+	for _, root := range r.roots {
+		if root.dest == destPath || strings.HasPrefix(destPath, root.dest+string(os.PathSeparator)) {
+			return root
+		}
+	}
+	return nil
+}
+
+// setRootStatus marks src's root row done/canceled and emits immediately so
+// the UI reflects it without waiting for the next throttled byte tick.
+func (r *progressReporter) setRootStatus(src, status string) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	for _, root := range r.roots {
+		if root.path == src {
+			root.status = status
+			if status == FileStatusDone && root.total > 0 {
+				root.done = root.total
+			}
+			break
+		}
+	}
+	r.force = true
+	ev := r.eventLocked("")
+	on := r.on
+	r.mu.Unlock()
+	if on != nil {
+		on(ev)
 	}
 }
 
@@ -137,6 +226,12 @@ func (r *progressReporter) addAt(n int64, currentPath, destPath string, destIsDi
 		r.destPath = destPath
 		r.destSize = r.written[destPath]
 		r.destIsDir = destIsDir
+		if root := r.findRootLocked(destPath); root != nil {
+			root.done += n
+			if root.total > 0 && root.done > root.total {
+				root.done = root.total
+			}
+		}
 	} else {
 		r.destSize += n
 	}
@@ -286,6 +381,10 @@ func MoveCtx(ctx context.Context, sources []string, destDir string, onProgress P
 		onProgress(ProgressEvent{Total: total})
 	}
 
+	type copyJob struct{ src, dst string }
+	var toCopy []copyJob
+	var created []string
+
 	for i, src := range sources {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -301,18 +400,74 @@ func MoveCtx(ctx context.Context, sources []string, destDir string, onProgress P
 		target := UniquePath(filepath.Join(destAbs, base))
 		srcIsDir := isDir(srcAbs)
 		rep.setDest(target, srcIsDir)
+		rep.addRoot(srcAbs, target, weights[i])
 
 		if err := os.Rename(srcAbs, target); err != nil {
-			if err := copyPathCtx(ctx, srcAbs, target, rep); err != nil {
-				removeAllRetry(target)
-				return preferCanceled(ctx, err)
-			}
-			if err := Delete([]string{srcAbs}); err != nil {
-				return err
-			}
+			created = append(created, target)
+			toCopy = append(toCopy, copyJob{srcAbs, target})
 			continue
 		}
 		rep.add(weights[i], srcAbs)
+		rep.setRootStatus(srcAbs, FileStatusDone)
+	}
+
+	if len(toCopy) == 0 {
+		rep.finish("")
+		return nil
+	}
+
+	copySrcs := make([]string, len(toCopy))
+	for i, j := range toCopy {
+		copySrcs[i] = j.src
+	}
+	st, err := collectCopyStats(copySrcs)
+	if err != nil {
+		removeCreatedOnErr(err, created)
+		return err
+	}
+	workers := copyWorkers(copySrcs, destAbs, st.files)
+
+	// Copy+delete one source at a time: caps extra disk usage at one source's
+	// worth of data instead of requiring 2x space for the whole batch (a low
+	// disk failure case that used to succeed with copy-then-delete per file).
+	registry := fileCancelRegistryFrom(ctx)
+	remaining := created
+	for i, j := range toCopy {
+		jctx, cancel := context.WithCancel(ctx)
+		registry.register(j.src, cancel)
+		c := &copier{ctx: jctx, cancel: cancel, rep: rep}
+		c.start(workers)
+		placeErr := c.place(jctx, j.src, j.dst)
+		if placeErr != nil {
+			placeErr = preferCanceled(jctx, placeErr)
+		}
+		waitErr := c.finish()
+		registry.remove(j.src)
+		cancel()
+
+		if errors.Is(placeErr, context.Canceled) && ctx.Err() == nil {
+			// only this source was cancelled via FileCancelRegistry — the
+			// rename never happened, so the source file is untouched; just
+			// drop the partial dest and move on to the rest of the batch.
+			rep.setRootStatus(j.src, FileStatusCanceled)
+			removeAllRetry(j.dst)
+			remaining = created[i+1:]
+			continue
+		}
+		if placeErr != nil {
+			removeCreatedOnErr(placeErr, remaining)
+			return placeErr
+		}
+		if waitErr != nil {
+			removeCreatedOnErr(waitErr, remaining)
+			return waitErr
+		}
+		if err := Delete([]string{j.src}); err != nil {
+			removeCreatedOnErr(err, remaining)
+			return err
+		}
+		rep.setRootStatus(j.src, FileStatusDone)
+		remaining = created[i+1:]
 	}
 	rep.finish("")
 	return nil

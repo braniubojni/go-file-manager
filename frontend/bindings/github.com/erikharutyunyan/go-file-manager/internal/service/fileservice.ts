@@ -47,6 +47,16 @@ export function CancelJob(jobID: string): $CancellablePromise<void> {
 }
 
 /**
+ * CancelTransferFile cancels one source path within a running Copy/Move job
+ * without cancelling the rest of it (the "Cancel All" job-wide cancel is
+ * CancelJob). Currently only takes effect for local (non-remote) transfers —
+ * remote SMB/SFTP jobs still support job-wide cancel only.
+ */
+export function CancelTransferFile(jobID: string, path: string): $CancellablePromise<void> {
+    return $Call.ByID(1905417083, jobID, path);
+}
+
+/**
  * Copy copies sources into destDir.
  * jobID from NewJobID enables CancelJob and transfer:progress events; empty is fire-and-forget.
  */

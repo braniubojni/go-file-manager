@@ -41,7 +41,7 @@ func (m *Manager) DownloadCtx(ctx context.Context, sources []string, localDestDi
 		return fmt.Errorf("destination is not a directory: %s", destAbs)
 	}
 
-	total, err := m.remoteSourcesBytes(sources)
+	files, total, err := m.remoteSourcesStats(sources)
 	if err != nil {
 		return err
 	}
@@ -49,6 +49,11 @@ func (m *Manager) DownloadCtx(ctx context.Context, sources []string, localDestDi
 	if onProgress != nil {
 		onProgress(filesystem.ProgressEvent{Total: total})
 	}
+
+	workers := filesystem.CopyWorkersWith(filesystem.IONetwork, []string{destAbs}, files)
+	pool := newXferPool(ctx, workers, func(ctx context.Context, j sftpFileJob) error {
+		return downloadFileCtx(ctx, j.c, j.src, j.dst, j.mode, rep)
+	})
 
 	var created []string
 	defer func() {
@@ -59,32 +64,51 @@ func (m *Manager) DownloadCtx(ctx context.Context, sources []string, localDestDi
 		}
 	}()
 
+	var placeErr error
 	for _, src := range sources {
 		if err := ctx.Err(); err != nil {
-			return err
+			placeErr = err
+			break
 		}
 		loc, err := ParseLocation(src)
 		if err != nil {
-			return err
+			placeErr = err
+			break
 		}
 		s, err := m.get(loc)
 		if err != nil {
-			return err
+			placeErr = err
+			break
 		}
 		base := path.Base(strings.TrimRight(loc.RemotePath, "/"))
 		if base == "" || base == "." || base == "/" {
-			return fmt.Errorf("invalid remote source: %s", src)
+			placeErr = fmt.Errorf("invalid remote source: %s", src)
+			break
 		}
 		st, err := s.sftp.Stat(loc.RemotePath)
 		if err != nil {
-			return err
+			placeErr = err
+			break
 		}
 		target := filesystem.UniquePath(filepath.Join(destAbs, base))
 		created = append(created, target)
 		rep.setDest(target, st.IsDir())
-		if err := downloadPathCtx(ctx, s.sftp, loc.RemotePath, target, rep); err != nil {
-			return err
+		if err := downloadPlace(ctx, s.sftp, loc.RemotePath, target, pool); err != nil {
+			placeErr = err
+			break
 		}
+	}
+	if placeErr != nil {
+		pool.cancel()
+	}
+	waitErr := pool.finish()
+	if placeErr != nil {
+		err = placeErr
+		return err
+	}
+	if waitErr != nil {
+		err = waitErr
+		return err
 	}
 	rep.finish("")
 	return nil
@@ -119,7 +143,7 @@ func (m *Manager) UploadCtx(ctx context.Context, localSources []string, remoteDe
 		return fmt.Errorf("destination is not a directory: %s", remoteDestDir)
 	}
 
-	total, err := filesystem.TotalBytes(localSources)
+	files, total, err := filesystem.CollectCopyStats(localSources)
 	if err != nil {
 		return err
 	}
@@ -127,6 +151,11 @@ func (m *Manager) UploadCtx(ctx context.Context, localSources []string, remoteDe
 	if onProgress != nil {
 		onProgress(filesystem.ProgressEvent{Total: total})
 	}
+
+	workers := filesystem.CopyWorkersWith(filesystem.IONetwork, localSources, files)
+	pool := newXferPool(ctx, workers, func(ctx context.Context, j sftpFileJob) error {
+		return uploadFileCtx(ctx, ds.sftp, j.src, j.dst, j.mode, rep)
+	})
 
 	var created []string
 	defer func() {
@@ -137,63 +166,84 @@ func (m *Manager) UploadCtx(ctx context.Context, localSources []string, remoteDe
 		}
 	}()
 
+	var placeErr error
 	for _, src := range localSources {
 		if err := ctx.Err(); err != nil {
-			return err
+			placeErr = err
+			break
 		}
 		srcAbs, err := filesystem.Resolve(src)
 		if err != nil {
-			return err
+			placeErr = err
+			break
 		}
 		base := filepath.Base(srcAbs)
 		if base == "" || base == "." || base == string(filepath.Separator) {
-			return fmt.Errorf("invalid local source: %s", src)
+			placeErr = fmt.Errorf("invalid local source: %s", src)
+			break
 		}
 		dest := uniqueRemotePath(ds.sftp, path.Join(dloc.RemotePath, base))
 		created = append(created, dest)
 		srcInfo, statErr := os.Lstat(srcAbs)
 		srcIsDir := statErr == nil && srcInfo.IsDir()
 		rep.setDest(dloc.JoinPath(dest), srcIsDir)
-		if err := uploadPathCtx(ctx, ds.sftp, srcAbs, dest, rep); err != nil {
-			return err
+		if err := uploadPlace(ctx, ds.sftp, srcAbs, dest, pool); err != nil {
+			placeErr = err
+			break
 		}
+	}
+	if placeErr != nil {
+		pool.cancel()
+	}
+	waitErr := pool.finish()
+	if placeErr != nil {
+		err = placeErr
+		return err
+	}
+	if waitErr != nil {
+		err = waitErr
+		return err
 	}
 	rep.finish("")
 	return nil
 }
 
-func (m *Manager) remoteSourcesBytes(sources []string) (int64, error) {
-	var total int64
+func (m *Manager) remoteSourcesStats(sources []string) (files int, total int64, err error) {
 	for _, src := range sources {
 		loc, err := ParseLocation(src)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 		s, err := m.get(loc)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
-		n, err := remotePathBytes(s.sftp, loc.RemotePath)
+		nfiles, nbytes, err := remotePathStats(s.sftp, loc.RemotePath)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
-		total += n
+		files += nfiles
+		total += nbytes
 	}
-	return total, nil
+	return files, total, nil
 }
 
 func remotePathBytes(c *sftp.Client, remotePath string) (int64, error) {
+	_, n, err := remotePathStats(c, remotePath)
+	return n, err
+}
+
+func remotePathStats(c *sftp.Client, remotePath string) (files int, total int64, err error) {
 	st, err := c.Lstat(remotePath)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	if st.Mode()&os.ModeSymlink != 0 {
-		return 0, nil
+		return 0, 0, nil
 	}
 	if !st.IsDir() {
-		return st.Size(), nil
+		return 1, st.Size(), nil
 	}
-	var total int64
 	var walk func(string) error
 	walk = func(p string) error {
 		entries, err := c.ReadDir(p)
@@ -211,14 +261,15 @@ func remotePathBytes(c *sftp.Client, remotePath string) (int64, error) {
 				}
 				continue
 			}
+			files++
 			total += e.Size()
 		}
 		return nil
 	}
 	if err := walk(remotePath); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return total, nil
+	return files, total, nil
 }
 
 type remoteProgress struct {
@@ -350,7 +401,13 @@ func copyUnwrapped(ctx context.Context, dst io.Writer, src io.Reader, path strin
 	}
 }
 
-func downloadPathCtx(ctx context.Context, c *sftp.Client, remotePath, localPath string, rep *remoteProgress) error {
+type sftpFileJob struct {
+	c        *sftp.Client
+	src, dst string
+	mode     os.FileMode
+}
+
+func downloadPlace(ctx context.Context, c *sftp.Client, remotePath, localPath string, pool *xferPool[sftpFileJob]) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -358,14 +415,10 @@ func downloadPathCtx(ctx context.Context, c *sftp.Client, remotePath, localPath 
 	if err != nil {
 		return err
 	}
-	if st.IsDir() {
-		return downloadDirCtx(ctx, c, remotePath, localPath, st.Mode(), rep)
+	if !st.IsDir() {
+		return pool.enqueue(sftpFileJob{c: c, src: remotePath, dst: localPath, mode: st.Mode()})
 	}
-	return downloadFileCtx(ctx, c, remotePath, localPath, st.Mode(), rep)
-}
-
-func downloadDirCtx(ctx context.Context, c *sftp.Client, remotePath, localPath string, mode os.FileMode, rep *remoteProgress) error {
-	perm := mode.Perm()
+	perm := st.Mode().Perm()
 	if perm == 0 {
 		perm = 0o755
 	}
@@ -381,7 +434,7 @@ func downloadDirCtx(ctx context.Context, c *sftp.Client, remotePath, localPath s
 			return err
 		}
 		name := e.Name()
-		if err := downloadPathCtx(ctx, c, path.Join(remotePath, name), filepath.Join(localPath, name), rep); err != nil {
+		if err := downloadPlace(ctx, c, path.Join(remotePath, name), filepath.Join(localPath, name), pool); err != nil {
 			return err
 		}
 	}
@@ -425,7 +478,7 @@ func downloadFileCtx(ctx context.Context, c *sftp.Client, remotePath, localPath 
 	return out.Close()
 }
 
-func uploadPathCtx(ctx context.Context, c *sftp.Client, localPath, remotePath string, rep *remoteProgress) error {
+func uploadPlace(ctx context.Context, c *sftp.Client, localPath, remotePath string, pool *xferPool[sftpFileJob]) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -439,17 +492,13 @@ func uploadPathCtx(ctx context.Context, c *sftp.Client, localPath, remotePath st
 			return err
 		}
 	}
-	if info.IsDir() {
-		return uploadDirCtx(ctx, c, localPath, remotePath, info.Mode(), rep)
+	if !info.IsDir() {
+		return pool.enqueue(sftpFileJob{c: c, src: localPath, dst: remotePath, mode: info.Mode()})
 	}
-	return uploadFileCtx(ctx, c, localPath, remotePath, info.Mode(), rep)
-}
-
-func uploadDirCtx(ctx context.Context, c *sftp.Client, localPath, remotePath string, mode os.FileMode, rep *remoteProgress) error {
 	if err := c.MkdirAll(remotePath); err != nil {
 		return err
 	}
-	_ = c.Chmod(remotePath, mode.Perm())
+	_ = c.Chmod(remotePath, info.Mode().Perm())
 	entries, err := os.ReadDir(localPath)
 	if err != nil {
 		return err
@@ -459,7 +508,7 @@ func uploadDirCtx(ctx context.Context, c *sftp.Client, localPath, remotePath str
 			return err
 		}
 		name := e.Name()
-		if err := uploadPathCtx(ctx, c, filepath.Join(localPath, name), path.Join(remotePath, name), rep); err != nil {
+		if err := uploadPlace(ctx, c, filepath.Join(localPath, name), path.Join(remotePath, name), pool); err != nil {
 			return err
 		}
 	}

@@ -119,10 +119,19 @@ tasks:
           done
         }
 
+        kill_docker_desktop() {
+          pkill -TERM -f '^/Applications/Docker.app/' 2>/dev/null || true
+          n=0
+          while [ "$n" -lt 10 ] && pgrep -q -f '^/Applications/Docker.app/'; do
+            sleep 0.5
+            n=$((n + 1))
+          done
+          pkill -KILL -f '^/Applications/Docker.app/' 2>/dev/null || true
+        }
+
         relaunch_docker() {
-          echo "=== try $1/5: engine wedged for $2s — killall Docker, relaunch ==="
-          killall Docker 2>/dev/null || true
-          killall "Docker Desktop" 2>/dev/null || true
+          echo "=== try $1/5: engine wedged for $2s — kill Docker Desktop, relaunch ==="
+          kill_docker_desktop
           sleep 1
           open -a Docker
           last_launch=$(date +%s)
@@ -192,8 +201,13 @@ tasks:
           exit 0
         fi
         echo "=== Quitting Docker Desktop (started by this dist run) ==="
-        osascript -e 'quit app "Docker"' >/dev/null 2>&1 || \
-          osascript -e 'quit app "Docker Desktop"' >/dev/null 2>&1 || true
+        pkill -TERM -f '^/Applications/Docker.app/' 2>/dev/null || true
+        n=0
+        while [ "$n" -lt 10 ] && pgrep -q -f '^/Applications/Docker.app/'; do
+          sleep 0.5
+          n=$((n + 1))
+        done
+        pkill -KILL -f '^/Applications/Docker.app/' 2>/dev/null || true
 
   build:
     summary: Builds the application

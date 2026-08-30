@@ -214,16 +214,27 @@ type SearchErrorPayload struct {
 
 // TransferProgressPayload is emitted while a copy/move/attach job runs.
 type TransferProgressPayload struct {
-	JobID       string `json:"jobId"`
-	Kind        string `json:"kind"` // copy | move | attach
-	BytesDone   int64  `json:"bytesDone"`
-	BytesTotal  int64  `json:"bytesTotal"`
-	CurrentPath string `json:"currentPath"`
-	Label       string `json:"label"`
-	DestDir     string `json:"destDir"`
-	DestPath    string `json:"destPath,omitempty"`
-	DestSize    int64  `json:"destSize"`
-	DestIsDir   bool   `json:"destIsDir"`
+	JobID       string                 `json:"jobId"`
+	Kind        string                 `json:"kind"` // copy | move | attach
+	BytesDone   int64                  `json:"bytesDone"`
+	BytesTotal  int64                  `json:"bytesTotal"`
+	CurrentPath string                 `json:"currentPath"`
+	Label       string                 `json:"label"`
+	DestDir     string                 `json:"destDir"`
+	DestPath    string                 `json:"destPath,omitempty"`
+	DestSize    int64                  `json:"destSize"`
+	DestIsDir   bool                   `json:"destIsDir"`
+	Files       []TransferFileProgress `json:"files,omitempty"`
+}
+
+// TransferFileProgress is one top-level source's own progress within a
+// TransferProgressPayload's job — lets the UI show/cancel it individually.
+type TransferFileProgress struct {
+	Path   string `json:"path"` // FileService.CancelTransferFile's path arg
+	Dest   string `json:"dest"` // dest row id this file was optimistically added under
+	Done   int64  `json:"done"`
+	Total  int64  `json:"total"`
+	Status string `json:"status"` // active | done | canceled
 }
 
 // PortListener is a local TCP socket in LISTEN state.
