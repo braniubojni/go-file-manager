@@ -33,3 +33,11 @@ func classifyMedia(path string) IOClass {
 	}
 	return parseDiskutilClass(string(out))
 }
+
+func cString(b []byte) string {
+	n := 0
+	for n < len(b) && b[n] != 0 {
+		n++
+	}
+	return string(b[:n])
+}
