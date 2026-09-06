@@ -13,8 +13,9 @@ import (
 //
 //	ssh://user@host:port/abs/path
 //	smb://user@host:port/Share/path
+//	mega://user@domain/CloudDrive/path  (email as user@host; no port)
 //
-// Port is always present after normalize (ssh default 22, smb default 445).
+// Port is always present after normalize for ssh (22) and smb (445).
 
 var (
 	// ssh user@host, ssh user@host:port, user@host, user@host:port
@@ -23,9 +24,9 @@ var (
 	smbSpecRe = regexp.MustCompile(`(?i)^(?:([^@\s]*)@)?([^@:\s]+)(?::(\d+))?$`)
 )
 
-// Spec is a parsed remote connection target (SSH or SMB).
+// Spec is a parsed remote connection target (SSH, SMB, or MEGA).
 type Spec struct {
-	Scheme        string // "ssh" (default) or "smb"
+	Scheme        string // "ssh" (default), "smb", or "mega"
 	User          string
 	Host          string
 	Port          int
@@ -36,17 +37,35 @@ type Spec struct {
 }
 
 func (s Spec) scheme() string {
-	if strings.EqualFold(s.Scheme, "smb") {
+	switch strings.ToLower(s.Scheme) {
+	case "smb":
 		return "smb"
+	case "mega":
+		return "mega"
+	default:
+		return "ssh"
 	}
-	return "ssh"
 }
 
 // IsSMB reports whether this spec targets SMB.
 func (s Spec) IsSMB() bool { return s.scheme() == "smb" }
 
-// SessionKey returns user@host:port for SSH, or smb:user@host:port for SMB.
+// IsMEGA reports whether this spec targets MEGA.
+func (s Spec) IsMEGA() bool { return s.scheme() == "mega" }
+
+// MEGAEmail returns user@host (the MEGA account email).
+func (s Spec) MEGAEmail() string {
+	if s.User == "" {
+		return s.Host
+	}
+	return s.User + "@" + s.Host
+}
+
+// SessionKey returns user@host:port for SSH, smb:user@host:port for SMB, or mega:user@host for MEGA.
 func (s Spec) SessionKey() string {
+	if s.IsMEGA() {
+		return "mega:" + s.MEGAEmail()
+	}
 	if s.IsSMB() {
 		return fmt.Sprintf("smb:%s@%s:%d", s.User, s.Host, s.Port)
 	}
@@ -59,7 +78,7 @@ func (s Spec) RootPath() string {
 }
 
 // JoinPath builds scheme://user@host:port/remotePath (remotePath must be absolute).
-// Host authority uses net.JoinHostPort so IPv6 literals are bracketed.
+// MEGA omits port. Host authority uses net.JoinHostPort so IPv6 literals are bracketed.
 func (s Spec) JoinPath(remotePath string) string {
 	p := remotePath
 	if p == "" {
@@ -71,9 +90,16 @@ func (s Spec) JoinPath(remotePath string) string {
 	for strings.Contains(p, "//") {
 		p = strings.ReplaceAll(p, "//", "/")
 	}
+	if s.IsMEGA() {
+		authority := s.Host
+		if s.User != "" {
+			authority = url.User(s.User).String() + "@" + s.Host
+		}
+		return "mega://" + authority + p
+	}
 	authority := net.JoinHostPort(s.Host, strconv.Itoa(s.Port))
 	if s.User != "" {
-		authority = s.User + "@" + authority
+		authority = url.User(s.User).String() + "@" + authority
 	}
 	return fmt.Sprintf("%s://%s%s", s.scheme(), authority, p)
 }
@@ -84,6 +110,9 @@ func ParseSpec(input string) (Spec, error) {
 	raw := strings.TrimSpace(input)
 	if raw == "" {
 		return Spec{}, fmt.Errorf("empty connection string")
+	}
+	if isMEGAInput(raw) {
+		return parseMEGASpec(raw)
 	}
 	if isSMBInput(raw) {
 		return parseSMBSpec(raw)
@@ -114,7 +143,47 @@ func ParseSpec(input string) (Spec, error) {
 			return SpecFromSSHConfigHost(h), nil
 		}
 	}
-	return Spec{}, fmt.Errorf("invalid format; use: ssh user@host, user@host:port, smb://host, or an SSH config Host alias")
+	return Spec{}, fmt.Errorf("invalid format; use: ssh user@host, user@host:port, smb://host, mega://user@domain, or an SSH config Host alias")
+}
+
+func isMEGAInput(raw string) bool {
+	lower := strings.ToLower(strings.TrimSpace(raw))
+	return strings.HasPrefix(lower, "mega://") ||
+		strings.HasPrefix(lower, "mega:") ||
+		strings.HasPrefix(lower, "mega ")
+}
+
+func parseMEGASpec(raw string) (Spec, error) {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(strings.ToLower(raw), "mega://") {
+		loc, err := ParseLocation(raw)
+		if err != nil {
+			return Spec{}, err
+		}
+		return loc.Spec, nil
+	}
+	rest := raw
+	switch {
+	case strings.HasPrefix(strings.ToLower(rest), "mega:"):
+		rest = strings.TrimSpace(rest[5:])
+	case strings.HasPrefix(strings.ToLower(rest), "mega "):
+		rest = strings.TrimSpace(rest[5:])
+	}
+	rest = strings.Trim(rest, "/")
+	user, host, err := splitEmail(rest)
+	if err != nil {
+		return Spec{}, err
+	}
+	return Spec{Scheme: "mega", User: user, Host: host}, nil
+}
+
+func splitEmail(email string) (user, host string, err error) {
+	email = strings.TrimSpace(email)
+	i := strings.LastIndex(email, "@")
+	if i <= 0 || i >= len(email)-1 {
+		return "", "", fmt.Errorf("invalid MEGA email; use: mega://user@domain")
+	}
+	return email[:i], email[i+1:], nil
 }
 
 func isSMBInput(raw string) bool {
@@ -179,9 +248,9 @@ type Location struct {
 	RemotePath string // absolute path on remote, e.g. /home/user or /Share/folder
 }
 
-// IsRemote reports whether path is an ssh:// or smb:// virtual path.
+// IsRemote reports whether path is an ssh://, smb://, or mega:// virtual path.
 func IsRemote(path string) bool {
-	return IsSSH(path) || IsSMB(path)
+	return IsSSH(path) || IsSMB(path) || IsMEGA(path)
 }
 
 // IsSSH reports whether path is an ssh:// virtual path.
@@ -194,9 +263,16 @@ func IsSMB(path string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(path)), "smb://")
 }
 
-// SchemeOf returns "ssh", "smb", or "" for a path.
+// IsMEGA reports whether path is a mega:// virtual path.
+func IsMEGA(path string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(path)), "mega://")
+}
+
+// SchemeOf returns "ssh", "smb", "mega", or "" for a path.
 func SchemeOf(path string) string {
 	switch {
+	case IsMEGA(path):
+		return "mega"
 	case IsSMB(path):
 		return "smb"
 	case IsSSH(path):
@@ -217,19 +293,29 @@ func ParseLocation(path string) (Location, error) {
 		return Location{}, fmt.Errorf("invalid remote path: %w", err)
 	}
 	scheme := strings.ToLower(u.Scheme)
-	if scheme != "ssh" && scheme != "smb" {
+	if scheme != "ssh" && scheme != "smb" && scheme != "mega" {
 		return Location{}, fmt.Errorf("unsupported scheme %q", u.Scheme)
 	}
 	user := ""
 	if u.User != nil {
 		user = u.User.Username()
 	}
-	if scheme == "ssh" && user == "" {
+	if (scheme == "ssh" || scheme == "mega") && user == "" {
 		return Location{}, fmt.Errorf("missing user in remote path")
 	}
 	host := u.Hostname()
 	if host == "" {
 		return Location{}, fmt.Errorf("missing host in remote path")
+	}
+	if scheme == "mega" {
+		rp := u.Path
+		if rp == "" {
+			rp = "/"
+		}
+		return Location{
+			Spec:       Spec{Scheme: "mega", User: user, Host: host},
+			RemotePath: rp,
+		}, nil
 	}
 	port := 22
 	if scheme == "smb" {
@@ -260,6 +346,14 @@ func ParseLocation(path string) (Location, error) {
 		},
 		RemotePath: rp,
 	}, nil
+}
+
+func megaHandle(vpath string) string {
+	u, err := url.Parse(vpath)
+	if err != nil {
+		return ""
+	}
+	return u.Query().Get("h")
 }
 
 // ParentRemote returns parent of a remote location path.

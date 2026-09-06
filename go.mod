@@ -7,6 +7,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/mholt/archives v0.1.5
 	github.com/pkg/sftp v1.13.11
+	github.com/t3rm1n4l/go-mega v0.0.0-20260717075258-c6acd6a5bd04
 	github.com/wailsapp/wails/v3 v3.0.0-alpha2.117
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
 	golang.org/x/crypto v0.54.0

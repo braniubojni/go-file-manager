@@ -14,7 +14,17 @@ export type AddConnectionState = {
   error: string;
   /** When re-prompting password for an existing profile connect */
   profileId: string;
-  mode: 'add' | 'add_smb' | 'smb_confirm' | 'password' | 'ssh_config' | 'workdir' | 'smb_shares';
+  totp: string;
+  megaAuth: boolean;
+  mode:
+    | 'add'
+    | 'add_smb'
+    | 'add_mega'
+    | 'smb_confirm'
+    | 'password'
+    | 'ssh_config'
+    | 'workdir'
+    | 'smb_shares';
   // ssh_config mode
   sshConfigPath: string;
   sshConfigHosts: SSHConfigHost[];
@@ -42,9 +52,11 @@ export type AddConnectionState = {
 export type AddConnectionAction =
   | { type: 'open_add' }
   | { type: 'open_add_smb' }
+  | { type: 'open_add_mega' }
   | { type: 'open_smb_confirm' }
   | { type: 'back_smb_form' }
-  | { type: 'open_password'; profileId: string; label?: string }
+  | { type: 'open_password'; profileId: string; label?: string; mega?: boolean }
+  | { type: 'set_totp'; totp: string }
   | { type: 'open_ssh_config' }
   | {
       type: 'open_workdir';

@@ -30,6 +30,7 @@ export const ConnectionsMenu: FC = () => {
     dispatch,
     sshProfiles,
     smbProfiles,
+    megaProfiles,
     sessionKeys,
     onMenuConnect,
     onDisconnect,
@@ -189,6 +190,28 @@ export const ConnectionsMenu: FC = () => {
         >
           <AddIcon fontSize="small" sx={{ mr: 1 }} />
           Add SMB…
+        </MenuItem>
+
+        <Divider />
+        <ListSubheader sx={{ lineHeight: '32px', bgcolor: 'background.paper' }}>MEGA</ListSubheader>
+        {megaProfiles.length === 0 && (
+          <MenuItem disabled dense>
+            <Typography variant="body2" color="text.secondary">
+              No saved MEGA connections
+            </Typography>
+          </MenuItem>
+        )}
+        {megaProfiles.map(renderProfile)}
+        <MenuItem
+          data-testid="menu-conn-add-mega"
+          dense
+          onClick={() => {
+            setAnchor(null);
+            dispatch({ type: 'open_add_mega' });
+          }}
+        >
+          <AddIcon fontSize="small" sx={{ mr: 1 }} />
+          Add MEGA…
         </MenuItem>
 
         <Divider />

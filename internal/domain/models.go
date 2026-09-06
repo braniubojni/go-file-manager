@@ -317,10 +317,10 @@ type ShortcutDef struct {
 	Binding     string `json:"binding"`
 }
 
-// ConnectionProfile is a saved remote connection (SSH or SMB).
+// ConnectionProfile is a saved remote connection (SSH, SMB, or MEGA).
 type ConnectionProfile struct {
 	ID             string   `json:"id"`
-	Protocol       string   `json:"protocol"` // "ssh" or "smb"
+	Protocol       string   `json:"protocol"` // "ssh", "smb", or "mega"
 	User           string   `json:"user"`
 	Host           string   `json:"host"`
 	Port           int      `json:"port"`

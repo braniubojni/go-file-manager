@@ -119,13 +119,13 @@ export interface ConnectResult {
 }
 
 /**
- * ConnectionProfile is a saved remote connection (SSH or SMB).
+ * ConnectionProfile is a saved remote connection (SSH, SMB, or MEGA).
  */
 export interface ConnectionProfile {
     "id": string;
 
     /**
-     * "ssh" or "smb"
+     * "ssh", "smb", or "mega"
      */
     "protocol": string;
     "user": string;

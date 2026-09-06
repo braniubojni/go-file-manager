@@ -1,11 +1,10 @@
-export type PathCrumb = { label: string; path: string };
+import { REMOTE_ORIGIN_RE } from '../../features/connections/helpers';
 
-/** Same origin capture as `parentOfVirtualPath` in connections/helpers. */
-const REMOTE_RE = /^((?:ssh|smb):\/\/[^/]+)(\/.*)?$/i;
+export type PathCrumb = { label: string; path: string };
 
 export function pathCrumbs(path: string): PathCrumb[] {
   const raw = path.trim() || '/';
-  const remote = raw.match(REMOTE_RE);
+  const remote = raw.replace(/\?[^/]*$/, '').match(REMOTE_ORIGIN_RE);
   if (remote) return remoteCrumbs(remote[1], remote[2] || '/', /^smb:/i.test(remote[1]));
   if (/^[a-zA-Z]:/.test(raw)) return windowsCrumbs(raw);
   return posixCrumbs(raw);

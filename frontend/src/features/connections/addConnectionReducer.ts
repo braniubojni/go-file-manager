@@ -11,6 +11,8 @@ export const initialAddConnectionState: AddConnectionState = {
   busy: false,
   error: '',
   profileId: '',
+  totp: '',
+  megaAuth: false,
   mode: 'add',
   sshConfigPath: '',
   sshConfigHosts: [],
@@ -42,6 +44,14 @@ export const addConnectionReducer = (
       return { ...initialAddConnectionState, open: true, mode: 'add', save: true };
     case 'open_add_smb':
       return { ...initialAddConnectionState, open: true, mode: 'add_smb', save: true };
+    case 'open_add_mega':
+      return {
+        ...initialAddConnectionState,
+        open: true,
+        mode: 'add_mega',
+        save: true,
+        megaAuth: true,
+      };
     case 'open_smb_confirm':
       return { ...state, mode: 'smb_confirm', error: '', busy: false };
     case 'back_smb_form':
@@ -54,6 +64,7 @@ export const addConnectionReducer = (
         askPassword: true,
         profileId: action.profileId,
         spec: action.label ?? '',
+        megaAuth: Boolean(action.mega),
       };
     case 'open_ssh_config':
       return {
@@ -104,6 +115,8 @@ export const addConnectionReducer = (
       return { ...state, spec: action.spec, error: '' };
     case 'set_password':
       return { ...state, password: action.password, error: '' };
+    case 'set_totp':
+      return { ...state, totp: action.totp, error: '' };
     case 'set_save':
       return { ...state, save: action.save };
     case 'set_busy':

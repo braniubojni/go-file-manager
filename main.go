@@ -33,14 +33,15 @@ func main() {
 
 	remoteMgr := service.NewRemoteManager(db)
 	smbMgr := remote.NewSMBManager()
-	fileSvc := service.NewFileService(remoteMgr, smbMgr, filepath.Join(cfgStore.Dir(), "trash"))
+	megaMgr := remote.NewMEGAManager()
+	fileSvc := service.NewFileService(remoteMgr, smbMgr, megaMgr, filepath.Join(cfgStore.Dir(), "trash"))
 	if err := fileSvc.PurgeTrash(); err != nil {
 		log.Printf("purge trash: %v", err)
 	}
 	settingsSvc := service.NewSettingsService(db, cfgStore)
 	bookmarkSvc := service.NewBookmarkService(db)
 	termSvc := service.NewTerminalService(remoteMgr)
-	connSvc := service.NewConnectionService(db, remoteMgr, smbMgr)
+	connSvc := service.NewConnectionService(db, remoteMgr, smbMgr, megaMgr)
 	updateSvc := service.NewUpdateService()
 	gitSvc := service.NewGitService()
 	portSvc := service.NewPortService()
@@ -95,6 +96,8 @@ func main() {
 		_ = termSvc.Stop("left")
 		_ = termSvc.Stop("right")
 		remoteMgr.CloseAll()
+		smbMgr.CloseAll()
+		megaMgr.CloseAll()
 		_ = db.Close()
 	})
 

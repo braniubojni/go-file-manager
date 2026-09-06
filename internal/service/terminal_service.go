@@ -77,12 +77,15 @@ func (t *TerminalService) Start(paneID, cwd string) error {
 		handle ptyHandle
 		err    error
 	)
-	if remote.IsRemote(cwd) {
+	switch {
+	case remote.IsSSH(cwd):
 		if t.remote == nil {
 			return fmt.Errorf("remote not available")
 		}
 		handle, err = spawnRemotePTY(t.remote, cwd, defaultCols, defaultRows)
-	} else {
+	case remote.IsRemote(cwd):
+		return fmt.Errorf("terminal is not supported for this connection type")
+	default:
 		handle, err = spawnLocalPTY(filesystem.LocalShellDir(cwd), defaultCols, defaultRows)
 	}
 	if err != nil {
@@ -182,13 +185,16 @@ func (t *TerminalService) SetCwd(paneID, cwd string) error {
 		return nil
 	}
 	var shellPath string
-	if remote.IsRemote(cwd) {
+	switch {
+	case remote.IsSSH(cwd):
 		loc, err := remote.ParseLocation(cwd)
 		if err != nil {
 			return err
 		}
 		shellPath = loc.RemotePath
-	} else {
+	case remote.IsRemote(cwd):
+		return fmt.Errorf("terminal is not supported for this connection type")
+	default:
 		shellPath = filesystem.LocalShellDir(cwd)
 	}
 	return h.Write(fmt.Sprintf("cd %q\n", shellPath))

@@ -31,6 +31,7 @@ type FileService struct {
 	transferGate chan struct{}
 	remote       *remote.Manager
 	smb          *remote.SMBManager
+	mega         *remote.MEGAManager
 	trash        *filesystem.Trash
 	app          *application.App
 	vols         *volumes.Manager
@@ -52,11 +53,12 @@ type remoteBackend interface {
 	DirChildSizesCtx(ctx context.Context, dir string) (domain.DirSizes, error)
 }
 
-func NewFileService(remoteMgr *remote.Manager, smbMgr *remote.SMBManager, trashDir string) *FileService {
+func NewFileService(remoteMgr *remote.Manager, smbMgr *remote.SMBManager, megaMgr *remote.MEGAManager, trashDir string) *FileService {
 	return &FileService{
 		transferGate: make(chan struct{}, maxConcurrentTransfers),
 		remote:       remoteMgr,
 		smb:          smbMgr,
+		mega:         megaMgr,
 		trash:        filesystem.NewTrash(trashDir),
 		vols:         volumes.NewManager(),
 	}
@@ -85,6 +87,12 @@ func (s *FileService) releaseTransfer() {
 }
 
 func (s *FileService) backendFor(path string) (remoteBackend, error) {
+	if remote.IsMEGA(path) {
+		if s.mega == nil {
+			return nil, fmt.Errorf("remote not available")
+		}
+		return s.mega, nil
+	}
 	if remote.IsSMB(path) {
 		if s.smb == nil {
 			return nil, fmt.Errorf("remote not available")
@@ -337,6 +345,12 @@ func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir 
 			}
 			return smb.CopyWithinCtx(ctx, sources, destDir, onProgress)
 		}
+		if mega, ok := be.(*remote.MEGAManager); ok {
+			if isMove {
+				return mega.MoveWithinCtx(ctx, sources, destDir, onProgress)
+			}
+			return mega.CopyWithinCtx(ctx, sources, destDir, onProgress)
+		}
 		if isMove {
 			return be.MoveWithin(sources, destDir)
 		}
@@ -352,6 +366,10 @@ func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir 
 			}
 		} else if smb, ok := be.(*remote.SMBManager); ok {
 			if err := smb.DownloadCtx(ctx, sources, destDir, onProgress); err != nil {
+				return err
+			}
+		} else if mega, ok := be.(*remote.MEGAManager); ok {
+			if err := mega.DownloadCtx(ctx, sources, destDir, onProgress); err != nil {
 				return err
 			}
 		} else if err := be.Download(sources, destDir); err != nil {
@@ -372,6 +390,10 @@ func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir 
 			}
 		} else if smb, ok := be.(*remote.SMBManager); ok {
 			if err := smb.UploadCtx(ctx, sources, destDir, onProgress); err != nil {
+				return err
+			}
+		} else if mega, ok := be.(*remote.MEGAManager); ok {
+			if err := mega.UploadCtx(ctx, sources, destDir, onProgress); err != nil {
 				return err
 			}
 		} else if err := be.Upload(sources, destDir); err != nil {
@@ -453,14 +475,17 @@ func transferKind(sources []string, destDir string) (xferKind, error) {
 	if srcAnyRemote && !srcRemote {
 		return 0, fmt.Errorf("mixed local/remote selection is not supported")
 	}
-	destRemote := remote.IsRemote(destDir)
-	if srcRemote && destRemote {
-		scheme := remote.SchemeOf(destDir)
+	if srcRemote {
+		scheme := remote.SchemeOf(sources[0])
 		for _, src := range sources {
 			if remote.SchemeOf(src) != scheme {
 				return 0, fmt.Errorf("cross-protocol copy not supported")
 			}
 		}
+	}
+	destRemote := remote.IsRemote(destDir)
+	if srcRemote && destRemote && remote.SchemeOf(destDir) != remote.SchemeOf(sources[0]) {
+		return 0, fmt.Errorf("cross-protocol copy not supported")
 	}
 	switch {
 	case !srcRemote && !destRemote:
