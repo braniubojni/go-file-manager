@@ -170,3 +170,66 @@ func TestSMBJoinPathIPv6(t *testing.T) {
 		t.Fatalf("roundtrip: %+v", loc)
 	}
 }
+
+func TestParseMEGASpecAndLocation(t *testing.T) {
+	t.Parallel()
+	s, err := ParseSpec("mega://alice@gmail.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !s.IsMEGA() || s.User != "alice" || s.Host != "gmail.com" || s.Port != 0 {
+		t.Fatalf("spec: %+v", s)
+	}
+	if s.SessionKey() != "mega:alice@gmail.com" {
+		t.Fatalf("key: %s", s.SessionKey())
+	}
+	if s.MEGAEmail() != "alice@gmail.com" {
+		t.Fatalf("email: %s", s.MEGAEmail())
+	}
+	if s.RootPath() != "mega://alice@gmail.com/" {
+		t.Fatalf("root: %q", s.RootPath())
+	}
+	if s.JoinPath("/Photos/x.jpg") != "mega://alice@gmail.com/Photos/x.jpg" {
+		t.Fatalf("join: %q", s.JoinPath("/Photos/x.jpg"))
+	}
+
+	s2, err := ParseSpec("mega alice@gmail.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s2.SessionKey() != "mega:alice@gmail.com" {
+		t.Fatalf("mega email: %+v", s2)
+	}
+
+	s3, err := ParseSpec("mega:alice@gmail.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s3.SessionKey() != "mega:alice@gmail.com" {
+		t.Fatalf("session key form: %+v", s3)
+	}
+
+	loc, err := ParseLocation("mega://alice@gmail.com/Photos/x.jpg?h=AbCd")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loc.User != "alice" || loc.Host != "gmail.com" || loc.RemotePath != "/Photos/x.jpg" {
+		t.Fatalf("loc: %+v", loc)
+	}
+	if megaHandle("mega://alice@gmail.com/Photos/x.jpg?h=AbCd") != "AbCd" {
+		t.Fatalf("handle: %q", megaHandle("mega://alice@gmail.com/Photos/x.jpg?h=AbCd"))
+	}
+	p := ParentRemote(loc)
+	if p.RemotePath != "/Photos" {
+		t.Fatalf("parent: %s", p.RemotePath)
+	}
+	if !IsMEGA("mega://alice@gmail.com/") || IsSSH("mega://alice@gmail.com/") || !IsRemote("mega://alice@gmail.com/") {
+		t.Fatal("scheme helpers")
+	}
+	if SchemeOf("mega://alice@gmail.com/x") != "mega" {
+		t.Fatal("SchemeOf")
+	}
+	if _, err := ParseSpec("mega not-an-email"); err == nil {
+		t.Fatal("expected invalid email")
+	}
+}

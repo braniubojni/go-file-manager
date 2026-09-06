@@ -2,10 +2,15 @@
  * Session key for a remote virtual path — mirrors remote.Spec.SessionKey.
  * Null for local paths.
  */
+export const REMOTE_ORIGIN_RE = /^((?:ssh|smb|mega):\/\/[^/]+)(\/.*)?$/i;
+
 export const isRemotePath = (p?: string | null): boolean =>
-  Boolean(p && /^(ssh|smb):\/\//i.test(p.trim()));
+  Boolean(p && /^(ssh|smb|mega):\/\//i.test(p.trim()));
 
 export const isSMBPath = (p?: string | null): boolean => Boolean(p && /^smb:\/\//i.test(p.trim()));
+
+export const isMEGAPath = (p?: string | null): boolean =>
+  Boolean(p && /^mega:\/\//i.test(p.trim()));
 
 export const sessionKeyFromPath = (path: string): string | null => {
   const raw = path.trim();
@@ -13,13 +18,14 @@ export const sessionKeyFromPath = (path: string): string | null => {
   try {
     const u = new URL(raw);
     const scheme = u.protocol.replace(/:$/, '').toLowerCase();
-    if (scheme !== 'ssh' && scheme !== 'smb') return null;
+    if (scheme !== 'ssh' && scheme !== 'smb' && scheme !== 'mega') return null;
     // JS URL.hostname keeps IPv6 brackets; Go url.Hostname / Spec.Host do not.
     let host = u.hostname;
     if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
     if (!host) return null;
     const user = decodeURIComponent(u.username || '');
-    if (scheme === 'ssh' && !user) return null;
+    if ((scheme === 'ssh' || scheme === 'mega') && !user) return null;
+    if (scheme === 'mega') return `mega:${user}@${host}`;
     const port = u.port || (scheme === 'smb' ? '445' : '22');
     if (scheme === 'smb') return `smb:${user}@${host}:${port}`;
     return `${user}@${host}:${port}`;
@@ -34,15 +40,19 @@ export const sessionKeyFromProfile = (p: {
   host: string;
   port: number;
 }): string => {
+  if (p.protocol === 'mega') {
+    return `mega:${p.user}@${p.host}`;
+  }
   if (p.protocol === 'smb') {
     return `smb:${p.user}@${p.host}:${p.port || 445}`;
   }
   return `${p.user}@${p.host}:${p.port || 22}`;
 };
 
-/** Parent directory for ssh:// or smb:// virtual paths. */
+/** Parent directory for ssh://, smb://, or mega:// virtual paths. */
 export const parentOfVirtualPath = (path: string): string | null => {
-  const m = path.match(/^((?:ssh|smb):\/\/[^/]+)(\/.*)?$/i);
+  const stripped = path.replace(/\?[^/]*$/, '');
+  const m = stripped.match(REMOTE_ORIGIN_RE);
   if (!m) return null;
   const base = m[1];
   const p = m[2] || '/';
@@ -88,7 +98,11 @@ export const isAuthErrorMessage = (msg: string): boolean => {
     m.includes('permission denied') ||
     m.includes('logon failure') ||
     m.includes('logon is invalid') ||
-    m.includes('bad username')
+    m.includes('bad username') ||
+    m.includes('2fa') ||
+    m.includes('two-factor') ||
+    m.includes('multi-factor') ||
+    m.includes('mega login failed')
   );
 };
 
@@ -112,7 +126,7 @@ export const resolveRemoteWorkdirInput = (homePath: string, input: string): stri
   const raw = input.trim();
   if (!raw) return null;
   if (isRemotePath(raw)) return raw;
-  const m = homePath.match(/^((?:ssh|smb):\/\/[^/]+)(\/.*)?$/i);
+  const m = homePath.match(REMOTE_ORIGIN_RE);
   if (!m) return null;
   const origin = m[1];
   if (raw.startsWith('/')) return `${origin}${raw}`;

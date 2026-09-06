@@ -32,10 +32,12 @@ import { handleDialogEnter, handleDialogFormSubmit } from '../../../shared/lib/d
 import type { ConnectionDialogProps } from '../types';
 import { SMBConnectFields, smbFormFromDialog } from './SMBConnectFields';
 import { SMBSharePicker } from './SMBSharePicker';
+import { MEGAConnectFields, megaEmailOk } from './MEGAConnectFields';
 
 const DIALOG_TITLES: Record<string, string> = {
   add: 'Add SSH connection',
   add_smb: 'Add SMB connection',
+  add_mega: 'Add MEGA connection',
   password: 'Password',
   ssh_config: 'Connect from SSH config',
   workdir: 'Choose working directory',
@@ -62,6 +64,7 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
   const connectDisabled =
     dialog.busy ||
     (dialog.mode === 'add_smb' && !smbForm.ok) ||
+    (dialog.mode === 'add_mega' && !megaEmailOk(dialog.spec)) ||
     (dialog.mode === 'smb_shares' && shareInvalid);
 
   const submit = () => {
@@ -100,6 +103,9 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
               onSubmit={submit}
               errors={smbForm.errors}
             />
+          )}
+          {dialog.mode === 'add_mega' && (
+            <MEGAConnectFields dialog={dialog} dispatch={dispatch} onSubmit={submit} />
           )}
           {dialog.mode === 'smb_shares' && <SMBSharePicker dialog={dialog} dispatch={dispatch} />}
           {dialog.mode === 'smb_confirm' && (
@@ -297,7 +303,7 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
                       autoFocus
                       label="Remote path"
                       placeholder="/home/user/project"
-                      helperText="Absolute path on the remote, or ssh:// / smb://…"
+                      helperText="Absolute path on the remote, or ssh:// / smb:// / mega://…"
                       onKeyDown={(e) => handleDialogEnter(e, submit)}
                       data-testid="input-workdir-custom"
                     />
@@ -324,24 +330,42 @@ export const ConnectionDialog: FC<ConnectionDialogProps> = ({
           {(dialog.askPassword || dialog.mode === 'password') &&
             dialog.mode !== 'workdir' &&
             dialog.mode !== 'smb_shares' &&
-            dialog.mode !== 'add_smb' && (
-              <TextField
-                autoFocus={dialog.mode === 'password' || dialog.askPassword}
-                type="password"
-                label="Password or key passphrase"
-                value={dialog.password}
-                onChange={(e) => dispatch({ type: 'set_password', password: e.target.value })}
-                onKeyDown={(e) => handleDialogEnter(e, submit)}
-                data-testid="input-conn-password"
-                fullWidth
-                disabled={dialog.busy}
-                helperText={
-                  dialog.mode === 'password'
-                    ? `Auth for ${dialog.spec || 'SSH'} (server password or encrypted key passphrase)`
-                    : 'Public key auth failed — try passphrase, password, or set IdentityFile in ~/.ssh/config'
-                }
-                sx={{ mt: 1 }}
-              />
+            dialog.mode !== 'add_smb' &&
+            dialog.mode !== 'add_mega' && (
+              <>
+                <TextField
+                  autoFocus={dialog.mode === 'password' || dialog.askPassword}
+                  type="password"
+                  label="Password or key passphrase"
+                  value={dialog.password}
+                  onChange={(e) => dispatch({ type: 'set_password', password: e.target.value })}
+                  onKeyDown={(e) => handleDialogEnter(e, submit)}
+                  data-testid="input-conn-password"
+                  fullWidth
+                  disabled={dialog.busy}
+                  helperText={
+                    dialog.megaAuth
+                      ? `MEGA account ${dialog.spec || ''}`.trim()
+                      : dialog.mode === 'password'
+                        ? `Auth for ${dialog.spec || 'SSH'} (server password or encrypted key passphrase)`
+                        : 'Public key auth failed — try passphrase, password, or set IdentityFile in ~/.ssh/config'
+                  }
+                  sx={{ mt: 1 }}
+                />
+                {dialog.megaAuth && (
+                  <TextField
+                    label="2FA code"
+                    placeholder="optional"
+                    value={dialog.totp}
+                    onChange={(e) => dispatch({ type: 'set_totp', totp: e.target.value })}
+                    onKeyDown={(e) => handleDialogEnter(e, submit)}
+                    data-testid="input-mega-totp-prompt"
+                    fullWidth
+                    disabled={dialog.busy}
+                    autoComplete="one-time-code"
+                  />
+                )}
+              </>
             )}
 
           {dialog.error && (

@@ -32,3 +32,11 @@ export const errMessage = (err: unknown): string => {
     return 'Unknown error';
   }
 };
+
+/** True when a local FS error means macOS TCC (privacy) denied access, e.g. a
+ * File Provider folder (Google Drive, OneDrive) without Full Disk Access.
+ * Matches only the macOS EPERM wording — "permission denied" (EACCES) is a
+ * generic, cross-platform error that also shows up for local Linux/Windows
+ * permission issues and unrelated remote (SSH/SMB) failures, so it's excluded. */
+export const isPermissionDeniedMessage = (msg: string): boolean =>
+  msg.toLowerCase().includes('operation not permitted');

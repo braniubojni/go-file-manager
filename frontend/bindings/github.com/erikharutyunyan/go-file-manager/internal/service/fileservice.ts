@@ -120,6 +120,13 @@ export function GetHomeDir(): $CancellablePromise<string> {
 }
 
 /**
+ * GoogleDrivePaths returns local Google Drive for desktop folders, or nil if none.
+ */
+export function GoogleDrivePaths(): $CancellablePromise<string[] | null> {
+    return $Call.ByID(286644403);
+}
+
+/**
  * ICloudDrivePath returns the macOS iCloud Drive folder, or "" if it is not present.
  */
 export function ICloudDrivePath(): $CancellablePromise<string> {

@@ -15,16 +15,17 @@ import (
 const kvConnections = "connections"
 const kvHostKeys = "ssh_host_keys"
 
-// ConnectionService manages remote connection profiles and SSH/SMB sessions.
+// ConnectionService manages remote connection profiles and SSH/SMB/MEGA sessions.
 type ConnectionService struct {
 	db      *storage.DB
 	manager *remote.Manager
 	smb     *remote.SMBManager
+	mega    *remote.MEGAManager
 }
 
 // NewConnectionService creates the service. managers may be shared with FileService.
-func NewConnectionService(db *storage.DB, manager *remote.Manager, smb *remote.SMBManager) *ConnectionService {
-	return &ConnectionService{db: db, manager: manager, smb: smb}
+func NewConnectionService(db *storage.DB, manager *remote.Manager, smb *remote.SMBManager, mega *remote.MEGAManager) *ConnectionService {
+	return &ConnectionService{db: db, manager: manager, smb: smb, mega: mega}
 }
 
 // ListProfiles returns saved connection profiles.
@@ -37,6 +38,9 @@ func (s *ConnectionService) AddProfile(spec string) (domain.ConnectionProfile, e
 	parsed, err := remote.ParseSpec(spec)
 	if err != nil {
 		return domain.ConnectionProfile{}, err
+	}
+	if parsed.IsMEGA() {
+		return s.upsertMEGAProfile(parsed)
 	}
 	if parsed.IsSMB() {
 		return s.upsertSMBProfile(parsed)
@@ -82,7 +86,7 @@ func (s *ConnectionService) SetProfileDefaultWorkDir(profileID, vpath string) er
 		return fmt.Errorf("profile id required")
 	}
 	if !remote.IsRemote(vpath) {
-		return fmt.Errorf("default workdir must be a remote ssh:// or smb:// path")
+		return fmt.Errorf("default workdir must be a remote ssh://, smb://, or mega:// path")
 	}
 	list, err := s.loadProfiles()
 	if err != nil {
@@ -118,6 +122,16 @@ func (s *ConnectionService) ConnectProfile(id string, password string) (domain.C
 	}
 	if prof == nil {
 		return domain.ConnectResult{}, fmt.Errorf("profile not found")
+	}
+	if prof.Protocol == "mega" {
+		spec := remote.Spec{Scheme: "mega", User: prof.User, Host: prof.Host}
+		res, err := s.connectMEGA(spec, password, "", false)
+		if err != nil {
+			return domain.ConnectResult{}, err
+		}
+		res.ProfileID = prof.ID
+		res.DefaultWorkDir = prof.DefaultWorkDir
+		return res, nil
 	}
 	if prof.Protocol == "smb" {
 		spec := remote.Spec{
@@ -176,6 +190,9 @@ func (s *ConnectionService) ConnectSpec(specStr string, password string, save bo
 	if err != nil {
 		return domain.ConnectResult{}, err
 	}
+	if parsed.IsMEGA() {
+		return s.connectMEGA(parsed, password, "", save)
+	}
 	if parsed.IsSMB() {
 		return s.connectSMB(parsed, password, save)
 	}
@@ -209,14 +226,22 @@ func (s *ConnectionService) Disconnect(keyOrPath string) error {
 			err = err2
 		}
 	}
+	if s.mega != nil {
+		if err2 := s.mega.Disconnect(keyOrPath); err2 != nil && err == nil {
+			err = err2
+		}
+	}
 	return err
 }
 
-// ListSessions returns live SSH and SMB sessions.
+// ListSessions returns live SSH, SMB, and MEGA sessions.
 func (s *ConnectionService) ListSessions() []domain.ActiveSession {
 	out := s.manager.ListSessions()
 	if s.smb != nil {
 		out = append(out, s.smb.ListSessions()...)
+	}
+	if s.mega != nil {
+		out = append(out, s.mega.ListSessions()...)
 	}
 	return out
 }
@@ -226,6 +251,9 @@ func (s *ConnectionService) ParseSpec(spec string) (domain.ConnectionProfile, er
 	parsed, err := remote.ParseSpec(spec)
 	if err != nil {
 		return domain.ConnectionProfile{}, err
+	}
+	if parsed.IsMEGA() {
+		return profileFromMEGASpec(parsed), nil
 	}
 	if parsed.IsSMB() {
 		return profileFromSMBSpec(parsed), nil
@@ -348,6 +376,75 @@ func profileFromSMBSpec(spec remote.Spec) domain.ConnectionProfile {
 		Port:     port,
 		Label:    label,
 		Domain:   spec.Domain,
+	}
+}
+
+// ConnectMEGA logs into MEGA (email + password; totp optional).
+func (s *ConnectionService) ConnectMEGA(email, password, totp string, save bool) (domain.ConnectResult, error) {
+	parsed, err := remote.ParseSpec("mega " + strings.TrimSpace(email))
+	if err != nil {
+		return domain.ConnectResult{}, err
+	}
+	return s.connectMEGA(parsed, password, totp, save)
+}
+
+func (s *ConnectionService) connectMEGA(spec remote.Spec, password, totp string, save bool) (domain.ConnectResult, error) {
+	if s.mega == nil {
+		return domain.ConnectResult{}, fmt.Errorf("remote not available")
+	}
+	spec.Scheme = "mega"
+	var profileID, defaultWD string
+	if save {
+		p, err := s.upsertMEGAProfile(spec)
+		if err != nil {
+			return domain.ConnectResult{}, err
+		}
+		profileID = p.ID
+		defaultWD = p.DefaultWorkDir
+	}
+	if err := s.mega.Connect(spec, password, totp); err != nil {
+		return domain.ConnectResult{}, err
+	}
+	home := spec.RootPath()
+	return domain.ConnectResult{
+		RootPath:       spec.RootPath(),
+		HomePath:       home,
+		Key:            spec.SessionKey(),
+		ProfileID:      profileID,
+		DefaultWorkDir: defaultWD,
+	}, nil
+}
+
+func (s *ConnectionService) upsertMEGAProfile(spec remote.Spec) (domain.ConnectionProfile, error) {
+	list, err := s.loadProfiles()
+	if err != nil {
+		return domain.ConnectionProfile{}, err
+	}
+	key := spec.SessionKey()
+	for _, p := range list {
+		if p.Protocol == "mega" {
+			cand := remote.Spec{Scheme: "mega", User: p.User, Host: p.Host}
+			if cand.SessionKey() == key {
+				return p, nil
+			}
+		}
+	}
+	p := profileFromMEGASpec(spec)
+	list = append(list, p)
+	if err := s.saveProfiles(list); err != nil {
+		return domain.ConnectionProfile{}, err
+	}
+	return p, nil
+}
+
+func profileFromMEGASpec(spec remote.Spec) domain.ConnectionProfile {
+	email := spec.MEGAEmail()
+	return domain.ConnectionProfile{
+		ID:       fmt.Sprintf("conn-%d", time.Now().UnixNano()),
+		Protocol: "mega",
+		User:     spec.User,
+		Host:     spec.Host,
+		Label:    email,
 	}
 }
 
@@ -548,7 +645,8 @@ func IsAuthError(err error) bool {
 		strings.Contains(msg, "unable to authenticate") ||
 		strings.Contains(msg, "no authentication methods") ||
 		strings.Contains(msg, "public key auth failed") ||
-		strings.Contains(msg, "passphrase")
+		strings.Contains(msg, "passphrase") ||
+		strings.Contains(msg, "mega login failed")
 }
 
 // DefaultSSHConfigPaths returns the standard OpenSSH client config file paths.

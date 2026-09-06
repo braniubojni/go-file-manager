@@ -11,7 +11,7 @@ Parent: root `AGENTS.md`. All app logic lives here; `main.go` only wires Wails +
 | `volumes`    | OS mounts list/unmount, DMG attach (darwin), poll watcher                       |
 | `ports`      | Local TCP LISTEN sockets (`lsof`/`netstat`) + user processes + force-kill by PID                 |
 | `gitstatus`  | Upward-only repo root + one scoped `git status` (no disk-wide `.git` walk)   |
-| `remote`     | SSH/SFTP + SMB (`path.go`, `ssh.go`, `smb.go`)                                |
+| `remote`     | SSH/SFTP + SMB + MEGA (`path.go`, `ssh.go`, `smb.go`, `mega.go`) |
 | `storage`    | SQLite bookmarks + crypto helpers                                             |
 | `config`     | Config dir, OS open, Open-with (`openwith_*.go`)                              |
 | `service`    | Wails-bound services (thin orchestration over packages above)                 |
@@ -24,7 +24,7 @@ Registered in `main.go`:
 - `FileService` — FS + remote + jobs cancel; `DiskUsage`, `ListOpenWithApps` / `OpenWith` / `OpenWithPicker`
 - `SettingsService` — JSON settings/shortcuts + pane paths + `GetGridPrefs` / `SaveGridPrefs` + `GetWindowState` / `SaveWindowState` KV
 - `BookmarkService` — SQLite
-- `ConnectionService` — SSH/SMB profiles/sessions
+- `ConnectionService` — SSH/SMB/MEGA profiles/sessions
 - `TerminalService` — PTY per pane (`_unix` / `_windows`); holds `*application.App` for events
 - `UpdateService` — thin façade over `app.Updater` (CheckAndInstall / GetVersion / OpenReleases)
 - `GitService` — `StatusForDir` (cached root + porcelain; local only)
@@ -32,7 +32,7 @@ Registered in `main.go`:
 
 ## Remote paths
 
-- Virtual paths: `ssh://user@host:port/remote/path` or `smb://user@host:port/Share/path` (see `remote.ParseLocation`).
+- Virtual paths: `ssh://user@host:port/remote/path`, `smb://user@host:port/Share/path`, or `mega://user@domain/path` (see `remote.ParseLocation`).
 - Archive browse: pane path is the zip/tar file plus inner members (`/path/to/a.zip/docs`); writes inside archives are rejected (`ErrArchiveReadOnly`).
 - `Location` **embeds** `Spec` → use `loc.JoinPath(...)`, not `loc.Spec.JoinPath` (staticcheck QF1008).
 

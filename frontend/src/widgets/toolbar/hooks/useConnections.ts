@@ -13,6 +13,7 @@ import {
   buildSMBSpec,
   isAuthErrorMessage,
   isLocalNetworkErrorMessage,
+  isMEGAPath,
   isSMBPath,
   resolveRemoteWorkdirInput,
 } from '../../../features/connections/helpers';
@@ -26,6 +27,7 @@ import type {
 import { usePaneStore } from '../../../features/pane/paneStore';
 import { smbAuthFailMessage } from '../../../features/connections/smbCopy';
 import { parseSMBForm, smbShareError } from '../../../features/connections/smbValidate';
+import { megaEmailOk } from '../components/MEGAConnectFields';
 import { ConnectionService } from '../../../shared/api/bindings';
 import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
@@ -64,6 +66,7 @@ export const useConnections = () => {
   const sessionKeys = new Set(sessions.map((s) => s.key));
   const sshProfiles = profiles.filter((p) => p.protocol === 'ssh' || !p.protocol);
   const smbProfiles = profiles.filter((p) => p.protocol === 'smb');
+  const megaProfiles = profiles.filter((p) => p.protocol === 'mega');
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['connections'] });
@@ -101,6 +104,12 @@ export const useConnections = () => {
         return;
       }
       landConnected(res.rootPath);
+      return;
+    }
+    if (isMEGAPath(res.rootPath) || res.rootPath.startsWith('mega:')) {
+      const dest = res.defaultWorkDir || res.homePath || res.rootPath;
+      void ConnectionService.AddRecentPath(dest);
+      landConnected(dest);
       return;
     }
     if (isSMBPath(res.rootPath) || (res.shares && res.shares.length > 0)) {
@@ -178,15 +187,40 @@ export const useConnections = () => {
     landConnected(navPath);
   };
 
-  const connectProfile = async (id: string, password = '') => {
+  const connectMEGA = async (email: string, password: string, totp: string, save: boolean) => {
+    const res = await ConnectionService.ConnectMEGA(email, password, totp, save);
+    await afterConnect(res);
+  };
+
+  const connectProfile = async (id: string, password = '', totp = '') => {
     try {
+      const p = profiles.find((x) => x.id === id);
+      if (p?.protocol === 'mega') {
+        const res = await ConnectionService.ConnectMEGA(
+          `${p.user}@${p.host}`,
+          password,
+          totp,
+          false,
+        );
+        await afterConnect({
+          ...res,
+          profileId: p.id,
+          defaultWorkDir: p.defaultWorkDir,
+        });
+        return;
+      }
       const res = await ConnectionService.ConnectProfile(id, password);
       await afterConnect(res);
     } catch (e) {
       const msg = errMessage(e);
       if (isAuthErrorMessage(msg) && !password) {
         const p = profiles.find((x) => x.id === id);
-        dispatch({ type: 'open_password', profileId: id, label: p?.label });
+        dispatch({
+          type: 'open_password',
+          profileId: id,
+          label: p?.label,
+          mega: p?.protocol === 'mega',
+        });
         return;
       }
       show(msg, 'error');
@@ -278,6 +312,10 @@ export const useConnections = () => {
       type: 'open_password',
       profileId: pendingConnect.profileId ?? '',
       label: pendingConnect.label,
+      mega:
+        pendingConnect.spec?.startsWith('mega:') ||
+        isMEGAPath(pendingConnect.targetPath) ||
+        pendingConnect.spec?.startsWith('mega://'),
     });
     // nonce re-opens the dialog even for a repeat of the same request
   }, [pendingConnect, pendingNonce]);
@@ -298,7 +336,25 @@ export const useConnections = () => {
 
   const submitPendingConnect = async (req: ConnectRequest) => {
     try {
-      if (req.profileId) await ConnectionService.ConnectProfile(req.profileId, dialog.password);
+      const mega =
+        req.spec?.startsWith('mega:') ||
+        isMEGAPath(req.targetPath) ||
+        Boolean(req.spec?.startsWith('mega://'));
+      if (mega) {
+        const email = req.spec?.startsWith('mega:')
+          ? req.spec.slice(5)
+          : req.spec && isMEGAPath(req.spec)
+            ? `${new URL(req.spec).username}@${new URL(req.spec).hostname}`
+            : '';
+        const fromProfile = profiles.find((x) => x.id === req.profileId);
+        await ConnectionService.ConnectMEGA(
+          fromProfile ? `${fromProfile.user}@${fromProfile.host}` : email,
+          dialog.password,
+          dialog.totp,
+          false,
+        );
+      } else if (req.profileId)
+        await ConnectionService.ConnectProfile(req.profileId, dialog.password);
       else await ConnectionService.ConnectSpec(req.spec ?? '', dialog.password, false);
     } catch (e) {
       const msg = errMessage(e);
@@ -318,6 +374,21 @@ export const useConnections = () => {
     }
     if (dialog.mode === 'smb_shares') {
       await confirmSMBShare();
+      return;
+    }
+    if (dialog.mode === 'add_mega') {
+      if (!megaEmailOk(dialog.spec)) {
+        dispatch({ type: 'set_error', error: 'Enter a MEGA email (you@example.com)' });
+        return;
+      }
+      dispatch({ type: 'set_busy', busy: true });
+      try {
+        await connectMEGA(dialog.spec.trim(), dialog.password, dialog.totp, dialog.save);
+      } catch (e) {
+        dispatch({ type: 'set_error', error: errMessage(e) });
+      } finally {
+        dispatch({ type: 'set_busy', busy: false });
+      }
       return;
     }
     if (dialog.mode === 'add_smb') {
@@ -355,7 +426,7 @@ export const useConnections = () => {
         return;
       }
       if (dialog.mode === 'password' && dialog.profileId) {
-        await connectProfile(dialog.profileId, dialog.password);
+        await connectProfile(dialog.profileId, dialog.password, dialog.totp);
         return;
       }
       if (dialog.mode === 'smb_confirm') {
@@ -430,6 +501,7 @@ export const useConnections = () => {
     dispatch,
     sshProfiles,
     smbProfiles,
+    megaProfiles,
     sessionKeys,
     onMenuConnect,
     onDisconnect,
