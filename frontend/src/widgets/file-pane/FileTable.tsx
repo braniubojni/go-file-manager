@@ -3,10 +3,12 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import { DataGrid } from '@mui/x-data-grid/DataGrid';
 import type { FC } from 'react';
-import { isNotConnectedMessage } from '../../features/connections/helpers';
+import { isNotConnectedMessage, isRemotePath } from '../../features/connections/helpers';
+import { isPermissionDeniedMessage } from '../../shared/lib/format';
 import { FileGridRow, FileRowProvider } from './dnd';
 import { FileColumnMenu } from './FileColumnMenu';
 import { useFileTable } from './hooks';
+import { PermissionDeniedNotice } from './PermissionDeniedNotice';
 import { ReconnectNotice } from './ReconnectNotice';
 import { dataGridSx, getBoxWrapperSx } from './styles';
 import type { FileTableProps } from './types';
@@ -36,6 +38,8 @@ export const FileTable: FC<FileTableProps> = (props) => {
       ) : t.isError ? (
         isNotConnectedMessage(t.errorMessage ?? '') ? (
           <ReconnectNotice paneId={t.paneId} path={props.panePath} />
+        ) : !isRemotePath(props.panePath) && isPermissionDeniedMessage(t.errorMessage ?? '') ? (
+          <PermissionDeniedNotice paneId={t.paneId} />
         ) : (
           <Box sx={{ p: 2 }}>
             <Typography color="error" variant="body2">

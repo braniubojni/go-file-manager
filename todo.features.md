@@ -23,9 +23,8 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 
 ## Remote drives
 
-- [ ] Google Drive — research only (no code yet)
-  - **Google Drive (easy later, same as iCloud):** Drive for desktop is a local folder. macOS File Provider: `~/Library/CloudStorage/GoogleDrive-<account>/` (location locked by macOS). [Drive for desktop on macOS](https://support.google.com/drive/answer/12178485). Older streaming mount: `/Volumes/GoogleDrive`. Windows: drive letter (`G:`) or `%USERPROFILE%\Google Drive`. Later: scan `CloudStorage` for `GoogleDrive-` like [`internal/filesystem/icloud.go`](internal/filesystem/icloud.go).
-  - **Google Drive in-app (no desktop app):** Drive API v3 + OAuth (Cloud project, refresh tokens, keychain) — heavy. rclone: [rclone.org/drive](https://rclone.org/drive/).
+- [x] Google Drive local shortcut — `internal/filesystem/googledrive.go` scans `~/Library/CloudStorage/GoogleDrive-*`, `/Volumes/GoogleDrive`, `~/Google Drive`, same pattern as [`internal/filesystem/icloud.go`](internal/filesystem/icloud.go); Connections menu Cloud section lists one entry per account.
+  - **Google Drive in-app (no desktop app):** Drive API v3 + OAuth (Cloud project, refresh tokens, keychain) — heavy, not done. rclone: [rclone.org/drive](https://rclone.org/drive/).
 - [x] MEGA in-app remote (`mega://user@domain/path`) via [`t3rm1n4l/go-mega`](https://github.com/t3rm1n4l/go-mega) — Connections menu, list/CRUD, local↔MEGA copy. Not a Finder CloudStorage folder; MEGAsync.cfg parse skipped.
 
 ## Remote/SFTP
@@ -58,7 +57,7 @@ Not commitments — ideas to triage. Check here before proposing new features (s
 
 ## Other
 
-- [ ] Smart tool that will analyze the files and folders and will highlight the files that are similar to each other(by content or by name, by metadata and etc.). It should be able to work with the files in the all remote connections as well. Let's also have OCR I want functionality that will going to find duplicates and if user need it it will show in dialog percentage of two photos together and user will be able to select all or select one by one, then remove it
+- [ ] Smart tool that will analyze the files and folders and will highlight the files that are similar to each other(by content or by name, by metadata and etc.). It should be able to work with the files in the all remote connections as well. Let's also have OCR I want functionality that will going to find duplicates and if user need it it will show in dialog percentage of two photos together and user will be able to select all or select one by one, then remove it. Tool should work everywhere. sftp, google drive, icloude, SMB, Mega
 - [ ] Trash/recycle bin integration (soft delete, restore) instead of permanent delete
 - [ ] Disk usage treemap view (like WinDirStat) per folder
 - [ ] Plugin/extension points — low priority, only if long-term extensibility actually needed

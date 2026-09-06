@@ -232,6 +232,11 @@ func (s *FileService) ICloudDrivePath() (string, error) {
 	return filesystem.ICloudDrivePath()
 }
 
+// GoogleDrivePaths returns local Google Drive for desktop folders, or nil if none.
+func (s *FileService) GoogleDrivePaths() ([]string, error) {
+	return filesystem.GoogleDrivePaths()
+}
+
 func (s *FileService) Exists(path string) (bool, error) {
 	if remote.IsRemote(path) {
 		be, err := s.backendFor(path)
