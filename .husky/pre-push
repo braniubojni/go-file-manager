@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 set -e
 export PATH="$HOME/go/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-# Compile only — lint/tests/knip run on push (`task check`).
+# Full quality gate (gofmt, vet, golangci, Go tests, tsc/oxlint, knip, oxfmt).
 if command -v task >/dev/null 2>&1; then
-  task check:build
+  task check
 else
-  wails3 task check:build
+  wails3 task check
 fi

@@ -28,7 +28,10 @@ var CreateFormats = []string{
 // Archive creates an archive at destPath from sources.
 // format is one of CreateFormats (e.g. "zip", "tar.gz").
 // password is only used for zip encryption (yeka/zip); empty = unencrypted.
-func Archive(ctx context.Context, sources []string, destPath, format, password string) error {
+// onProgress (may be nil) is reported against the total uncompressed source
+// size — for compressed formats the written archive is smaller, so progress
+// eases off near the end rather than being byte-exact; good enough for a bar.
+func Archive(ctx context.Context, sources []string, destPath, format, password string, onProgress ProgressFunc) error {
 	if len(sources) == 0 {
 		return fmt.Errorf("no sources to archive")
 	}
@@ -45,6 +48,10 @@ func Archive(ctx context.Context, sources []string, destPath, format, password s
 		return fmt.Errorf("%w: %s", ErrExists, destAbs)
 	}
 
+	total, _ := TotalBytes(sources) // best-effort; 0 just means an indeterminate bar
+	rep := newProgressReporter(total, onProgress)
+	defer rep.finish(destAbs)
+
 	// Map disk paths → archive names
 	fileMap := make(map[string]string, len(sources))
 	for _, src := range sources {
@@ -59,7 +66,7 @@ func Archive(ctx context.Context, sources []string, destPath, format, password s
 	}
 
 	if format == "zip" && password != "" {
-		return archiveZipEncrypted(sources, destAbs, password)
+		return archiveZipEncrypted(ctx, sources, destAbs, password, rep)
 	}
 
 	files, err := archives.FilesFromDisk(ctx, nil, fileMap)
@@ -78,11 +85,28 @@ func Archive(ctx context.Context, sources []string, destPath, format, password s
 		_ = os.Remove(destAbs)
 		return err
 	}
-	if err := archiver.Archive(ctx, out, files); err != nil {
+	if err := archiver.Archive(ctx, &countingWriter{w: out, rep: rep, path: destAbs}, files); err != nil {
 		_ = os.Remove(destAbs)
 		return err
 	}
 	return out.Close()
+}
+
+// countingWriter reports bytes written to w through a progressReporter; used
+// as a stand-in for per-source progress when the archiver library (mholt)
+// doesn't expose one of its own.
+type countingWriter struct {
+	w    io.Writer
+	rep  *progressReporter
+	path string
+}
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	if n > 0 {
+		c.rep.add(int64(n), c.path)
+	}
+	return n, err
 }
 
 func archiverForFormat(format string) (archives.Archiver, error) {
@@ -109,7 +133,7 @@ func archiverForFormat(format string) (archives.Archiver, error) {
 }
 
 // archiveZipEncrypted creates a password-protected zip via yeka/zip (traditional encryption).
-func archiveZipEncrypted(sources []string, destAbs, password string) error {
+func archiveZipEncrypted(ctx context.Context, sources []string, destAbs, password string, rep *progressReporter) error {
 	out, err := os.Create(destAbs)
 	if err != nil {
 		return err
@@ -120,6 +144,10 @@ func archiveZipEncrypted(sources []string, destAbs, password string) error {
 	defer func() { _ = zw.Close() }()
 
 	for _, src := range sources {
+		if err := ctx.Err(); err != nil {
+			_ = os.Remove(destAbs)
+			return err
+		}
 		abs, err := Resolve(src)
 		if err != nil {
 			return err
@@ -130,12 +158,12 @@ func archiveZipEncrypted(sources []string, destAbs, password string) error {
 		}
 		base := filepath.Base(abs)
 		if info.IsDir() {
-			if err := addZipDirEncrypted(zw, abs, base, password); err != nil {
+			if err := addZipDirEncrypted(ctx, zw, abs, base, password, rep); err != nil {
 				_ = os.Remove(destAbs)
 				return err
 			}
 		} else {
-			if err := addZipFileEncrypted(zw, abs, base, password); err != nil {
+			if err := addZipFileEncrypted(ctx, zw, abs, base, password, rep); err != nil {
 				_ = os.Remove(destAbs)
 				return err
 			}
@@ -148,7 +176,10 @@ func archiveZipEncrypted(sources []string, destAbs, password string) error {
 	return out.Close()
 }
 
-func addZipFileEncrypted(zw *yzip.Writer, diskPath, nameInZip, password string) error {
+func addZipFileEncrypted(ctx context.Context, zw *yzip.Writer, diskPath, nameInZip, password string, rep *progressReporter) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	f, err := os.Open(diskPath)
 	if err != nil {
 		return err
@@ -172,14 +203,17 @@ func addZipFileEncrypted(zw *yzip.Writer, diskPath, nameInZip, password string) 
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(w, f)
+	_, err = copyCtx(ctx, w, f, rep, diskPath)
 	return err
 }
 
-func addZipDirEncrypted(zw *yzip.Writer, diskPath, prefix, password string) error {
+func addZipDirEncrypted(ctx context.Context, zw *yzip.Writer, diskPath, prefix, password string, rep *progressReporter) error {
 	return filepath.Walk(diskPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
 		rel, err := filepath.Rel(diskPath, path)
 		if err != nil {
@@ -202,28 +236,112 @@ func addZipDirEncrypted(zw *yzip.Writer, diskPath, prefix, password string) erro
 			_, err = zw.CreateHeader(hdr)
 			return err
 		}
-		return addZipFileEncrypted(zw, path, name, password)
+		return addZipFileEncrypted(ctx, zw, path, name, password, rep)
 	})
+}
+
+// copyCtx copies src into dst in chunks, aborting with ctx.Err() as soon as
+// the context is cancelled instead of running an io.Copy to completion. r may
+// be nil (progressReporter.add is nil-safe); cur labels the reported path.
+func copyCtx(ctx context.Context, dst io.Writer, src io.Reader, r *progressReporter, cur string) (int64, error) {
+	buf := make([]byte, 1<<20) // 1 MiB, matches copy_fast's chunk size
+	var total int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return total, err
+		}
+		n, rerr := src.Read(buf)
+		if n > 0 {
+			if _, werr := dst.Write(buf[:n]); werr != nil {
+				return total, werr
+			}
+			total += int64(n)
+			r.add(int64(n), cur)
+		}
+		if rerr != nil {
+			if rerr == io.EOF {
+				return total, nil
+			}
+			return total, rerr
+		}
+	}
 }
 
 // Extract unpacks archivePath into destDir (created if needed).
 // Supports zip, rar, 7z, tar and compressed tar via mholt Identify.
-// password is used for password-protected rar/7z when provided.
-func Extract(ctx context.Context, archivePath, destDir, password string) error {
-	abs, err := Resolve(archivePath)
-	if err != nil {
-		return err
+// password is used for password-protected rar/7z/zip when provided.
+// onProgress (may be nil) reports bytes written across all members.
+func Extract(ctx context.Context, archivePath, destDir, password string, onProgress ProgressFunc) error {
+	return ExtractBatch(ctx, []ExtractJob{{ArchivePath: archivePath, DestDir: destDir}}, password, onProgress)
+}
+
+// ExtractJob pairs one archive with its own destination directory for a
+// multi-select extract handled by ExtractBatch.
+type ExtractJob struct {
+	ArchivePath string
+	DestDir     string
+}
+
+// ExtractBatch unpacks each job in turn, sharing a single progress total
+// across the whole batch so a multi-select extract's transfer-bar row
+// progresses monotonically instead of resetting to a new (often smaller)
+// total each time the next archive starts.
+func ExtractBatch(ctx context.Context, jobs []ExtractJob, password string, onProgress ProgressFunc) error {
+	if len(jobs) == 0 {
+		return nil
 	}
-	destAbs, err := Resolve(destDir)
-	if err != nil {
-		return err
+	abss := make([]string, len(jobs))
+	destAbss := make([]string, len(jobs))
+	var total int64
+	for i, j := range jobs {
+		abs, err := Resolve(j.ArchivePath)
+		if err != nil {
+			return err
+		}
+		destAbs, err := Resolve(j.DestDir)
+		if err != nil {
+			return err
+		}
+		abss[i], destAbss[i] = abs, destAbs
+		// Fail fast on a missing password before sinking time into sizing a
+		// progress bar for a batch that can't fully proceed.
+		if strings.HasSuffix(strings.ToLower(abs), ".zip") && password == "" {
+			if encrypted, encErr := zipEncrypted(abs); encErr == nil && encrypted {
+				return ErrPasswordRequired
+			}
+		}
+		total += archiveMemberBytes(abs) // best-effort; 0 contribution = indeterminate share
 	}
-	if err := os.MkdirAll(destAbs, 0o755); err != nil {
-		return err
+
+	rep := newProgressReporter(total, onProgress)
+	defer rep.finish(destAbss[len(destAbss)-1])
+
+	for i, abs := range abss {
+		destAbs := destAbss[i]
+		if err := os.MkdirAll(destAbs, 0o755); err != nil {
+			return err
+		}
+		if err := walkArchive(ctx, abs, password, func(ctx context.Context, fi archives.FileInfo) error {
+			return writeArchiveMember(ctx, destAbs, "", fi, rep)
+		}); err != nil {
+			return err
+		}
 	}
-	return walkArchive(ctx, abs, password, func(ctx context.Context, fi archives.FileInfo) error {
-		return writeArchiveMember(destAbs, "", fi)
+	return nil
+}
+
+// archiveMemberBytes sums member sizes for a progress-bar total, without
+// opening (or needing the password for) any member — same funnel ListArchiveDir
+// uses. Errors are swallowed; the caller falls back to an indeterminate bar.
+func archiveMemberBytes(archiveAbs string) int64 {
+	var total int64
+	_ = walkArchiveNames(archiveAbs, func(fi archives.FileInfo) error {
+		if !fi.IsDir() {
+			total += fi.Size()
+		}
+		return nil
 	})
+	return total
 }
 
 func applyArchivePassword(format archives.Format, password string) archives.Format {
@@ -249,6 +367,24 @@ func applyArchivePassword(format archives.Format, password string) archives.Form
 }
 
 func walkArchive(ctx context.Context, archiveAbs, password string, fn func(context.Context, archives.FileInfo) error) error {
+	var zipOpenErr error
+	if strings.HasSuffix(strings.ToLower(archiveAbs), ".zip") {
+		encrypted, err := zipEncrypted(archiveAbs)
+		if err == nil {
+			if encrypted {
+				if password == "" {
+					return ErrPasswordRequired
+				}
+				return walkEncryptedZip(ctx, archiveAbs, password, fn)
+			}
+		} else {
+			// yzip couldn't open it (e.g. truncated/corrupt file). Keep the
+			// error so a subsequent mholt/archives failure below can report
+			// it instead of a less specific one.
+			zipOpenErr = err
+		}
+	}
+
 	f, err := os.Open(archiveAbs)
 	if err != nil {
 		return err
@@ -257,6 +393,9 @@ func walkArchive(ctx context.Context, archiveAbs, password string, fn func(conte
 
 	format, stream, err := archives.Identify(ctx, filepath.Base(archiveAbs), f)
 	if err != nil {
+		if zipOpenErr != nil {
+			return fmt.Errorf("identify archive: %w (zip open also failed: %v)", err, zipOpenErr)
+		}
 		return fmt.Errorf("identify archive: %w", err)
 	}
 	format = applyArchivePassword(format, password)
@@ -267,7 +406,7 @@ func walkArchive(ctx context.Context, archiveAbs, password string, fn func(conte
 	return ex.Extract(ctx, stream, fn)
 }
 
-func writeArchiveMember(destAbs, destName string, fi archives.FileInfo) error {
+func writeArchiveMember(ctx context.Context, destAbs, destName string, fi archives.FileInfo, rep *progressReporter) error {
 	name := destName
 	if name == "" {
 		name = filepath.FromSlash(path.Clean("/" + strings.ReplaceAll(fi.NameInArchive, `\`, `/`)))
@@ -296,7 +435,9 @@ func writeArchiveMember(destAbs, destName string, fi archives.FileInfo) error {
 		return err
 	}
 	defer func() { _ = out.Close() }()
-	if _, err = io.Copy(out, rc); err != nil {
+	if _, err = copyCtx(ctx, out, rc, rep, target); err != nil {
+		_ = out.Close()
+		_ = os.Remove(target)
 		return err
 	}
 	return out.Close()

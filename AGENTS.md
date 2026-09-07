@@ -45,7 +45,7 @@ scripts/ci-go-docker.sh # local Linux Go CI mirror
 
 - **Questions ≠ work:** If the user asks a **question** (research, “do we have…?”, “will X work?”, “how does…?”), **only research and answer**. Do **not** edit, implement, refactor, commit, or run write-side actions. Start implementation **only** when they explicitly ask you to **do** something (e.g. “add”, “fix”, “implement”, “change”).
 - **Do not invent features** without user ask; check `todo.features.md`.
-- **gofmt** before commit; root **husky** + lint-staged (`gofmt`, `oxfmt`).
+- **gofmt** / **oxfmt** on push (`task check`); husky pre-commit is compile-only (`task check:build`).
 - Frontend components **~100–150 lines**; styles/helpers **colocated**.
 - MUI: **path imports** (`@mui/material/Button`) — no barrel `@mui/material`.
 - React Query: **`mutate` + `onSuccess`/`onError`**, not `mutateAsync`.
@@ -66,6 +66,8 @@ task build:linux VERSION=0.1.0 ARCH=arm64 # cross helpers in Taskfile.yml
 task dist VERSION=0.1.0                   # all platforms → dist/ (Linux arch = host)
 
 # Quality
+task check          # lint + knip + Go tests (husky pre-push)
+task check:build    # frontend + Go compile (husky pre-commit)
 gofmt -l .
 go test ./internal/...
 go test ./internal/filesystem/... -run TestName -v   # single package/test

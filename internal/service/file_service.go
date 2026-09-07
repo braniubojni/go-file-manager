@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	gopath "path"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -35,6 +36,7 @@ type FileService struct {
 	trash        *filesystem.Trash
 	app          *application.App
 	vols         *volumes.Manager
+	archivePw    sync.Map // archive abs path -> password, cached for the session
 }
 
 type remoteBackend interface {
@@ -320,7 +322,7 @@ func (s *FileService) runTransfer(jobID, kind string, sources []string, destDir 
 		if isMove {
 			return filesystem.ErrArchiveReadOnly
 		}
-		return extractArchiveSources(ctx, sources, destDir)
+		return s.extractArchiveSources(ctx, sources, destDir)
 	}
 
 	xfer, err := transferKind(sources, destDir)
@@ -453,8 +455,13 @@ func transferLabel(kind string, sources []string, destDir string) string {
 		base = base[i+1:]
 	}
 	verb := "Copy"
-	if kind == "move" {
+	switch kind {
+	case "move":
 		verb = "Move"
+	case "archive":
+		verb = "Archive"
+	case "extract":
+		verb = "Extract"
 	}
 	if n == 1 {
 		return fmt.Sprintf("%s %s → %s", verb, base, destDir)
@@ -565,13 +572,27 @@ func (s *FileService) Mkdir(parent, name string) (string, error) {
 	return filesystem.Mkdir(parent, name)
 }
 
-// CreateFile creates an empty file under parent (local only).
+// CreateFile creates an empty file under parent (local or remote).
 func (s *FileService) CreateFile(parent, name string) (string, error) {
 	if err := rejectArchiveWrite(parent); err != nil {
 		return "", err
 	}
 	if remote.IsRemote(parent) {
-		return "", fmt.Errorf("create file is not available on remote connections yet")
+		be, err := s.backendFor(parent)
+		if err != nil {
+			return "", err
+		}
+		loc, err := remote.ParseLocation(parent)
+		if err != nil {
+			return "", err
+		}
+		p := loc.JoinPath(gopath.Join(loc.RemotePath, name))
+		if ok, err := be.Exists(p); err != nil {
+			return "", err
+		} else if ok {
+			return "", fmt.Errorf("%w: %s", filesystem.ErrExists, p)
+		}
+		return p, be.WriteTextFile(p, "")
 	}
 	return filesystem.CreateFile(parent, name)
 }
@@ -602,7 +623,7 @@ func (s *FileService) ReadTextFile(path string) (string, error) {
 		return be.ReadTextFile(path)
 	}
 	if a, inner, ok := filesystem.SplitArchivePath(path); ok && inner != "" {
-		return filesystem.ReadArchiveTextFile(a, inner)
+		return filesystem.ReadArchiveTextFile(a, inner, s.archivePassword(a))
 	}
 	return filesystem.ReadTextFile(path)
 }
@@ -622,15 +643,44 @@ func (s *FileService) WriteTextFile(path, content string) error {
 	return filesystem.WriteTextFile(path, content)
 }
 
-// SearchTree finds nested files/folders under root (local only; Go-to).
+// SearchTree finds nested files/folders under root (local and remote; Go-to).
 func (s *FileService) SearchTree(root, query string, showHidden bool, limit int) ([]domain.SearchHit, error) {
-	if remote.IsRemote(root) {
-		return nil, fmt.Errorf("go-to is not available on remote connections yet")
-	}
 	if filesystem.IsArchivePath(root) {
 		return nil, fmt.Errorf("go-to is not available inside archives yet")
 	}
+	if remote.IsRemote(root) {
+		be, err := s.backendFor(root)
+		if err != nil {
+			return nil, err
+		}
+		return s.searchTreeRemote(be, root, query, showHidden, limit)
+	}
 	return filesystem.SearchTree(root, query, showHidden, limit)
+}
+
+func (s *FileService) searchTreeRemote(be remoteBackend, root, query string, showHidden bool, limit int) ([]domain.SearchHit, error) {
+	if limit <= 0 {
+		limit = 80
+	}
+	q := strings.ToLower(strings.TrimSpace(query))
+	var hits []domain.SearchHit
+	err := walkRemote(context.Background(), be, root, showHidden, func(e domain.FileEntry, rel string, depth int) (descend, stop bool) {
+		if q == "" {
+			if depth == 0 {
+				hits = append(hits, domain.SearchHit{Name: e.Name, Path: e.Path, IsDir: e.IsDir, RelPath: rel})
+			}
+			// Empty query: immediate children only, matching filesystem.SearchTree.
+			return false, false
+		}
+		if strings.Contains(strings.ToLower(e.Name), q) {
+			hits = append(hits, domain.SearchHit{Name: e.Name, Path: e.Path, IsDir: e.IsDir, RelPath: rel})
+		}
+		return true, len(hits) >= limit*3
+	})
+	if err != nil {
+		return nil, err
+	}
+	return filesystem.RankSearchHits(hits, q, limit), nil
 }
 
 // StartSearch runs a cancellable content or folder-name search and streams
@@ -641,8 +691,8 @@ func (s *FileService) StartSearch(
 	caseSensitive, showHidden bool,
 	limit int,
 ) error {
-	if remote.IsRemote(root) {
-		return fmt.Errorf("search is not available on remote connections yet")
+	if remote.IsRemote(root) && mode != domain.SearchModeFolders {
+		return fmt.Errorf("content search is not available on remote connections yet")
 	}
 	if filesystem.IsArchivePath(root) {
 		return fmt.Errorf("search is not available inside archives yet")
@@ -688,16 +738,25 @@ func (s *FileService) runSearch(
 
 	switch mode {
 	case domain.SearchModeFolders:
+		onHit := func(h domain.SearchHit) {
+			hitCount++
+			cp := h
+			s.emit("search:hit", domain.SearchHitPayload{
+				JobID:  jobID,
+				Mode:   domain.SearchModeFolders,
+				Folder: &cp,
+			})
+		}
+		if remote.IsRemote(root) {
+			var be remoteBackend
+			be, err = s.backendFor(root)
+			if err == nil {
+				truncated, err = s.searchFoldersRemote(ctx, be, root, query, include, exclude, showHidden, limit, onHit, onDenied)
+			}
+			break
+		}
 		truncated, err = filesystem.SearchFolders(ctx, root, query, include, exclude, showHidden, limit, filesystem.FolderSearchCallbacks{
-			OnHit: func(h domain.SearchHit) {
-				hitCount++
-				cp := h
-				s.emit("search:hit", domain.SearchHitPayload{
-					JobID:  jobID,
-					Mode:   domain.SearchModeFolders,
-					Folder: &cp,
-				})
-			},
+			OnHit:    onHit,
 			OnDenied: onDenied,
 		})
 	default:
@@ -849,6 +908,29 @@ func allRemote(paths []string) bool {
 	return true
 }
 
+// archivePassword returns the cached password for archiveAbs, or "".
+func (s *FileService) archivePassword(archiveAbs string) string {
+	if v, ok := s.archivePw.Load(archiveAbs); ok {
+		return v.(string)
+	}
+	return ""
+}
+
+// SetArchivePassword validates password against archivePath's central
+// directory and caches it for the session (used by ReadTextFile/Extract on
+// subsequent calls into the same archive). Returns ErrBadPassword on mismatch.
+func (s *FileService) SetArchivePassword(archivePath, password string) error {
+	abs, err := filesystem.Resolve(archivePath)
+	if err != nil {
+		return err
+	}
+	if err := filesystem.CheckArchivePassword(abs, password); err != nil {
+		return err
+	}
+	s.archivePw.Store(abs, password)
+	return nil
+}
+
 // ListArchiveCreateFormats returns formats the create dialog can use.
 func (s *FileService) ListArchiveCreateFormats() []string {
 	return append([]string(nil), filesystem.CreateFormats...)
@@ -856,7 +938,10 @@ func (s *FileService) ListArchiveCreateFormats() []string {
 
 // Archive packs sources into destPath using format (zip, tar.gz, …).
 // password enables traditional zip encryption when format is zip.
-// jobID from NewJobID enables CancelJob; empty jobID is non-cancellable.
+// jobID from NewJobID enables CancelJob and transfer:progress events; empty jobID is fire-and-forget.
+// Unlike Copy/Move, this does not emit transfer:done — a single Archive call
+// is one full job, so the frontend (useArchiveExtract) registers/removes the
+// transfer-bar row itself around the call, the same way startTransfer does.
 func (s *FileService) Archive(jobID string, sources []string, destPath, format, password string) error {
 	defer func() { _ = s.FinishJob(jobID) }()
 	if anyRemote(sources) || remote.IsRemote(destPath) {
@@ -865,11 +950,15 @@ func (s *FileService) Archive(jobID string, sources []string, destPath, format, 
 	if err := rejectInsideArchive(append(sources, destPath)...); err != nil {
 		return err
 	}
-	return filesystem.Archive(s.jobCtx(jobID), sources, destPath, format, password)
+	label := transferLabel("archive", sources, destPath)
+	onProgress := s.transferProgress(jobID, "archive", label, destPath)
+	return filesystem.Archive(s.jobCtx(jobID), sources, destPath, format, password, onProgress)
 }
 
 // Extract unpacks archivePath into destDir. password for protected rar/7z/zip when needed.
 // Does not finish the job — call FinishJob after multi-extract, or CancelJob.
+// No transfer:done either (see Archive) — a multi-extract loop shares one
+// jobID across several Extract calls, so only the caller knows when it's done.
 func (s *FileService) Extract(jobID string, archivePath, destDir, password string) error {
 	if remote.IsRemote(archivePath) || remote.IsRemote(destDir) {
 		return fmt.Errorf("extract is not supported for remote paths yet")
@@ -877,7 +966,34 @@ func (s *FileService) Extract(jobID string, archivePath, destDir, password strin
 	if filesystem.IsInsideArchive(archivePath) || filesystem.IsArchivePath(destDir) {
 		return filesystem.ErrArchiveReadOnly
 	}
-	return filesystem.Extract(s.jobCtx(jobID), archivePath, destDir, password)
+	label := transferLabel("extract", []string{archivePath}, destDir)
+	onProgress := s.transferProgress(jobID, "extract", label, destDir)
+	return filesystem.Extract(s.jobCtx(jobID), archivePath, destDir, password, onProgress)
+}
+
+// ExtractBatch unpacks each archivePaths[i] into destDirs[i] (same length),
+// sharing one progress total across the whole batch — see
+// filesystem.ExtractBatch — so a multi-select extract's transfer-bar row
+// progresses monotonically instead of resetting per archive.
+// Does not finish the job — call FinishJob after, or CancelJob.
+func (s *FileService) ExtractBatch(jobID string, archivePaths, destDirs []string, password string) error {
+	if len(archivePaths) != len(destDirs) {
+		return fmt.Errorf("archivePaths and destDirs must be the same length")
+	}
+	jobs := make([]filesystem.ExtractJob, len(archivePaths))
+	for i, a := range archivePaths {
+		d := destDirs[i]
+		if remote.IsRemote(a) || remote.IsRemote(d) {
+			return fmt.Errorf("extract is not supported for remote paths yet")
+		}
+		if filesystem.IsInsideArchive(a) || filesystem.IsArchivePath(d) {
+			return filesystem.ErrArchiveReadOnly
+		}
+		jobs[i] = filesystem.ExtractJob{ArchivePath: a, DestDir: d}
+	}
+	label := transferLabel("extract", archivePaths, "")
+	onProgress := s.transferProgress(jobID, "extract", label, "")
+	return filesystem.ExtractBatch(s.jobCtx(jobID), jobs, password, onProgress)
 }
 
 // ArchiveExtension returns the extension for a create format.

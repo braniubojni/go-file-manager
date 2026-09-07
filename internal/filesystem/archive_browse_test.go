@@ -138,7 +138,7 @@ func TestArchiveTarGzList(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := filepath.Join(root, "out.tar.gz")
-	if err := Archive(context.Background(), []string{src}, out, "tar.gz", ""); err != nil {
+	if err := Archive(context.Background(), []string{src}, out, "tar.gz", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	ents, err := ListArchiveDir(out, "", false)
@@ -157,7 +157,7 @@ func TestReadArchiveTextFile(t *testing.T) {
 	if err := writeTestZip(zipPath, map[string]string{"n.txt": "note"}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := ReadArchiveTextFile(zipPath, "n.txt")
+	got, err := ReadArchiveTextFile(zipPath, "n.txt", "")
 	if err != nil {
 		t.Fatal(err)
 	}

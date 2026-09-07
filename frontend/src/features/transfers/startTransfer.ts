@@ -1,7 +1,12 @@
+import { useArchivePasswordStore } from '../archive/archivePasswordStore';
 import { FileService } from '../../shared/api/bindings';
 import { errMessage } from '../../shared/lib/format';
+import { splitArchivePanePath } from '../../shared/lib/archives';
 import { useTransferStore } from './transferStore';
 import type { TransferKind } from './types';
+
+/** Matches filesystem.ErrPasswordRequired ("password required"). */
+const PASSWORD_RE = /password required/i;
 
 type StartTransferOpts = {
   kind: TransferKind;
@@ -69,6 +74,17 @@ export const startTransfer = (opts: StartTransferOpts): void => {
             show('Cancelled', 'info');
             onSettled?.();
             return;
+          }
+          // Dragging a member out of a password-protected archive: prompt
+          // and retry the whole transfer once it's cached (SetArchivePassword).
+          if (PASSWORD_RE.test(msg)) {
+            const split = splitArchivePanePath(sources[0]);
+            if (split) {
+              useArchivePasswordStore
+                .getState()
+                .prompt(split.archivePath, () => startTransfer(opts));
+              return;
+            }
           }
           show(msg, 'error');
           onSettled?.();

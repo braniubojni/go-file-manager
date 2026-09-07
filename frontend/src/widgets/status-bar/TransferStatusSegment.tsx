@@ -29,6 +29,8 @@ const basename = (p: string): string => p.split(/[/\\]/).pop() || p;
 const kindCaption = (kind: TransferOp['kind']): string => {
   if (kind === 'move') return 'Moving';
   if (kind === 'attach') return 'Attaching';
+  if (kind === 'archive') return 'Archiving';
+  if (kind === 'extract') return 'Extracting';
   return 'Copying';
 };
 

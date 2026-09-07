@@ -1,10 +1,7 @@
 import type { PaneId } from '../../entities/file/types';
 import { parentOfVirtualPath } from '../../features/connections/helpers';
 import type { FileOpsAction } from '../../features/file-ops/types';
-import { newJobId, usePaneJobStore } from '../../features/jobs/paneJobStore';
-import { FileService } from '../../shared/api/bindings';
-import { errMessage } from '../../shared/lib/format';
-import type { RunPaneJobOptions, ToolbarRequestHandlers } from './types';
+import type { ToolbarRequestHandlers } from './types';
 
 export type { ToolbarRequestHandlers } from './types';
 
@@ -35,57 +32,6 @@ export const resolveActionPaths = (selection: string[], focus: string): string[]
   if (sel.length) return sel;
   if (focus && focus.split(/[/\\]/).pop() !== '..') return [focus];
   return [];
-};
-
-// --- pane jobs ---
-
-/** Start a pane job, run work, finish job; handles cancel messages. */
-export const runPaneJob = async (opts: RunPaneJobOptions): Promise<void> => {
-  const { pane, kind, label, show, work, onSuccess, finishBackendJob } = opts;
-  const startJob = usePaneJobStore.getState().start;
-  const finishJob = usePaneJobStore.getState().finish;
-
-  const uiJobId = newJobId(kind);
-  let backendJobId = '';
-  try {
-    backendJobId = await FileService.NewJobID();
-  } catch {
-    /* soft cancel only */
-  }
-  startJob(pane, {
-    id: uiJobId,
-    kind,
-    label,
-    cancelable: true,
-    backendJobId: backendJobId || undefined,
-  });
-  try {
-    await work(backendJobId);
-    if (finishBackendJob && backendJobId) {
-      try {
-        await FileService.FinishJob(backendJobId);
-      } catch {
-        /* ignore */
-      }
-    }
-    finishJob(pane, uiJobId);
-    onSuccess();
-  } catch (e) {
-    if (finishBackendJob && backendJobId) {
-      try {
-        await FileService.FinishJob(backendJobId);
-      } catch {
-        /* ignore */
-      }
-    }
-    finishJob(pane, uiJobId);
-    const msg = errMessage(e);
-    if (msg.toLowerCase().includes('cancel') || msg.includes('context canceled')) {
-      show('Cancelled', 'info');
-      return;
-    }
-    show(msg, 'error');
-  }
 };
 
 // --- keyboard / menu request map ---

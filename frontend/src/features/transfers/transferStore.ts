@@ -8,13 +8,22 @@ import type {
 } from './types';
 
 const kindFromPayload = (kind: string | undefined, prev?: TransferKind): TransferKind => {
-  if (kind === 'move' || kind === 'copy' || kind === 'attach') return kind;
+  if (
+    kind === 'move' ||
+    kind === 'copy' ||
+    kind === 'attach' ||
+    kind === 'archive' ||
+    kind === 'extract'
+  )
+    return kind;
   return prev ?? 'copy';
 };
 
 const labelForKind = (kind: TransferKind): string => {
   if (kind === 'move') return 'Move';
   if (kind === 'attach') return 'Attach';
+  if (kind === 'archive') return 'Archive';
+  if (kind === 'extract') return 'Extract';
   return 'Copy';
 };
 
@@ -42,16 +51,24 @@ const filesFromPayload = (
   });
 };
 
+// jobIds whose transfer-bar row has been removed. Archive/Extract emit their
+// last transfer:progress event over a separate async Wails event channel
+// that isn't ordered against the RPC promise runTransferJob awaits, so that
+// event can arrive after remove() already ran — without this guard,
+// updateProgress would resurrect a ghost row nothing then cleans up.
+const removedJobIds = new Set<string>();
+
 export const useTransferStore = create<TransferState>((set, get) => ({
   byId: {},
 
   upsert: (op) => {
+    removedJobIds.delete(op.jobId);
     set((s) => ({ byId: { ...s.byId, [op.jobId]: op } }));
   },
 
   updateProgress: (payload) => {
     const jobId = payload.jobId;
-    if (!jobId) return;
+    if (!jobId || removedJobIds.has(jobId)) return;
     set((s) => {
       const prev = s.byId[jobId];
       const bytesDone = Number(payload.bytesDone ?? prev?.bytesDone ?? 0);
@@ -96,6 +113,7 @@ export const useTransferStore = create<TransferState>((set, get) => ({
   // job — success, user cancel, or a real transfer error all route through
   // here rather than each needing to remember cancelAllFiles first.
   remove: (jobId) => {
+    removedJobIds.add(jobId);
     get().cancelAllFiles(jobId);
     set((s) => {
       if (!s.byId[jobId]) return s;

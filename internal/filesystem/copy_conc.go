@@ -277,6 +277,9 @@ func CopyCtx(ctx context.Context, sources []string, destDir string, onProgress P
 		rep.setDest(target, isDir(srcAbs))
 		srcTotal, _ := pathBytes(srcAbs)
 		rep.addRoot(srcAbs, target, srcTotal)
+		// Track dest before place(): a dir walk can MkdirAll then return
+		// canceled mid-enqueue, and cleanup would otherwise miss the dest.
+		created = append(created, target)
 		placeThisErr := c.place(srcCtx, srcAbs, target)
 
 		if placeThisErr != nil {
@@ -294,7 +297,6 @@ func CopyCtx(ctx context.Context, sources []string, destDir string, onProgress P
 			placeErr = placeThisErr
 			break
 		}
-		created = append(created, target)
 		succeeded = append(succeeded, srcAbs)
 	}
 	if placeErr != nil {

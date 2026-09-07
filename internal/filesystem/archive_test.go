@@ -23,7 +23,7 @@ func TestArchiveZipAndExtract(t *testing.T) {
 
 	zipPath := filepath.Join(root, "out.zip")
 	ctx := context.Background()
-	if err := Archive(ctx, []string{src, sub}, zipPath, "zip", ""); err != nil {
+	if err := Archive(ctx, []string{src, sub}, zipPath, "zip", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(zipPath); err != nil {
@@ -31,7 +31,7 @@ func TestArchiveZipAndExtract(t *testing.T) {
 	}
 
 	dest := filepath.Join(root, "extracted")
-	if err := Extract(ctx, zipPath, dest, ""); err != nil {
+	if err := Extract(ctx, zipPath, dest, "", nil); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(dest, "hello.txt"))
@@ -53,11 +53,11 @@ func TestArchiveTarGz(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := filepath.Join(root, "out.tar.gz")
-	if err := Archive(context.Background(), []string{src}, out, "tar.gz", ""); err != nil {
+	if err := Archive(context.Background(), []string{src}, out, "tar.gz", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	dest := filepath.Join(root, "ex")
-	if err := Extract(context.Background(), out, dest, ""); err != nil {
+	if err := Extract(context.Background(), out, dest, "", nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dest, "f.txt")); err != nil {
@@ -94,5 +94,44 @@ func TestDeletePermissionMessage(t *testing.T) {
 	// Just ensure ErrPermission string is usable
 	if ErrPermission.Error() != "permission denied" {
 		t.Fatal(ErrPermission)
+	}
+}
+
+func TestArchiveZipEncryptedCancel(t *testing.T) {
+	root := t.TempDir()
+	big := filepath.Join(root, "big.bin")
+	if err := os.WriteFile(big, make([]byte, 8<<20), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	zipPath := filepath.Join(root, "out.zip")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := Archive(ctx, []string{big}, zipPath, "zip", "secret", nil); err == nil {
+		t.Fatal("expected cancel error")
+	}
+	if _, err := os.Stat(zipPath); !os.IsNotExist(err) {
+		t.Fatalf("expected partial zip to be removed, got err=%v", err)
+	}
+}
+
+func TestArchiveUnencryptedExtractCancel(t *testing.T) {
+	root := t.TempDir()
+	big := filepath.Join(root, "big.bin")
+	if err := os.WriteFile(big, make([]byte, 8<<20), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	zipPath := filepath.Join(root, "out.zip")
+	if err := Archive(context.Background(), []string{big}, zipPath, "zip", "", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := filepath.Join(root, "extracted")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := Extract(ctx, zipPath, dest, "", nil); err == nil {
+		t.Fatal("expected cancel error")
+	}
+	if _, err := os.Stat(filepath.Join(dest, "big.bin")); !os.IsNotExist(err) {
+		t.Fatalf("expected partial member to be removed, got err=%v", err)
 	}
 }

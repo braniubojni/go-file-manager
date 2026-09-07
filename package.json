@@ -5,6 +5,8 @@
   "scripts": {
     "prepare": "husky",
     "precommit": "lint-staged",
+    "check": "wails3 task check",
+    "check:build": "wails3 task check:build",
     "knip": "npm run knip --prefix frontend"
   },
   "devDependencies": {

@@ -8,14 +8,56 @@ import {
   extractDialogReducer,
   initialExtractState,
 } from '../../../features/archive/extractDialogReducer';
+import { useTransferStore } from '../../../features/transfers/transferStore';
 import { FileService } from '../../../shared/api/bindings';
 import { archiveStem } from '../../../shared/lib/archives';
+import { errMessage } from '../../../shared/lib/format';
 import { useSnack } from '../../../shared/ui/SnackbarHost';
-import { runPaneJob } from '../helpers';
 import type { ArchiveExtractArgs } from '../types';
 
+/** Registers a transfer-bar row around work(jobId), removing it on settle —
+ * archive/extract share this with copy/move (features/transfers/startTransfer.ts)
+ * instead of the indeterminate pane spinner, since the backend now reports
+ * real byte progress for these jobs too. */
+const runTransferJob = async (
+  kind: 'archive' | 'extract',
+  label: string,
+  work: (jobId: string) => Promise<void>,
+): Promise<void> => {
+  const upsert = useTransferStore.getState().upsert;
+  const remove = useTransferStore.getState().remove;
+  const jobId = await FileService.NewJobID().catch(() => '');
+  if (jobId) {
+    upsert({
+      jobId,
+      kind,
+      label,
+      destDir: '',
+      bytesDone: 0,
+      bytesTotal: 0,
+      currentPath: '',
+      destPath: '',
+      destSize: 0,
+      destIsDir: false,
+      percent: 0,
+      files: [],
+    });
+  }
+  try {
+    await work(jobId);
+  } finally {
+    if (jobId) {
+      try {
+        await FileService.FinishJob(jobId);
+      } catch {
+        /* ignore */
+      }
+      remove(jobId);
+    }
+  }
+};
+
 export const useArchiveExtract = ({
-  activePane,
   activePath,
   realSelection,
   clearSelection,
@@ -59,18 +101,20 @@ export const useArchiveExtract = ({
     const name = archive.name.trim() || 'archive';
     const password = format === 'zip' && encrypt ? pwd : '';
     dispatchArchive({ type: 'close' });
-    await runPaneJob({
-      pane: activePane,
-      kind: 'archive',
-      label: `Archiving ${sources.length} item(s)…`,
-      show,
-      onSuccess: () => afterOk('Archive created'),
-      work: async (backendJobId) => {
+    try {
+      await runTransferJob('archive', `Archiving ${sources.length} item(s)…`, async (jobId) => {
         const ext = await FileService.ArchiveExtension(format);
         const dest = `${activePath.replace(/\/+$/, '')}/${name}${ext.startsWith('.') ? ext : `.${ext}`}`;
-        await FileService.Archive(backendJobId, sources, dest, format, password);
-      },
-    });
+        await FileService.Archive(jobId, sources, dest, format, password);
+      });
+      afterOk('Archive created');
+    } catch (e) {
+      const msg = errMessage(e);
+      show(
+        msg.toLowerCase().includes('cancel') ? 'Cancelled' : msg,
+        msg.toLowerCase().includes('cancel') ? 'info' : 'error',
+      );
+    }
   };
 
   const openExtractDialog = () => {
@@ -84,22 +128,23 @@ export const useArchiveExtract = ({
     const sources = [...realSelection];
     const password = extract.password;
     dispatchExtract({ type: 'close' });
-    await runPaneJob({
-      pane: activePane,
-      kind: 'extract',
-      label: `Extracting ${sources.length} archive(s)…`,
-      show,
-      finishBackendJob: true,
-      onSuccess: () => afterOk('Extract completed'),
-      work: async (backendJobId) => {
-        for (const src of sources) {
+    try {
+      await runTransferJob('extract', `Extracting ${sources.length} archive(s)…`, async (jobId) => {
+        const dests = sources.map((src) => {
           const base = src.split(/[/\\]/).pop() || 'extracted';
           const stem = archiveStem(base);
-          const dest = `${activePath.replace(/\/+$/, '')}/${stem || 'extracted'}`;
-          await FileService.Extract(backendJobId, src, dest, password);
-        }
-      },
-    });
+          return `${activePath.replace(/\/+$/, '')}/${stem || 'extracted'}`;
+        });
+        await FileService.ExtractBatch(jobId, sources, dests, password);
+      });
+      afterOk('Extract completed');
+    } catch (e) {
+      const msg = errMessage(e);
+      show(
+        msg.toLowerCase().includes('cancel') ? 'Cancelled' : msg,
+        msg.toLowerCase().includes('cancel') ? 'info' : 'error',
+      );
+    }
   };
 
   return {

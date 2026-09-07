@@ -124,10 +124,6 @@ export const useToolbarActions = () => {
 
   const onGoTo = () => {
     if (editorOpen) return;
-    if (isRemotePath(activePath)) {
-      show('Go-to is not available on remote connections yet', 'warning');
-      return;
-    }
     openGoTo();
   };
 

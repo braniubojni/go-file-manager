@@ -49,3 +49,20 @@ export const isArchivePanePath = (path: string): boolean => {
 
 /** Base name with the archive suffix removed, for naming an extract target. */
 export const archiveStem = (basename: string): string => basename.replace(ARCHIVE_SUFFIX_RE, '');
+
+/** Splits a pane path into the archive file and the member path inside it
+ * (name heuristic — mirrors the backend's filesystem.SplitArchivePath), or
+ * null when path isn't inside a browsable archive. */
+export const splitArchivePanePath = (
+  path: string,
+): { archivePath: string; inner: string } | null => {
+  const segs = path.replace(/\\/g, '/').split('/');
+  let acc = '';
+  for (let i = 0; i < segs.length; i++) {
+    acc = acc ? `${acc}/${segs[i]}` : segs[i];
+    if (isBrowsableArchive(segs[i])) {
+      return { archivePath: acc, inner: segs.slice(i + 1).join('/') };
+    }
+  }
+  return null;
+};
