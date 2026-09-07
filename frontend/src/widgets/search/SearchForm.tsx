@@ -17,6 +17,7 @@ type Props = {
   patch: (p: Partial<SearchPrefs>) => void;
   searching: boolean;
   resultCount: number;
+  contentSearchDisabled?: boolean;
   onSearch: () => void;
   onReplaceOne: () => void;
   onReplaceAll: () => void;
@@ -27,6 +28,7 @@ const SearchFormInner: FC<Props> = ({
   patch,
   searching,
   resultCount,
+  contentSearchDisabled,
   onSearch,
   onReplaceOne,
   onReplaceAll,
@@ -109,7 +111,13 @@ const SearchFormInner: FC<Props> = ({
         onChange={(_, v) => patch({ mode: v as SearchMode })}
         data-testid="search-mode"
       >
-        <FormControlLabel value="content" control={<Radio size="small" />} label="Text in files" />
+        <FormControlLabel
+          value="content"
+          control={<Radio size="small" />}
+          label="Text in files"
+          disabled={contentSearchDisabled}
+          title={contentSearchDisabled ? 'Not available on remote connections yet' : undefined}
+        />
         <FormControlLabel value="folders" control={<Radio size="small" />} label="Folder names" />
       </RadioGroup>
     </Box>

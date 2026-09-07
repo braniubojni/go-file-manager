@@ -550,7 +550,7 @@ tasks:
       - bash ./scripts/ci-go-docker.sh
 
   lint:
-    summary: Go + frontend lint/format
+    summary: Go + frontend lint/format/knip
     cmds:
       - |
         out=$(gofmt -l .)
@@ -558,6 +558,11 @@ tasks:
           echo "gofmt needed on:"
           echo "$out"
           exit 1
+        fi
+      - |
+        if [ ! -f frontend/dist/index.html ]; then
+          mkdir -p frontend/dist
+          printf '%s\n' '<!doctype html><title>ci-stub</title>' > frontend/dist/index.html
         fi
       - go vet ./...
       - golangci-lint run --timeout=3m
@@ -567,7 +572,26 @@ tasks:
     dir: frontend
     cmds:
       - npm run lint
+      - npm run knip
       - npm run format:check
+
+  check:
+    summary: Full quality gate — lint, knip, Go tests (husky pre-push)
+    desc: |
+      Local CI-lite: gofmt, go vet, golangci-lint, go test, frontend tsc/oxlint, knip, oxfmt.
+      No e2e, no production binary. Used by .husky/pre-push.
+    cmds:
+      - task: lint
+      - task: test
+
+  check:build:
+    summary: Compile gate — frontend production build + Go binary (husky pre-commit)
+    desc: |
+      Verifies TypeScript/Vite and the Wails Go binary compile. Does not generate
+      bindings, tidy modules, or run lint/tests. Used by .husky/pre-commit.
+    cmds:
+      - npm run build --prefix frontend
+      - CGO_ENABLED=1 go build -tags production -o "{{.BIN_DIR}}/{{.APP_NAME}}"
 
   test:e2e:
     summary: Playwright e2e against Wails server mode

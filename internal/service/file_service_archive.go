@@ -40,7 +40,7 @@ func countInsideArchive(paths []string) int {
 	return n
 }
 
-func extractArchiveSources(ctx context.Context, sources []string, destDir string) error {
+func (s *FileService) extractArchiveSources(ctx context.Context, sources []string, destDir string) error {
 	groups := make(map[string][]string)
 	for _, src := range sources {
 		a, inner, ok := filesystem.SplitArchivePath(src)
@@ -50,7 +50,7 @@ func extractArchiveSources(ctx context.Context, sources []string, destDir string
 		groups[a] = append(groups[a], inner)
 	}
 	for a, inners := range groups {
-		if err := filesystem.ExtractMembers(ctx, a, destDir, inners, ""); err != nil {
+		if err := filesystem.ExtractMembers(ctx, a, destDir, inners, s.archivePassword(a)); err != nil {
 			return err
 		}
 	}

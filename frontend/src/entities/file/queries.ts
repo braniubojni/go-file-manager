@@ -150,7 +150,7 @@ export const useSearchTree = (
       const rows = await FileService.SearchTree(root!, query, showHidden, 80);
       return rows ?? [];
     },
-    enabled: Boolean(enabled && root && !isRemotePath(root)),
+    enabled: Boolean(enabled && root),
     staleTime: 2_000,
   });
 };

@@ -31,6 +31,8 @@ Releases are **local only** (`task dist` / `task release:local`) — no GitHub A
 ## Local mirror (preferred over raw wails-cross for CI)
 
 ```bash
+task check      # local CI-lite (lint, knip, Go tests) — also husky pre-push
+task check:build  # frontend + Go compile — also husky pre-commit
 task ci:go
 # = bash scripts/ci-go-docker.sh
 # ubuntu:24.04 + install Go from go.mod + GTK4 stack + same steps (incl. golangci-lint v2.12.2)

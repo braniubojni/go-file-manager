@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { usePatchSettings, useSettings, useShortcutDefs } from '../../../entities/file/queries';
-import { isRemotePath } from '../../../features/connections/helpers';
 import {
   runShortcutAction,
   shortcutToggles,
@@ -45,8 +44,6 @@ export const useFileManagerKeyboard = () => {
       // Go-to: Mod+P — disabled while the editor workspace is open
       if (!editorOpen && matched === 'goTo') {
         e.preventDefault();
-        const path = usePaneStore.getState().getPath(usePaneStore.getState().activePane);
-        if (isRemotePath(path)) return;
         openGoTo();
         return;
       }
@@ -54,8 +51,6 @@ export const useFileManagerKeyboard = () => {
       // Find in files: Mod+Shift+F (works with editor open too)
       if (matched === 'openSearch') {
         e.preventDefault();
-        const path = usePaneStore.getState().getPath(usePaneStore.getState().activePane);
-        if (isRemotePath(path)) return;
         openSearch();
         return;
       }

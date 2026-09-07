@@ -193,14 +193,11 @@ The real, permanent fix is an Apple Developer ID ($99/yr) → sign with `wails3 
 ## Quality / CI
 
 ```bash
-# Go (on macOS, go vet of the main package needs a frontend/dist stub; Linux CI also installs GTK4)
-mkdir -p frontend/dist && echo '<!doctype html><title>stub</title>' > frontend/dist/index.html
-go test ./internal/...
-gofmt -l .
-go vet ./...   # Linux requires: libgtk-4-dev libwebkitgtk-6.0-dev
+# One command — Go + frontend lint, knip, tests (same as pre-push)
+task check
 
-# Frontend
-cd frontend && npm run lint && npm run knip && npm run format:check && npm run build
+# Compile only — frontend production build + Go binary (same as pre-commit)
+task check:build
 
 # Mirror the Go GitHub Actions job in Docker (Ubuntu 24.04 + GTK4)
 task ci:go
@@ -211,25 +208,26 @@ GitHub Actions (`.github/workflows/ci.yml`) runs these on PRs and `main`.
 
 ### Git hooks (Husky)
 
-Root `npm install` installs [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/lint-staged/lint-staged). On every commit:
+Root `npm install` installs [Husky](https://typicode.github.io/husky/). After that:
 
-- staged `*.go` → `gofmt -w`
-- staged `frontend/src/**/*.{ts,tsx,css,json}` → Prettier
+- **commit** (`pre-commit`) → `task check:build` (frontend + Go compile only)
+- **push** (`pre-push`) → `task check` (gofmt, vet, golangci-lint, Go tests, tsc/oxlint, knip, oxfmt)
 
 ```bash
 npm install   # once (runs prepare → husky)
+task check    # run the push gate without pushing
 ```
 
 ## Best Practices
 
 ### Code Quality Enforcement
 
-**Automated formatting (zero-config for developers):**
+**Automated quality gates:**
 
-- ✅ **Pre-commit hook** (Husky) auto-formats Go + TypeScript/CSS
-- ✅ **gofmt** on all `*.go` files (no configuration needed)
-- ✅ **Prettier** on frontend code (consistent style)
-- ✅ **CI rejects** unformatted code
+- ✅ **Pre-commit** compiles frontend + Go (`task check:build`)
+- ✅ **Pre-push** runs lint, knip, and Go tests (`task check`)
+- ✅ **gofmt** / **oxfmt** checked on push and in CI
+- ✅ **CI rejects** unformatted or failing code
 
 **Linting:**
 

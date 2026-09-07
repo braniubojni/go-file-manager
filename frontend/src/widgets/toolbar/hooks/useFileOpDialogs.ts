@@ -150,9 +150,6 @@ export const useFileOpDialogs = ({
   };
 
   const onMkdir = () => {
-    if (isRemotePath(activePath)) {
-      return show('Not available on remote connections yet', 'warning');
-    }
     dispatchMkdir({ type: 'open', name: 'New Folder' });
   };
 
@@ -168,9 +165,6 @@ export const useFileOpDialogs = ({
   };
 
   const onMkfile = () => {
-    if (isRemotePath(activePath)) {
-      return show('Not available on remote connections yet', 'warning');
-    }
     dispatchMkfile({ type: 'open', name: 'untitled.txt' });
   };
 

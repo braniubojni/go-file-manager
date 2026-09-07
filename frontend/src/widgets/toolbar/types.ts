@@ -18,10 +18,6 @@ import type {
   NameDialogAction,
   NameDialogState,
 } from '../../features/file-ops/types';
-import type { PaneJobKind } from '../../features/jobs/types';
-
-/** Snackbar show callback used by toolbar helpers. */
-type SnackShow = (msg: string, severity?: 'success' | 'error' | 'info' | 'warning') => void;
 
 /** One handler per file-ops store action (shortcuts, menu triggers). */
 export type ToolbarRequestHandlers = Record<FileOpsAction, () => void>;
@@ -123,14 +119,4 @@ export type ArchiveExtractArgs = {
   activePath: string;
   realSelection: string[];
   clearSelection: () => void;
-};
-
-export type RunPaneJobOptions = {
-  pane: PaneId;
-  kind: PaneJobKind;
-  label: string;
-  show: SnackShow;
-  work: (backendJobId: string) => Promise<void>;
-  onSuccess: () => void;
-  finishBackendJob?: boolean;
 };

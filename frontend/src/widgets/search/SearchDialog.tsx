@@ -222,6 +222,7 @@ export const SearchDialog: FC<Props> = ({ open, onClose }) => {
             patch={patch}
             searching={searching}
             resultCount={results.length}
+            contentSearchDisabled={isRemotePath(root)}
             onSearch={() => void runSearch()}
             onReplaceOne={() => void replaceOne()}
             onReplaceAll={() => void replaceAll()}
@@ -231,7 +232,7 @@ export const SearchDialog: FC<Props> = ({ open, onClose }) => {
           ) : null}
         </Box>
         <SearchResultsList
-          remote={isRemotePath(root)}
+          remote={isRemotePath(root) && prefs.mode !== 'folders'}
           searching={searching}
           results={results}
           index={index}

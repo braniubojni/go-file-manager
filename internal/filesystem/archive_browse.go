@@ -140,6 +140,8 @@ func relToPrefix(name, prefix string) (string, bool) {
 }
 
 // ListArchiveDir lists immediate children of inner inside archiveAbs.
+// Names/sizes are readable from the central directory without a password
+// even when the zip is encrypted; password is only needed to read content.
 func ListArchiveDir(archiveAbs, inner string, showHidden bool) ([]domain.FileEntry, error) {
 	inner = normalizeInner(inner)
 	type child struct {
@@ -149,7 +151,7 @@ func ListArchiveDir(archiveAbs, inner string, showHidden bool) ([]domain.FileEnt
 	}
 	children := map[string]*child{}
 
-	err := walkArchive(context.Background(), archiveAbs, "", func(_ context.Context, fi archives.FileInfo) error {
+	err := walkArchiveNames(archiveAbs, func(fi archives.FileInfo) error {
 		name, ok := memberName(fi.NameInArchive)
 		if !ok {
 			return nil
@@ -245,7 +247,7 @@ func ArchiveMemberExists(archiveAbs, inner string) (bool, error) {
 		return Exists(archiveAbs)
 	}
 	found := false
-	err := walkArchive(context.Background(), archiveAbs, "", func(_ context.Context, fi archives.FileInfo) error {
+	err := walkArchiveNames(archiveAbs, func(fi archives.FileInfo) error {
 		name, ok := memberName(fi.NameInArchive)
 		if !ok {
 			return nil
@@ -258,15 +260,16 @@ func ArchiveMemberExists(archiveAbs, inner string) (bool, error) {
 	return found, err
 }
 
-// ReadArchiveTextFile reads a text member for the built-in editor.
-func ReadArchiveTextFile(archiveAbs, inner string) (string, error) {
+// ReadArchiveTextFile reads a text member for the built-in editor. password
+// is required when the archive member is encrypted (see ErrPasswordRequired).
+func ReadArchiveTextFile(archiveAbs, inner, password string) (string, error) {
 	inner = normalizeInner(inner)
 	if inner == "" {
 		return "", fmt.Errorf("not a file: %s", archiveAbs)
 	}
 	var data []byte
 	var found bool
-	err := walkArchive(context.Background(), archiveAbs, "", func(_ context.Context, fi archives.FileInfo) error {
+	err := walkArchive(context.Background(), archiveAbs, password, func(_ context.Context, fi archives.FileInfo) error {
 		if found {
 			return nil
 		}
@@ -337,7 +340,7 @@ func ExtractMembers(ctx context.Context, archiveAbs, destDir string, inners []st
 		base := path.Base(w)
 		destRoot[w] = UniquePath(filepath.Join(destAbs, base))
 	}
-	return walkArchive(ctx, archiveAbs, password, func(_ context.Context, fi archives.FileInfo) error {
+	return walkArchive(ctx, archiveAbs, password, func(ctx context.Context, fi archives.FileInfo) error {
 		name, ok := memberName(fi.NameInArchive)
 		if !ok {
 			return nil
@@ -347,7 +350,7 @@ func ExtractMembers(ctx context.Context, archiveAbs, destDir string, inners []st
 				if fi.IsDir() {
 					return os.MkdirAll(destRoot[w], 0o755)
 				}
-				return writeArchiveMember(filepath.Dir(destRoot[w]), filepath.Base(destRoot[w]), fi)
+				return writeArchiveMember(ctx, filepath.Dir(destRoot[w]), filepath.Base(destRoot[w]), fi, nil)
 			}
 			if strings.HasPrefix(name, w+"/") {
 				rel := name[len(w)+1:]
@@ -355,7 +358,7 @@ func ExtractMembers(ctx context.Context, archiveAbs, destDir string, inners []st
 				if fi.IsDir() {
 					return os.MkdirAll(filepath.Join(root, filepath.FromSlash(rel)), 0o755)
 				}
-				return writeArchiveMember(root, filepath.FromSlash(rel), fi)
+				return writeArchiveMember(ctx, root, filepath.FromSlash(rel), fi, nil)
 			}
 		}
 		return nil

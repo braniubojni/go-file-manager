@@ -17,7 +17,10 @@ import * as domain$0 from "../domain/models.js";
 /**
  * Archive packs sources into destPath using format (zip, tar.gz, …).
  * password enables traditional zip encryption when format is zip.
- * jobID from NewJobID enables CancelJob; empty jobID is non-cancellable.
+ * jobID from NewJobID enables CancelJob and transfer:progress events; empty jobID is fire-and-forget.
+ * Unlike Copy/Move, this does not emit transfer:done — a single Archive call
+ * is one full job, so the frontend (useArchiveExtract) registers/removes the
+ * transfer-bar row itself around the call, the same way startTransfer does.
  */
 export function Archive(jobID: string, sources: string[] | null, destPath: string, format: string, password: string): $CancellablePromise<void> {
     return $Call.ByID(275001290, jobID, sources, destPath, format, password);
@@ -65,7 +68,7 @@ export function Copy(jobID: string, sources: string[] | null, destDir: string): 
 }
 
 /**
- * CreateFile creates an empty file under parent (local only).
+ * CreateFile creates an empty file under parent (local or remote).
  */
 export function CreateFile(parent: string, name: string): $CancellablePromise<string> {
     return $Call.ByID(1566414454, parent, name);
@@ -103,9 +106,22 @@ export function Exists(path: string): $CancellablePromise<boolean> {
 /**
  * Extract unpacks archivePath into destDir. password for protected rar/7z/zip when needed.
  * Does not finish the job — call FinishJob after multi-extract, or CancelJob.
+ * No transfer:done either (see Archive) — a multi-extract loop shares one
+ * jobID across several Extract calls, so only the caller knows when it's done.
  */
 export function Extract(jobID: string, archivePath: string, destDir: string, password: string): $CancellablePromise<void> {
     return $Call.ByID(1130524277, jobID, archivePath, destDir, password);
+}
+
+/**
+ * ExtractBatch unpacks each archivePaths[i] into destDirs[i] (same length),
+ * sharing one progress total across the whole batch — see
+ * filesystem.ExtractBatch — so a multi-select extract's transfer-bar row
+ * progresses monotonically instead of resetting per archive.
+ * Does not finish the job — call FinishJob after, or CancelJob.
+ */
+export function ExtractBatch(jobID: string, archivePaths: string[] | null, destDirs: string[] | null, password: string): $CancellablePromise<void> {
+    return $Call.ByID(397110539, jobID, archivePaths, destDirs, password);
 }
 
 /**
@@ -274,10 +290,19 @@ export function RestoreDeleted(batchID: string): $CancellablePromise<void> {
 }
 
 /**
- * SearchTree finds nested files/folders under root (local only; Go-to).
+ * SearchTree finds nested files/folders under root (local and remote; Go-to).
  */
 export function SearchTree(root: string, query: string, showHidden: boolean, limit: number): $CancellablePromise<domain$0.SearchHit[] | null> {
     return $Call.ByID(3279656272, root, query, showHidden, limit);
+}
+
+/**
+ * SetArchivePassword validates password against archivePath's central
+ * directory and caches it for the session (used by ReadTextFile/Extract on
+ * subsequent calls into the same archive). Returns ErrBadPassword on mismatch.
+ */
+export function SetArchivePassword(archivePath: string, password: string): $CancellablePromise<void> {
+    return $Call.ByID(3737787471, archivePath, password);
 }
 
 /**

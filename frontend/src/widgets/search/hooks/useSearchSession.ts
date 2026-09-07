@@ -44,12 +44,12 @@ export const useSearchSession = (open: boolean, root: string, showHidden: boolea
   }, []);
 
   const runSearch = useCallback(async () => {
-    if (isRemotePath(root)) {
-      show('Search is not available on remote connections yet', 'error');
-      return;
-    }
     const p = prefsRef.current;
     if (!p) return;
+    if (isRemotePath(root) && p.mode !== 'folders') {
+      show('Content search is not available on remote connections yet', 'error');
+      return;
+    }
     if (p.mode === 'content' && !p.query.trim()) {
       setResults([]);
       return;

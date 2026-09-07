@@ -129,8 +129,36 @@ func SearchTree(root, query string, showHidden bool, limit int) ([]domain.Search
 		return nil, err
 	}
 
-	sort.SliceStable(hits, func(i, j int) bool {
-		a, b := hits[i], hits[j]
+	out := make([]domain.SearchHit, len(hits))
+	for i := range hits {
+		out[i] = hits[i].SearchHit
+	}
+	return RankSearchHits(out, q, limit), nil
+}
+
+// RankSearchHits sorts go-to hits (dot-files last, name-starts-with-query
+// first, dirs before files, then alphabetically) and truncates to limit.
+// query should already be lowercased/trimmed; shared by the local walker
+// above and the remote walker in internal/service/remote_walk.go.
+func RankSearchHits(hits []domain.SearchHit, query string, limit int) []domain.SearchHit {
+	if limit <= 0 {
+		limit = defaultSearchLimit
+	}
+	type ranked struct {
+		domain.SearchHit
+		starts bool
+		isDot  bool
+	}
+	rs := make([]ranked, len(hits))
+	for i, h := range hits {
+		rs[i] = ranked{
+			SearchHit: h,
+			starts:    strings.HasPrefix(strings.ToLower(h.Name), query),
+			isDot:     strings.HasPrefix(h.Name, "."),
+		}
+	}
+	sort.SliceStable(rs, func(i, j int) bool {
+		a, b := rs[i], rs[j]
 		if a.isDot != b.isDot {
 			return !a.isDot
 		}
@@ -142,13 +170,12 @@ func SearchTree(root, query string, showHidden bool, limit int) ([]domain.Search
 		}
 		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 	})
-
-	if len(hits) > limit {
-		hits = hits[:limit]
+	if len(rs) > limit {
+		rs = rs[:limit]
 	}
-	out := make([]domain.SearchHit, len(hits))
-	for i := range hits {
-		out[i] = hits[i].SearchHit
+	out := make([]domain.SearchHit, len(rs))
+	for i := range rs {
+		out[i] = rs[i].SearchHit
 	}
-	return out, nil
+	return out
 }

@@ -1,4 +1,4 @@
-export type TransferKind = 'copy' | 'move' | 'attach';
+export type TransferKind = 'copy' | 'move' | 'attach' | 'archive' | 'extract';
 
 type TransferFileStatus = 'active' | 'done' | 'canceled';
 
