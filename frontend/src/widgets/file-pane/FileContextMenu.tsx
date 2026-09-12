@@ -5,6 +5,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
 import EditIcon from '@mui/icons-material/Edit';
+import FilterNoneIcon from '@mui/icons-material/FilterNone';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import NoteAddIcon from '@mui/icons-material/NoteAdd';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -17,6 +18,8 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import type { FC, ReactNode } from 'react';
 import { isRemotePath, isSMBPath, parentOfVirtualPath } from '../../features/connections/helpers';
+import { useDuplicatesStore } from '../../features/duplicates/duplicatesStore';
+import { isLocalArchivePath } from '../../features/duplicates/helpers';
 import { useContextMenuStore } from '../../features/file-ops/contextMenuStore';
 import { useFileOpsStore } from '../../features/file-ops/fileOpsStore';
 import type { FileOpsAction } from '../../features/file-ops/types';
@@ -38,6 +41,7 @@ type Item = {
   run: () => void;
   danger?: boolean;
   dividerBefore?: boolean;
+  disabled?: boolean;
 };
 
 const parentOf = (p: string): string => {
@@ -56,6 +60,8 @@ const parentOf = (p: string): string => {
 export const FileContextMenu: FC = () => {
   const { open, x, y, paneId, entry, panePath, close } = useContextMenuStore();
   const trigger = useFileOpsStore((s) => s.trigger);
+  const openDuplicates = useDuplicatesStore((s) => s.openDialog);
+  const dupRunning = useDuplicatesStore((s) => s.phase === 'running');
   const otherPane = usePaneStore((s) => s.otherPane);
   const navigate = usePaneStore((s) => s.navigate);
   const setTerminalOpen = useTerminalStore((s) => s.setOpen);
@@ -213,6 +219,15 @@ export const FileContextMenu: FC = () => {
     });
   }
 
+  items.push({
+    key: 'duplicates',
+    label: 'Find duplicates…',
+    icon: <FilterNoneIcon fontSize="small" />,
+    run: act(() => openDuplicates(panePath)),
+    disabled: dupRunning || isLocalArchivePath(panePath),
+    dividerBefore: true,
+  });
+
   if (entry && !inArchive) {
     items.push({
       key: 'delete',
@@ -235,7 +250,13 @@ export const FileContextMenu: FC = () => {
     >
       {items.map((it) => [
         it.dividerBefore ? <Divider key={`${it.key}-div`} /> : null,
-        <MenuItem key={it.key} dense data-testid={`ctx-${it.key}`} onClick={it.run}>
+        <MenuItem
+          key={it.key}
+          dense
+          disabled={it.disabled}
+          data-testid={`ctx-${it.key}`}
+          onClick={it.run}
+        >
           <ListItemIcon>{it.icon}</ListItemIcon>
           <ListItemText
             primary={it.label}

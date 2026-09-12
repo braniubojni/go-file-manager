@@ -99,6 +99,13 @@ export function DiskUsage(path: string): $CancellablePromise<domain$0.DiskUsage>
     return $Call.ByID(1676274460, path);
 }
 
+/**
+ * EstimateDuplicateScan counts files and bytes under root without hashing.
+ */
+export function EstimateDuplicateScan(root: string, includeHidden: boolean, minSize: number, exclude: string): $CancellablePromise<domain$0.ScanEstimate> {
+    return $Call.ByID(1804249746, root, includeHidden, minSize, exclude);
+}
+
 export function Exists(path: string): $CancellablePromise<boolean> {
     return $Call.ByID(2431508164, path);
 }
@@ -303,6 +310,13 @@ export function SearchTree(root: string, query: string, showHidden: boolean, lim
  */
 export function SetArchivePassword(archivePath: string, password: string): $CancellablePromise<void> {
     return $Call.ByID(3737787471, archivePath, password);
+}
+
+/**
+ * StartDuplicateScan runs a cancellable SHA-256 duplicate scan in the background.
+ */
+export function StartDuplicateScan(jobID: string, root: string, includeHidden: boolean, minSize: number, exclude: string): $CancellablePromise<void> {
+    return $Call.ByID(3653197540, jobID, root, includeHidden, minSize, exclude);
 }
 
 /**

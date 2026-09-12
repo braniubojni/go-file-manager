@@ -76,7 +76,7 @@ test.describe("file operations", () => {
     await refresh(page);
     await selectRow(page, "left", name);
     await fileAction(page, "btn-copy");
-    await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
+    await expect(page.getByTestId("snackbar")).toContainText("Copied 1 item(s)", { timeout: 10_000 });
     await expectRowVisible(page, "right", name);
     expect(fs.existsSync(path.join(RIGHT_DIR, name))).toBeTruthy();
     // source remains
@@ -89,7 +89,7 @@ test.describe("file operations", () => {
     await refresh(page);
     await selectRow(page, "left", name);
     await fileAction(page, "btn-move");
-    await expect(page.getByTestId("snackbar")).toContainText("completed", { timeout: 10_000 });
+    await expect(page.getByTestId("snackbar")).toContainText("Moved 1 item(s)", { timeout: 10_000 });
     await expectRowVisible(page, "right", name);
     await expectRowVisible(page, "left", name, false);
   });
@@ -224,7 +224,7 @@ test.describe("file operations", () => {
     await expectRowVisible(page, "left", inner);
     await selectRow(page, "left", inner);
     await fileAction(page, "btn-copy");
-    await expect(page.getByTestId("snackbar")).toContainText(/Copied|completed/, {
+    await expect(page.getByTestId("snackbar")).toContainText("Copied 1 item(s)", {
       timeout: 15_000,
     });
     await expectRowVisible(page, "right", inner);

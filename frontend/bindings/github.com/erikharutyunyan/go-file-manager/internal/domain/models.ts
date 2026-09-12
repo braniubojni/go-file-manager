@@ -388,6 +388,21 @@ export interface SSHConfigHost {
 }
 
 /**
+ * ScanEstimate is a pre-hash count for the duplicate-finder setup dialog.
+ */
+export interface ScanEstimate {
+    "fileCount": number;
+    "byteCount": number;
+    "etaSeconds": number;
+
+    /**
+     * local | ssh | smb | mega
+     */
+    "protocol": string;
+    "megaDownload": boolean;
+}
+
+/**
  * SearchHit is one result from nested file/folder search (Go-to).
  */
 export interface SearchHit {

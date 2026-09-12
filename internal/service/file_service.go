@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	gopath "path"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,6 +39,12 @@ type FileService struct {
 	app          *application.App
 	vols         *volumes.Manager
 	archivePw    sync.Map // archive abs path -> password, cached for the session
+	dupMu        sync.Mutex
+	dupJob       string
+	dupCacheDir  string
+	onEvent      func(name string, data any)
+	hashFile     func(context.Context, string) (string, error)
+	listDup      listDirFunc
 }
 
 type remoteBackend interface {
@@ -53,6 +61,7 @@ type remoteBackend interface {
 	ReadTextFile(path string) (string, error)
 	WriteTextFile(path, content string) error
 	DirChildSizesCtx(ctx context.Context, dir string) (domain.DirSizes, error)
+	OpenRead(path string) (io.ReadCloser, error)
 }
 
 func NewFileService(remoteMgr *remote.Manager, smbMgr *remote.SMBManager, megaMgr *remote.MEGAManager, trashDir string) *FileService {
@@ -63,6 +72,7 @@ func NewFileService(remoteMgr *remote.Manager, smbMgr *remote.SMBManager, megaMg
 		mega:         megaMgr,
 		trash:        filesystem.NewTrash(trashDir),
 		vols:         volumes.NewManager(),
+		dupCacheDir:  filepath.Join(trashDir, "dup-cache"),
 	}
 }
 
@@ -127,7 +137,10 @@ func (s *FileService) SetApp(app *application.App) {
 }
 
 func (s *FileService) emit(name string, data any) {
-	if s.app != nil {
+	if s != nil && s.onEvent != nil {
+		s.onEvent(name, data)
+	}
+	if s != nil && s.app != nil {
 		s.app.Event.Emit(name, data)
 	}
 }
@@ -141,10 +154,22 @@ type jobHandle struct {
 // NewJobID allocates a cancellable job context and returns its id.
 func (s *FileService) NewJobID() string {
 	id := fmt.Sprintf("job-%d", s.jobSeq.Add(1))
+	s.storeJob(id)
+	return id
+}
+
+// storeJob puts id in the CancelJob map, or returns the existing ctx.
+func (s *FileService) storeJob(id string) context.Context {
+	if id == "" {
+		return context.Background()
+	}
+	if v, ok := s.jobs.Load(id); ok {
+		return v.(*jobHandle).ctx
+	}
 	reg := filesystem.NewFileCancelRegistry()
 	ctx, cancel := context.WithCancel(filesystem.WithFileCancelRegistry(context.Background(), reg))
 	s.jobs.Store(id, &jobHandle{ctx: ctx, cancel: cancel, fileCancel: reg})
-	return id
+	return ctx
 }
 
 func (s *FileService) jobCtx(jobID string) context.Context {

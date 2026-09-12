@@ -206,6 +206,66 @@ type SearchDeniedPayload struct {
 	Error string `json:"error"`
 }
 
+// ScanEstimate is a pre-hash count for the duplicate-finder setup dialog.
+type ScanEstimate struct {
+	FileCount    int64  `json:"fileCount"`
+	ByteCount    int64  `json:"byteCount"`
+	EtaSeconds   int    `json:"etaSeconds"`
+	Protocol     string `json:"protocol"` // local | ssh | smb | mega
+	MegaDownload bool   `json:"megaDownload"`
+}
+
+// DuplicateFile is one member of a same-hash group.
+type DuplicateFile struct {
+	Path     string `json:"path"`
+	Name     string `json:"name"`
+	Size     int64  `json:"size"`
+	ModTime  int64  `json:"modTime"`
+	Protocol string `json:"protocol"` // local | ssh | smb | mega
+}
+
+// DuplicateGroup is files that share one SHA-256 and size.
+type DuplicateGroup struct {
+	Hash  string          `json:"hash"`
+	Size  int64           `json:"size"`
+	Files []DuplicateFile `json:"files"`
+}
+
+// DupProgressPayload is emitted while a duplicate scan runs.
+type DupProgressPayload struct {
+	JobID       string `json:"jobId"`
+	DoneFiles   int64  `json:"doneFiles"`
+	TotalFiles  int64  `json:"totalFiles"`
+	DoneBytes   int64  `json:"doneBytes"`
+	TotalBytes  int64  `json:"totalBytes"`
+	Groups      int    `json:"groups"`
+	Skipped     int    `json:"skipped"`
+	CurrentPath string `json:"currentPath"`
+}
+
+// DupGroupPayload streams one closed duplicate group.
+type DupGroupPayload struct {
+	JobID string         `json:"jobId"`
+	Group DuplicateGroup `json:"group"`
+}
+
+// DupErrorPayload is a per-path skip (fatal=false) or a job-ending failure.
+type DupErrorPayload struct {
+	JobID   string `json:"jobId"`
+	Path    string `json:"path"`
+	Message string `json:"message"`
+	Fatal   bool   `json:"fatal"`
+}
+
+// DupDonePayload is emitted when a duplicate scan finishes or is cancelled.
+// Groups are attached here (not streamed as dup:group) so a fast scan cannot
+// flood Wails ExecJS and drop this event — the running dialog would hang.
+type DupDonePayload struct {
+	JobID  string           `json:"jobId"`
+	Error  string           `json:"error,omitempty"`
+	Groups []DuplicateGroup `json:"groups,omitempty"`
+}
+
 // SearchErrorPayload is a fatal search failure.
 type SearchErrorPayload struct {
 	JobID string `json:"jobId"`

@@ -3,6 +3,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DriveFileMoveIcon from '@mui/icons-material/DriveFileMove';
 import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DifferenceIcon from '@mui/icons-material/Difference';
 import TuneIcon from '@mui/icons-material/Tune';
 import Button from '@mui/material/Button';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -10,6 +11,9 @@ import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import { useState, type FC, type ReactNode } from 'react';
+import { useDuplicatesStore } from '../../../features/duplicates/duplicatesStore';
+import { isLocalArchivePath } from '../../../features/duplicates/helpers';
+import { usePaneStore } from '../../../features/pane/paneStore';
 import type { FileActionsMenuProps } from '../types';
 
 type Item = {
@@ -18,10 +22,14 @@ type Item = {
   icon: ReactNode;
   run: () => void;
   danger?: boolean;
+  disabled?: boolean;
 };
 
 export const FileActionsMenu: FC<FileActionsMenuProps> = (p) => {
   const [anchor, setAnchor] = useState<null | HTMLElement>(null);
+  const cwd = usePaneStore((s) => s.getPath(s.activePane));
+  const openDuplicates = useDuplicatesStore((s) => s.openDialog);
+  const dupRunning = useDuplicatesStore((s) => s.phase === 'running');
 
   const items: Item[] = [
     {
@@ -49,6 +57,13 @@ export const FileActionsMenu: FC<FileActionsMenuProps> = (p) => {
       run: p.onDelete,
       danger: true,
     },
+    {
+      testId: 'btn-find-duplicates',
+      label: 'Find duplicates…',
+      icon: <DifferenceIcon fontSize="small" />,
+      run: () => openDuplicates(cwd),
+      disabled: dupRunning || isLocalArchivePath(cwd),
+    },
   ];
 
   return (
@@ -66,6 +81,7 @@ export const FileActionsMenu: FC<FileActionsMenuProps> = (p) => {
           <MenuItem
             key={it.testId}
             data-testid={it.testId}
+            disabled={it.disabled}
             onClick={() => {
               setAnchor(null);
               it.run();

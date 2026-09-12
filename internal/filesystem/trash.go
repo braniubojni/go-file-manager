@@ -26,6 +26,14 @@ var batchIDRe = regexp.MustCompile(`^[0-9]{8}-[0-9]{9}-[0-9]+$`)
 // NewTrash returns a trash rooted at dir (created on first use).
 func NewTrash(dir string) *Trash { return &Trash{root: dir} }
 
+// Root is the trash directory. Empty when t is nil.
+func (t *Trash) Root() string {
+	if t == nil {
+		return ""
+	}
+	return t.root
+}
+
 type trashItem struct {
 	Origin string `json:"origin"`
 	Stored string `json:"stored"`
